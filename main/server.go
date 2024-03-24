@@ -13,14 +13,22 @@ import (
 
 func main() {
 	// Inizializzazione delle strutture KeyValueStoreCausale e KeyValueStoreSequential
+	fmt.Println("FATTO")
+
+	// ----- CONSISTENZA CAUSALE -----
 	kvCausale := &KeyValueStoreCausale{
 		data:        make(map[string]string),
 		vectorClock: make([]int, 0), // Inizializzazione dell'orologio vettoriale
 	}
 
+	// ----- CONSISTENZA SEQUENZIALE -----
 	kvSequential := &KeyValueStoreSequential{
 		dataStore:    make(map[string]string),
 		logicalClock: 0, // Inizializzazione dell'orologio logico scalare
+	}
+
+	multicastTotalOrdinal := &TotalOrderedMulticast{
+		queue: make([]Message, 0),
 	}
 
 	// Registrazione dei servizi RPC
@@ -29,6 +37,10 @@ func main() {
 		return
 	}
 	err = rpc.RegisterName("KeyValueStoreSequential", kvSequential)
+	if err != nil {
+		return
+	}
+	err = rpc.RegisterName("TotalOrderedMulticast", multicastTotalOrdinal)
 	if err != nil {
 		return
 	}
