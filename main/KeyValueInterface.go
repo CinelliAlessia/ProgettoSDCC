@@ -13,6 +13,7 @@ type Response struct {
 	reply string
 }
 
+// KeyValueStoreService è un'interfaccia che deve essere implementata da tutti i servizi che vogliono essere
 type KeyValueStoreService interface {
 	Get(args Args, reply *Response) error
 	Put(args Args, reply *Response) error
