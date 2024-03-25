@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"net/rpc"
+)
 
 func main() {
 
@@ -23,8 +27,10 @@ func main() {
 		switch choice {
 		case 1:
 			causal()
+			break
 		case 2:
 			sequential()
+			break
 		default:
 			fmt.Println("Scelta non valida. Riprova.")
 		}
@@ -33,6 +39,25 @@ func main() {
 
 func sequential() {
 	// Test consistenza sequenziale
+	// Genera un numero casuale tra 0 e il numero di repliche - 1
+	randomIndex := rand.Intn(Replicas)
+
+	// Connessione al server RPC casuale
+	conn, err := rpc.Dial("tcp", ":"+ReplicaPorts[randomIndex])
+	if err != nil {
+		fmt.Println("Errore durante la connessione al server:", err)
+		return
+	}
+
+	args := Args{generateUniqueID(), "1234567890"}
+	reply := Response{}
+
+	// Effettua la chiamata RPC
+	err = conn.Call("KeyValueStoreSequential.Put", args, &reply)
+	if err != nil {
+		fmt.Println("Errore durante la chiamata RPC:", err)
+		return
+	}
 
 	// comandi random a server random, li conosce tutti e fine
 }
