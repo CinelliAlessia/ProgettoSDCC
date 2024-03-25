@@ -82,6 +82,7 @@ func (kvs *KeyValueStoreSequential) Delete(args Args, response *Response) error 
 	return nil
 }
 
+// handleTotalOrderedMulticast invia la richiesta a tutte le repliche del sistema
 func handleTotalOrderedMulticast(args Message) error {
 	for i := 0; i < Replicas; i++ {
 		// Connessione al server RPC
@@ -90,12 +91,6 @@ func handleTotalOrderedMulticast(args Message) error {
 			fmt.Println("Errore durante la connessione al server:", err)
 			return nil
 		}
-		defer func(client *rpc.Client) {
-			err := client.Close()
-			if err != nil {
-
-			}
-		}(client)
 
 		reply := false
 		// Chiama il metodo Multiply sul server RPC
