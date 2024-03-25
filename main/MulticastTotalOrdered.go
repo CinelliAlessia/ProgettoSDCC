@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -19,17 +20,23 @@ import (
 
 type TotalOrderedMulticast struct {
 	queue []Message
+	mu    sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 }
 
 func (mto *TotalOrderedMulticast) MulticastTotalOrdered(message Message, reply *bool) error {
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
 
 	// Gestisce i messaggi in ingresso aggiungendo i messaggi in coda e inviando gli ack
+	mto.mu.Lock()
 	mto.queue = append(mto.queue, message)
+
 	// Ordina la coda in base al logicalClock
 	sort.Slice(mto.queue, func(i, j int) bool {
 		return mto.queue[i].logicalClock < mto.queue[j].logicalClock
 	})
+	mto.mu.Unlock()
+
+	mto.sendAck(message)
 
 	// Ciclo finché controlSendToApplication non restituisce true
 	for {
@@ -105,7 +112,9 @@ func (mto *TotalOrderedMulticast) findByID(id string) *Message {
 func (mto *TotalOrderedMulticast) updateMessageByID(newMessage *Message) {
 	for i := range mto.queue {
 		if mto.queue[i].id == newMessage.id {
+			mto.mu.Lock()
 			mto.queue[i] = *newMessage
+			mto.mu.Unlock()
 		}
 	}
 }
