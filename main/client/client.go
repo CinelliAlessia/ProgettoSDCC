@@ -43,30 +43,56 @@ func main() {
 
 func sequential() {
 	// Test consistenza sequenziale
-	// Genera un numero casuale tra 0 e il numero di repliche - 1
-	randomIndex := rand.Intn(common.Replicas)
-	// Connessione al server RPC casuale
-	fmt.Println("CLIENT: Contatto il server " + common.ReplicaPorts[randomIndex])
-	conn, err := rpc.Dial("tcp", ":"+common.ReplicaPorts[randomIndex])
-	if err != nil {
-		fmt.Println("CLIENT: Errore durante la connessione al server:", err)
-		return
-	}
 
 	args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
 	reply := common.Response{}
 
-	// Effettua la chiamata RPC
-	err = conn.Call("KeyValueStoreSequential.Put", args, &reply.Reply)
+	// PUT
+	conn := randomConnect()
+	if conn == nil {
+		fmt.Println("CLIENT: Errore durante la connessione")
+		return
+	}
+
+	err := conn.Call("KeyValueStoreSequential.Put", args, &reply)
 	if err != nil {
 		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
 		return
 	}
 
-	fmt.Println("CLIENT: Richiesta effettuata " + reply.Reply)
+	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
+
+	// GET
+	conn = randomConnect()
+	if conn == nil {
+		fmt.Println("CLIENT: Errore durante la connessione 2")
+		return
+	}
+	// Effettua la chiamata RPC
+	err = conn.Call("KeyValueStoreSequential.Get", args, &reply)
+	if err != nil {
+		fmt.Println("CLIENT: Errore durante la chiamata RPC Get:", err)
+		return
+	}
+
+	fmt.Println("CLIENT: Richiesta get effettuata " + reply.Reply)
 	// comandi random a server random, li conosce tutti e fine
 }
 
 func causal() {
 	// Test consistenza causale
+}
+
+func randomConnect() *rpc.Client {
+	// Genera un numero casuale tra 0 e il numero di repliche - 1
+	randomIndex := rand.Intn(common.Replicas)
+
+	// Connessione al server RPC casuale
+	fmt.Println("CLIENT: Contatto il server " + common.ReplicaPorts[randomIndex])
+	conn, err := rpc.Dial("tcp", ":"+common.ReplicaPorts[randomIndex])
+	if err != nil {
+		fmt.Println("CLIENT: Errore durante la connessione al server:", err)
+		return nil
+	}
+	return conn
 }
