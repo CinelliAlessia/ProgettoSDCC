@@ -1,16 +1,16 @@
-package main
+package common
 
 // In questo file dovrebbero esserci i servizi esposti dal server per il clint, che sono "Fake" poiché il server in
 // realtà deve eseguire l'algoritmo multicast totalmente ordinato.
 // Ma è fake solo per le operazioni di lettura
 
 type Args struct {
-	key   string
-	value string
+	Key   string
+	Value string
 }
 
 type Response struct {
-	reply string
+	Reply string
 }
 
 // KeyValueStoreService è un'interfaccia che deve essere implementata da tutti i servizi che vogliono essere
