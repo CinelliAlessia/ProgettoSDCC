@@ -26,12 +26,16 @@ type MulticastTotalOrdered struct {
 	mu    sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 }
 
+// SendToEveryOne non fa come dice, ma riceve già un messaggio.
 func (mto *MulticastTotalOrdered) SentToEveryOne(message Message, reply *bool) error {
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
 	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
 	// Gestisce i messaggi in ingresso aggiungendo i messaggi in coda e inviando gli ack
 	mto.mu.Lock()
 	mto.queue = append(mto.queue, message)
+
+	mto.printMessageQueue()
+
 	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + message.Id)
 	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + mto.queue[0].Id)
 
@@ -59,20 +63,22 @@ func (mto *MulticastTotalOrdered) SentToEveryOne(message Message, reply *bool) e
 
 func (mto *MulticastTotalOrdered) controlSendToApplication(message *Message) bool {
 	// Controlla se il messaggio è in testa alla coda locale
+	//fmt.Printf("AAA %d\n", message.NumberAck)
 
 	//4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
 	//	da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
 	//(quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 	//timestamp potenzialmente minore o uguale a quello di msg_i).
-
-	if mto.queue[0].Id == message.Id && message.NumberAck == common.Replicas {
+	if mto.queue[0].Id == message.Id && mto.queue[0].NumberAck == common.Replicas {
 		// Invia il messaggio all'applicazione
 		fmt.Println("MulticastTotalOrdered-controlSendToApplication: Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla mia coda")
+		//mto.queue.remo
 		return true
 	}
 	return false
 }
 
+// sendAck invia a tutti i server un Ack
 func (mto *MulticastTotalOrdered) sendAck(message Message) {
 	fmt.Println("MulticastTotalOrdered-sendAck: Invio un ack a tutti specificando il messaggio ricevuto")
 	for i := 0; i < common.Replicas; i++ {
@@ -95,8 +101,8 @@ func (mto *MulticastTotalOrdered) sendAck(message Message) {
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
 func (mto *MulticastTotalOrdered) ReceiveAck(message Message, _ *bool) error {
-	// Trova il messaggio nella coda
 
+	// Trova il messaggio nella coda
 	newMessage := mto.findByID(message.Id)
 	if newMessage.Id == "" {
 		return fmt.Errorf("MulticastTotalOrdered-ReceiveAck: AAA messaggio %s non trovato nella coda", message.Id)
@@ -131,5 +137,11 @@ func (mto *MulticastTotalOrdered) updateMessageByID(newMessage Message) {
 			mto.queue[i] = newMessage
 			mto.mu.Unlock()
 		}
+	}
+}
+
+func (mto *MulticastTotalOrdered) printMessageQueue() {
+	for i := range mto.queue {
+		fmt.Println("Id " + mto.queue[i].Id + "Value " + mto.queue[i].Args.Value)
 	}
 }
