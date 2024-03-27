@@ -16,11 +16,11 @@ type KeyValueStoreSequential struct {
 }
 
 type Message struct {
-	id            string
-	typeOfMessage string
-	args          common.Args
-	logicalClock  int
-	numberAck     int
+	Id            string
+	TypeOfMessage string
+	Args          common.Args
+	LogicalClock  int
+	NumberAck     int
 }
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
@@ -52,9 +52,9 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	message := Message{common.GenerateUniqueID(), "Put", args, kvs.logicalClock, 0}
 	//fmt.Println("SERVER: Key " + args.Key)
 	//fmt.Println("SERVER: Value " + args.Value)
-	fmt.Println("KeyValueStoreSequential: ID associato al messaggio " + message.id)
+	fmt.Println("KeyValueStoreSequential: ID associato al messaggio " + message.Id)
 
-	err := handleTotalOrderedMulticast(message)
+	err := kvs.handleTotalOrderedMulticast(message)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.mutexClock.Unlock()
 
 	message := Message{common.GenerateUniqueID(), "Delete", args, kvs.logicalClock, 0}
-	err := handleTotalOrderedMulticast(message)
+	err := kvs.handleTotalOrderedMulticast(message)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // handleTotalOrderedMulticast invia la richiesta a tutte le repliche del sistema
-func handleTotalOrderedMulticast(args Message) error {
+func (kvs *KeyValueStoreSequential) handleTotalOrderedMulticast(args Message) error {
 	fmt.Println("KeyValueStoreSequential: Inoltro a tutti i server la richiesta ricevuta dal client")
 
 	// Creare un canale per ricevere le risposte dai server RPC
@@ -98,10 +98,10 @@ func handleTotalOrderedMulticast(args Message) error {
 	for i := 0; i < common.Replicas; i++ {
 		go func(replicaPort string) {
 			// Connessione al server RPC
-			fmt.Println("KeyValueStoreSequential: Inoltro della richiesta ricevuta al server " + replicaPort)
+			//fmt.Println("KeyValueStoreSequential: Inoltro della richiesta ricevuta al server " + replicaPort)
 			server, err := rpc.Dial("tcp", ":"+replicaPort)
 			if err != nil {
-				fmt.Println("KeyValueStoreSequential: Errore durante la connessione al server:", err)
+				//fmt.Println("KeyValueStoreSequential: Errore durante la connessione al server:", err)
 				responseChannel <- false // Invia falso al canale se c'è un errore
 				return
 			}
@@ -110,7 +110,7 @@ func handleTotalOrderedMulticast(args Message) error {
 			// Chiama il metodo SentToEveryOne sul server RPC
 			err = server.Call("MulticastTotalOrdered.SentToEveryOne", args, &reply)
 			if err != nil {
-				fmt.Println("KeyValueStoreSequential: Errore durante la chiamata RPC:", err)
+				fmt.Println("KeyValueStoreSequential: Errore durante la chiamata RPC SentToEveryOne:", err)
 				responseChannel <- false // Invia falso al canale se c'è un errore
 				return
 			}
