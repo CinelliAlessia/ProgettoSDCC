@@ -53,17 +53,17 @@ func sequential() {
 		return
 	}
 
-	args := common.Args{Key: common.GenerateUniqueID(), Value: "1234567890"}
+	args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
 	reply := common.Response{}
 
 	// Effettua la chiamata RPC
-	err = conn.Call("KeyValueStoreSequential.Put", args, &reply)
+	err = conn.Call("KeyValueStoreSequential.Put", args, &reply.Reply)
 	if err != nil {
-		fmt.Println("CLIENT: Errore durante la chiamata RPC:", err)
+		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
 		return
 	}
 
-	fmt.Println("CLIENT: Richiesta effettuata")
+	fmt.Println("CLIENT: Richiesta effettuata " + reply.Reply)
 	// comandi random a server random, li conosce tutti e fine
 }
 
