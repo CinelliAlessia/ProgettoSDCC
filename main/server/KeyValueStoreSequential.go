@@ -59,6 +59,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 		return err
 	}
 
+	// TODO !!! Se lo faccio qui lo fa solo il server contattato !!!
 	kvs.mutexClock.Lock()
 	kvs.dataStore[args.Key] = args.Value
 	kvs.mutexClock.Unlock()
@@ -124,11 +125,12 @@ func (kvs *KeyValueStoreSequential) handleTotalOrderedMulticast(args Message) er
 		if reply {
 			fmt.Println("KeyValueStoreSequential: Risposta ricevuta da un server.")
 			// Puoi gestire la risposta qui
+			return nil
 		} else {
-			fmt.Println("KeyValueStoreSequential: Errore durante la ricezione della risposta da un server.")
+			return fmt.Errorf("KeyValueStoreSequential: No replica ack")
 			// Gestisci l'errore qui
 		}
 	}
+	return nil
 
-	return fmt.Errorf("KeyValueStoreSequential: no replica ack")
 }
