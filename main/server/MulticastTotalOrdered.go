@@ -32,11 +32,12 @@ func (mto *MulticastTotalOrdered) SentToEveryOne(message Message, reply *bool) e
 	// Gestisce i messaggi in ingresso aggiungendo i messaggi in coda e inviando gli ack
 	mto.mu.Lock()
 	mto.queue = append(mto.queue, message)
-	fmt.Println("MulticastTotalOrdered: Messaggio in coda " + message.id)
+	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + message.Id)
+	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + mto.queue[0].Id)
 
 	// Ordina la coda in base al logicalClock
 	sort.Slice(mto.queue, func(i, j int) bool {
-		return mto.queue[i].logicalClock < mto.queue[j].logicalClock
+		return mto.queue[i].LogicalClock < mto.queue[j].LogicalClock
 	})
 	mto.mu.Unlock()
 
@@ -64,65 +65,70 @@ func (mto *MulticastTotalOrdered) controlSendToApplication(message *Message) boo
 	//(quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 	//timestamp potenzialmente minore o uguale a quello di msg_i).
 
-	if mto.queue[0].id == message.id && message.numberAck == common.Replicas {
+	if mto.queue[0].Id == message.Id && message.NumberAck == common.Replicas {
 		// Invia il messaggio all'applicazione
-		fmt.Println("MulticastTotalOrdered: Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla mia coda")
+		fmt.Println("MulticastTotalOrdered-controlSendToApplication: Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla mia coda")
 		return true
 	}
 	return false
 }
 
 func (mto *MulticastTotalOrdered) sendAck(message Message) {
-	fmt.Println("MulticastTotalOrdered: Invio un ack a tutti specificando il messaggio ricevuto")
+	fmt.Println("MulticastTotalOrdered-sendAck: Invio un ack a tutti specificando il messaggio ricevuto")
 	for i := 0; i < common.Replicas; i++ {
-		// Connessione al server RPC
-		server, err := rpc.Dial("tcp", ":"+common.ReplicaPorts[i])
-		if err != nil {
-			fmt.Println("MulticastTotalOrdered: Errore durante la connessione al server:", err)
-		}
+		go func(replicaPort string) {
+			// Connessione al server RPC
+			server, err := rpc.Dial("tcp", ":"+replicaPort)
+			if err != nil {
+				fmt.Println("MulticastTotalOrdered-sendAck: Errore durante la connessione al server:", err)
+			}
 
-		// Chiama il metodo Multiply sul server RPC
-		err = server.Call("MulticastTotalOrdered.ReceiveAck", message, false)
-		if err != nil {
-			fmt.Println("MulticastTotalOrdered: Errore durante la chiamata RPC ReceiveAck:", err)
-		}
-
+			reply := false
+			// Chiama il metodo Multiply sul server RPC
+			err = server.Call("MulticastTotalOrdered.ReceiveAck", message, &reply)
+			if err != nil {
+				fmt.Println("MulticastTotalOrdered-sendAck: Errore durante la chiamata RPC ReceiveAck:", err)
+			}
+		}(common.ReplicaPorts[i])
 	}
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
 func (mto *MulticastTotalOrdered) ReceiveAck(message Message, _ *bool) error {
 	// Trova il messaggio nella coda
-	fmt.Println("MulticastTotalOrdered: Ho ricevuto un ack")
 
-	newMessage := mto.findByID(message.id)
-	if newMessage == nil {
-		return fmt.Errorf("MulticastTotalOrdered: messaggio %s non trovato nella coda", message.id)
+	newMessage := mto.findByID(message.Id)
+	if newMessage.Id == "" {
+		return fmt.Errorf("MulticastTotalOrdered-ReceiveAck: AAA messaggio %s non trovato nella coda", message.Id)
 	}
 
 	// Incrementa il conteggio degli ack
-	newMessage.numberAck++
+	newMessage.NumberAck++
+	fmt.Println("MulticastTotalOrdered-ReceiveAck: Ho ricevuto un ack")
 
 	// Aggiorna il messaggio nella coda
 	mto.updateMessageByID(newMessage)
 	return nil
 }
 
-func (mto *MulticastTotalOrdered) findByID(id string) *Message {
-	fmt.Println("MulticastTotalOrdered: ID associato al messaggio " + id)
+func (mto *MulticastTotalOrdered) findByID(id string) Message {
+	//fmt.Println("MulticastTotalOrdered-findByID: ID associato al messaggio " + id)
 	for i := range mto.queue {
-		if mto.queue[i].id == id {
-			return &mto.queue[i]
+		//fmt.Println("MulticastTotalOrdered-findByID: paragone con " + mto.queue[i].Id)
+
+		if mto.queue[i].Id == id {
+			fmt.Println("MulticastTotalOrdered-findByID: TROVATO")
+			return mto.queue[i]
 		}
 	}
-	return nil
+	return Message{}
 }
 
-func (mto *MulticastTotalOrdered) updateMessageByID(newMessage *Message) {
+func (mto *MulticastTotalOrdered) updateMessageByID(newMessage Message) {
 	for i := range mto.queue {
-		if mto.queue[i].id == newMessage.id {
+		if mto.queue[i].Id == newMessage.Id {
 			mto.mu.Lock()
-			mto.queue[i] = *newMessage
+			mto.queue[i] = newMessage
 			mto.mu.Unlock()
 		}
 	}
