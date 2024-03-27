@@ -109,7 +109,7 @@ func (kvs *KeyValueStoreSequential) handleTotalOrderedMulticast(args Message) er
 
 			reply := false
 			// Chiama il metodo SentToEveryOne sul server RPC
-			err = server.Call("MulticastTotalOrdered.SentToEveryOne", args, &reply)
+			err = server.Call("MulticastTotalOrdered.SendToEveryone", args, &reply)
 			if err != nil {
 				fmt.Println("KeyValueStoreSequential: Errore durante la chiamata RPC SentToEveryOne:", err)
 				responseChannel <- false // Invia falso al canale se c'è un errore

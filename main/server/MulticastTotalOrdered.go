@@ -26,8 +26,8 @@ type MulticastTotalOrdered struct {
 	mu    sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 }
 
-// SendToEveryOne non fa come dice, ma riceve già un messaggio.
-func (mto *MulticastTotalOrdered) SentToEveryOne(message Message, reply *bool) error {
+// SendToEveryone non fa come dice, ma riceve già un messaggio.
+func (mto *MulticastTotalOrdered) SendToEveryone(message Message, reply *bool) error {
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
 	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
 	// Gestisce i messaggi in ingresso aggiungendo i messaggi in coda e inviando gli ack
