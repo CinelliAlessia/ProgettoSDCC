@@ -1,7 +1,9 @@
+// client.go
 package main
 
 import (
 	"fmt"
+	"main/common"
 	"math/rand"
 	"net/rpc"
 )
@@ -26,9 +28,11 @@ func main() {
 		// Esegui l'operazione scelta
 		switch choice {
 		case 1:
+			fmt.Println("Scelta di consistenza causale")
 			causal()
 			break
 		case 2:
+			fmt.Println("Scelta di consistenza sequenziale")
 			sequential()
 			break
 		default:
@@ -40,25 +44,26 @@ func main() {
 func sequential() {
 	// Test consistenza sequenziale
 	// Genera un numero casuale tra 0 e il numero di repliche - 1
-	randomIndex := rand.Intn(Replicas)
-
+	randomIndex := rand.Intn(common.Replicas)
 	// Connessione al server RPC casuale
-	conn, err := rpc.Dial("tcp", ":"+ReplicaPorts[randomIndex])
+	fmt.Println("CLIENT: Contatto il server " + common.ReplicaPorts[randomIndex])
+	conn, err := rpc.Dial("tcp", ":"+common.ReplicaPorts[randomIndex])
 	if err != nil {
-		fmt.Println("Errore durante la connessione al server:", err)
+		fmt.Println("CLIENT: Errore durante la connessione al server:", err)
 		return
 	}
 
-	args := Args{generateUniqueID(), "1234567890"}
-	reply := Response{}
+	args := common.Args{Key: common.GenerateUniqueID(), Value: "1234567890"}
+	reply := common.Response{}
 
 	// Effettua la chiamata RPC
 	err = conn.Call("KeyValueStoreSequential.Put", args, &reply)
 	if err != nil {
-		fmt.Println("Errore durante la chiamata RPC:", err)
+		fmt.Println("CLIENT: Errore durante la chiamata RPC:", err)
 		return
 	}
 
+	fmt.Println("CLIENT: Richiesta effettuata")
 	// comandi random a server random, li conosce tutti e fine
 }
 

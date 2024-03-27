@@ -83,3 +83,12 @@ Quindi, all'interno del contenitore, puoi accedere alla porta utilizzando la var
 
 Nel mio progetto un evento di send e receive sono le "stabilizzazioni" delle repliche, la richiesta
 di scrittura da parte degli altri server. 
+
+
+- Nel tuo file di configurazione Docker Compose, hai definito tre repliche per il servizio "server". Ogni replica ha porte mappate sulla porta ${RPC_PORT} su host specifici, come segue:
+
+- La prima replica ha le porte mappate come segue: "8081:${RPC_PORT}". Questo significa che la porta 8081 sull'host sarà mappata alla porta specificata da ${RPC_PORT} nel container della prima replica.
+
+- La seconda replica ha le porte mappate come segue: "8082:${RPC_PORT}". Questo significa che la porta 8082 sull'host sarà mappata alla porta specificata da ${RPC_PORT} nel container della seconda replica.
+
+- La terza replica ha le porte mappate come segue: "8083:${RPC_PORT}". Questo significa che la porta 8083 sull'host sarà mappata alla porta specificata da ${RPC_PORT} nel container della terza replica.

@@ -1,10 +1,10 @@
+// server.go
 package main
 
 import (
 	"fmt"
 	"net"
 	"net/rpc"
-	"os"
 )
 
 // server.go
@@ -13,7 +13,6 @@ import (
 
 func main() {
 	// Inizializzazione delle strutture KeyValueStoreCausale e KeyValueStoreSequential
-	fmt.Println("FATTO")
 
 	// ----- CONSISTENZA CAUSALE -----
 	kvCausale := &KeyValueStoreCausale{
@@ -27,34 +26,45 @@ func main() {
 		logicalClock: 0, // Inizializzazione dell'orologio logico scalare
 	}
 
-	multicastTotalOrdinal := &TotalOrderedMulticast{
+	multicastTotalOrdinal := &MulticastTotalOrdered{
 		queue: make([]Message, 0),
 	}
 
 	// Registrazione dei servizi RPC
 	err := rpc.RegisterName("KeyValueStoreCausale", kvCausale)
 	if err != nil {
+		fmt.Println("SERVER: Errore durante la registrazione di KeyValueStoreCausale", err)
 		return
 	}
 	err = rpc.RegisterName("KeyValueStoreSequential", kvSequential)
 	if err != nil {
+		fmt.Println("SERVER: Errore durante la registrazione di KeyValueStoreSequential", err)
 		return
 	}
-	err = rpc.RegisterName("TotalOrderedMulticast", multicastTotalOrdinal)
+	err = rpc.RegisterName("MulticastTotalOrdered", multicastTotalOrdinal)
 	if err != nil {
+		fmt.Println("SERVER: Errore durante la registrazione di MulticastTotalOrdered", err)
 		return
 	}
 
 	// Ottieni la porta da una variabile d'ambiente o assegna un valore predefinito
-	port := os.Getenv("RPC_PORT")
+	/* port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080" // Porta predefinita se RPC_PORT non è impostata !!! lettura file di config?
+	} */
+
+	fmt.Println("Inserisci la porta:")
+	var port string
+	_, err = fmt.Scanln(&port)
+	if err != nil {
+		fmt.Println("SERVER: Errore durante la lettura dell'input:", err)
+		return
 	}
 
 	// Avvio del listener RPC sulla porta specificata
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
-		fmt.Println("Errore nell'avvio del listener RPC:", err)
+		fmt.Println("SERVER: Errore nell'avvio del listener RPC:", err)
 		return
 	}
 
