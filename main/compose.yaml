@@ -1,0 +1,31 @@
+version: '3.7'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: DockerfileServer
+    deploy:
+      mode: replicated
+      replicas: 3
+    networks:
+      - my_network
+    ports:
+      - "8081:8085"
+      - "8082:8086"
+      - "8083:8086"
+
+  client:
+    build:
+      context: .
+      dockerfile: DockerfileClient
+    stdin_open: true
+    depends_on:
+      - server
+    networks:
+      - my_network
+    ports:
+      - "${CLIENT_PORT}:${CLIENT_PORT}"
+
+networks:
+  my_network:

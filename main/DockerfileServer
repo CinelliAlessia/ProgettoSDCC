@@ -1,5 +1,4 @@
 FROM ubuntu:latest
-LABEL authors="cinelli"
 
 ENTRYPOINT ["top", "-b"]
 
