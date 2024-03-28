@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// KeyValueStoreSequential KeyValueStoreCausale rappresenta il servizio di memorizzazione chiave-valore
+// KeyValueStoreSequential rappresenta il servizio di memorizzazione chiave-valore specializzato nel sequenziale
 type KeyValueStoreSequential struct {
 	dataStore    map[string]string // Mappa -> struttura dati che associa chiavi a valori
 	logicalClock int               // Orologio logico scalare
@@ -23,14 +23,12 @@ type Message struct {
 	NumberAck     int
 }
 
-// Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
+// Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
 
 	kvs.mutexClock.Lock()
-
 	kvs.logicalClock++
 	val, ok := kvs.dataStore[args.Key]
-
 	kvs.mutexClock.Unlock()
 
 	if !ok {
@@ -50,9 +48,12 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.mutexClock.Unlock()
 
 	message := Message{common.GenerateUniqueID(), "Put", args, kvs.logicalClock, 0}
+
+	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
+
 	//fmt.Println("SERVER: Key " + args.Key)
 	//fmt.Println("SERVER: Value " + args.Value)
-	fmt.Println("KeyValueStoreSequential: ID associato al messaggio " + message.Id)
+	//fmt.Println("KeyValueStoreSequential: ID associato al messaggio " + message.Id)
 
 	err := kvs.handleTotalOrderedMulticast(message)
 	if err != nil {
@@ -89,7 +90,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	return nil
 }
 
-// handleTotalOrderedMulticast invia la richiesta a tutte le repliche del sistema
+// handleTotalOrderedMulticast invia la richiesta a tutte le repliche Server
 func (kvs *KeyValueStoreSequential) handleTotalOrderedMulticast(args Message) error {
 	fmt.Println("KeyValueStoreSequential: Inoltro a tutti i server la richiesta ricevuta dal client")
 
@@ -124,13 +125,38 @@ func (kvs *KeyValueStoreSequential) handleTotalOrderedMulticast(args Message) er
 		reply := <-responseChannel
 		if reply {
 			fmt.Println("KeyValueStoreSequential: Risposta ricevuta da un server.")
-			// Puoi gestire la risposta qui
-			return nil
+
 		} else {
-			return fmt.Errorf("KeyValueStoreSequential: No replica ack")
-			// Gestisci l'errore qui
+			fmt.Errorf("KeyValueStoreSequential: NON VAAAAA")
 		}
 	}
 	return nil
+
+}
+
+func (kvs *KeyValueStoreSequential) RealFunction(args Message, response *common.Response) error {
+
+	if args.TypeOfMessage == "Put" { // Scrittura
+		kvs.mutexClock.Lock()
+		kvs.dataStore[args.Args.Key] = args.Args.Value
+		kvs.mutexClock.Unlock()
+		response.Reply = "true"
+	} else if args.TypeOfMessage == "Get" { // TODO: Lettura non dovrebbe fare nulla !!!
+		kvs.mutexClock.Lock()
+		response.Reply = kvs.dataStore[args.Args.Key]
+		kvs.mutexClock.Unlock()
+	} else if args.TypeOfMessage == "Delete" { // Scrittura
+		kvs.mutexClock.Lock()
+		delete(kvs.dataStore, args.Args.Key)
+		kvs.mutexClock.Unlock()
+		response.Reply = "true"
+	} else {
+		response.Reply = "false"
+		return fmt.Errorf("not found")
+	}
+	return nil
+}
+
+func sendToOtherServer() {
 
 }

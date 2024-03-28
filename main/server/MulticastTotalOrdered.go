@@ -51,6 +51,7 @@ func (mto *MulticastTotalOrdered) SendToEveryone(message Message, reply *bool) e
 	for {
 		canSend := mto.controlSendToApplication(&message)
 		if canSend {
+			// TODO: Invio a livello applicativo
 			*reply = true
 			break // Esci dal ciclo se controlSendToApplication restituisce true
 		}
@@ -117,6 +118,7 @@ func (mto *MulticastTotalOrdered) ReceiveAck(message Message, _ *bool) error {
 	return nil
 }
 
+// findByID Ritorna un messaggio cercandolo by id
 func (mto *MulticastTotalOrdered) findByID(id string) Message {
 	//fmt.Println("MulticastTotalOrdered-findByID: ID associato al messaggio " + id)
 	for i := range mto.queue {
@@ -130,6 +132,7 @@ func (mto *MulticastTotalOrdered) findByID(id string) Message {
 	return Message{}
 }
 
+// updateMessageByID aggiorna il messaggio in coda corrispondente all'id del messaggio passato in argomento
 func (mto *MulticastTotalOrdered) updateMessageByID(newMessage Message) {
 	for i := range mto.queue {
 		if mto.queue[i].Id == newMessage.Id {
@@ -140,6 +143,7 @@ func (mto *MulticastTotalOrdered) updateMessageByID(newMessage Message) {
 	}
 }
 
+// printMessageQueue è una funzione di debug che stampa la coda
 func (mto *MulticastTotalOrdered) printMessageQueue() {
 	for i := range mto.queue {
 		fmt.Println("Id " + mto.queue[i].Id + "Value " + mto.queue[i].Args.Value)
