@@ -30,14 +30,10 @@ type MulticastTotalOrdered struct {
 func (mto *MulticastTotalOrdered) SendToEveryone(message Message, reply *bool) error {
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
 	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
+
 	// Gestisce i messaggi in ingresso aggiungendo i messaggi in coda e inviando gli ack
 	mto.mu.Lock()
 	mto.queue = append(mto.queue, message)
-
-	mto.printMessageQueue()
-
-	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + message.Id)
-	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + mto.queue[0].Id)
 
 	// Ordina la coda in base al logicalClock
 	sort.Slice(mto.queue, func(i, j int) bool {
@@ -45,13 +41,22 @@ func (mto *MulticastTotalOrdered) SendToEveryone(message Message, reply *bool) e
 	})
 	mto.mu.Unlock()
 
+	mto.printMessageQueue() // DEBUG
 	mto.sendAck(message)
+
+	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + message.Id)
+	//fmt.Println("MulticastTotalOrdered: Messaggio in coda " + mto.queue[0].Id)
 
 	// Ciclo finché controlSendToApplication non restituisce true
 	for {
 		canSend := mto.controlSendToApplication(&message)
 		if canSend {
 			// TODO: Invio a livello applicativo
+			/*var replySaveInDatastore common.Response
+			err := sendToOtherServer("KeyValueStoreSequential.RealFunction", message, &replySaveInDatastore)
+			if err != nil {
+				// VEDI UN PO'
+			}*/
 			*reply = true
 			break // Esci dal ciclo se controlSendToApplication restituisce true
 		}

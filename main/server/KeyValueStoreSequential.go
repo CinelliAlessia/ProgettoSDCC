@@ -49,21 +49,12 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 
 	message := Message{common.GenerateUniqueID(), "Put", args, kvs.logicalClock, 0}
 
+	var reply *bool
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-
-	//fmt.Println("SERVER: Key " + args.Key)
-	//fmt.Println("SERVER: Value " + args.Value)
-	//fmt.Println("KeyValueStoreSequential: ID associato al messaggio " + message.Id)
-
-	err := kvs.handleTotalOrderedMulticast(message)
+	err := sendToOtherServerB("MulticastTotalOrdered.SendToEveryone", message, reply)
 	if err != nil {
 		return err
 	}
-
-	// TODO !!! Se lo faccio qui lo fa solo il server contattato !!!
-	kvs.mutexClock.Lock()
-	kvs.dataStore[args.Key] = args.Value
-	kvs.mutexClock.Unlock()
 
 	response.Reply = "true"
 	return nil
@@ -77,86 +68,95 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.mutexClock.Unlock()
 
 	message := Message{common.GenerateUniqueID(), "Delete", args, kvs.logicalClock, 0}
-	err := kvs.handleTotalOrderedMulticast(message)
+
+	var reply *bool
+	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
+	err := sendToOtherServerB("MulticastTotalOrdered.SendToEveryone", message, reply)
 	if err != nil {
 		return err
 	}
-
-	kvs.mutexClock.Lock()
-	delete(kvs.dataStore, args.Key)
-	kvs.mutexClock.Unlock()
 
 	response.Reply = "true"
 	return nil
 }
 
-// handleTotalOrderedMulticast invia la richiesta a tutte le repliche Server
-func (kvs *KeyValueStoreSequential) handleTotalOrderedMulticast(args Message) error {
-	fmt.Println("KeyValueStoreSequential: Inoltro a tutti i server la richiesta ricevuta dal client")
-
-	// Creare un canale per ricevere le risposte dai server RPC
-	responseChannel := make(chan bool, common.Replicas)
-
-	for i := 0; i < common.Replicas; i++ {
-		go func(replicaPort string) {
-			// Connessione al server RPC
-			//fmt.Println("KeyValueStoreSequential: Inoltro della richiesta ricevuta al server " + replicaPort)
-			server, err := rpc.Dial("tcp", ":"+replicaPort)
-			if err != nil {
-				//fmt.Println("KeyValueStoreSequential: Errore durante la connessione al server:", err)
-				responseChannel <- false // Invia falso al canale se c'è un errore
-				return
-			}
-
-			reply := false
-			// Chiama il metodo SentToEveryOne sul server RPC
-			err = server.Call("MulticastTotalOrdered.SendToEveryone", args, &reply)
-			if err != nil {
-				fmt.Println("KeyValueStoreSequential: Errore durante la chiamata RPC SentToEveryOne:", err)
-				responseChannel <- false // Invia falso al canale se c'è un errore
-				return
-			}
-			responseChannel <- reply // Invia la risposta al canale
-		}(common.ReplicaPorts[i])
-	}
-
-	// Attendere tutte le risposte
-	for i := 0; i < common.Replicas; i++ {
-		reply := <-responseChannel
-		if reply {
-			fmt.Println("KeyValueStoreSequential: Risposta ricevuta da un server.")
-
-		} else {
-			fmt.Errorf("KeyValueStoreSequential: NON VAAAAA")
-		}
-	}
-	return nil
-
-}
-
 func (kvs *KeyValueStoreSequential) RealFunction(args Message, response *common.Response) error {
+	// Stampa la mappa
+	fmt.Println("MAPPA:")
+	fmt.Println(kvs.dataStore)
 
 	if args.TypeOfMessage == "Put" { // Scrittura
 		kvs.mutexClock.Lock()
 		kvs.dataStore[args.Args.Key] = args.Args.Value
 		kvs.mutexClock.Unlock()
-		response.Reply = "true"
-	} else if args.TypeOfMessage == "Get" { // TODO: Lettura non dovrebbe fare nulla !!!
-		kvs.mutexClock.Lock()
-		response.Reply = kvs.dataStore[args.Args.Key]
-		kvs.mutexClock.Unlock()
 	} else if args.TypeOfMessage == "Delete" { // Scrittura
 		kvs.mutexClock.Lock()
 		delete(kvs.dataStore, args.Args.Key)
 		kvs.mutexClock.Unlock()
-		response.Reply = "true"
 	} else {
 		response.Reply = "false"
 		return fmt.Errorf("not found")
 	}
+	response.Reply = "true"
+	return nil
+
+	/*else if args.TypeOfMessage == "Get" { // Lettura non dovrebbe fare nulla !!!
+		kvs.mutexClock.Lock()
+		response.Reply = kvs.dataStore[args.Args.Key]
+		kvs.mutexClock.Unlock()
+	} */
+}
+
+// sendToOtherServer invia a tutti i server la richiesta rpcName
+func sendToOtherServer(rpcName string, message Message, response *common.Response) error {
+
+	//var responseValues [common.Replicas]common.Response
+
+	for i := 0; i < common.Replicas; i++ {
+		go func(replicaPort string) {
+
+			conn, err := rpc.Dial("tcp", ":"+replicaPort)
+			if err != nil {
+				fmt.Printf("KeyValueStoreSequential: Errore durante la connessione al server "+replicaPort+": ", err)
+				return
+			}
+
+			// Chiama il metodo "rpcName" sul server
+			err = conn.Call(rpcName, message, &response)
+			if err != nil {
+				fmt.Println("KeyValueStoreSequential-sendToOtherServer: Errore durante la chiamata RPC "+rpcName+": ", err)
+				return
+			}
+
+		}(common.ReplicaPorts[i])
+	}
+
 	return nil
 }
 
-func sendToOtherServer() {
+// sendToOtherServer invia a tutti i server la richiesta rpcName
+func sendToOtherServerB(rpcName string, message Message, response *bool) error {
 
+	//var responseValues [common.Replicas]common.Response
+
+	for i := 0; i < common.Replicas; i++ {
+		go func(replicaPort string) {
+
+			conn, err := rpc.Dial("tcp", ":"+replicaPort)
+			if err != nil {
+				fmt.Printf("KeyValueStoreSequential: Errore durante la connessione al server "+replicaPort+": ", err)
+				return
+			}
+
+			// Chiama il metodo "rpcName" sul server
+			err = conn.Call(rpcName, message, &response)
+			if err != nil {
+				fmt.Println("KeyValueStoreSequential-sendToOtherServer: Errore durante la chiamata RPC "+rpcName+": ", err)
+				return
+			}
+
+		}(common.ReplicaPorts[i])
+	}
+
+	return nil
 }
