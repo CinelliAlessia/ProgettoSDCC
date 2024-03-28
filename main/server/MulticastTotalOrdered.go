@@ -34,6 +34,10 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 	})
 	kvs.mu.Unlock()
 
+	kvs.mutexClock.Lock()
+	kvs.logicalClock = max(message.LogicalClock, kvs.logicalClock)
+	kvs.mutexClock.Unlock()
+
 	kvs.printMessageQueue() // DEBUG
 	kvs.sendAck(message)
 
