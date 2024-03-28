@@ -22,12 +22,9 @@ func main() {
 
 	// ----- CONSISTENZA SEQUENZIALE -----
 	kvSequential := &KeyValueStoreSequential{
-		dataStore:    make(map[string]string),
+		datastore:    make(map[string]string),
 		logicalClock: 0, // Inizializzazione dell'orologio logico scalare
-	}
-
-	multicastTotalOrdinal := &MulticastTotalOrdered{
-		queue: make([]Message, 0),
+		queue:        make([]Message, 0),
 	}
 
 	// Registrazione dei servizi RPC
@@ -39,11 +36,6 @@ func main() {
 	err = rpc.RegisterName("KeyValueStoreSequential", kvSequential)
 	if err != nil {
 		fmt.Println("SERVER: Errore durante la registrazione di KeyValueStoreSequential", err)
-		return
-	}
-	err = rpc.RegisterName("MulticastTotalOrdered", multicastTotalOrdinal)
-	if err != nil {
-		fmt.Println("SERVER: Errore durante la registrazione di MulticastTotalOrdered", err)
 		return
 	}
 
