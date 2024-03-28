@@ -92,3 +92,11 @@ di scrittura da parte degli altri server.
 - La seconda replica ha le porte mappate come segue: "8082:${RPC_PORT}". Questo significa che la porta 8082 sull'host sarà mappata alla porta specificata da ${RPC_PORT} nel container della seconda replica.
 
 - La terza replica ha le porte mappate come segue: "8083:${RPC_PORT}". Questo significa che la porta 8083 sull'host sarà mappata alla porta specificata da ${RPC_PORT} nel container della terza replica.
+
+
+
+
+
+
+
+- Mi arriva prima un ack e dopo la richiesta di append
