@@ -98,28 +98,28 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente
-func (kvs *KeyValueStoreSequential) RealFunction(args Message, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) RealFunction(args Message, _ *common.Response) error {
 	// Stampa la mappa
-	fmt.Println("MAPPA PRIMA:")
+	fmt.Println("DATASTORE prima dell'evento di scrittura:")
 	fmt.Println(kvs.datastore)
 
 	if args.TypeOfMessage == "Put" { // Scrittura
 		kvs.mutexClock.Lock()
 		kvs.datastore[args.Args.Key] = args.Args.Value
 		kvs.mutexClock.Unlock()
+
 	} else if args.TypeOfMessage == "Delete" { // Scrittura
 		kvs.mutexClock.Lock()
 		delete(kvs.datastore, args.Args.Key)
 		kvs.mutexClock.Unlock()
+
 	} else {
-		response.Reply = "false"
-		return fmt.Errorf("not found")
+		return fmt.Errorf("command not found")
 	}
 
-	fmt.Println("MAPPA DOPO:")
+	fmt.Println("DATASTORE dopo dell'evento di scrittura:")
 	fmt.Println(kvs.datastore)
 
-	response.Reply = "true"
 	return nil
 }
 
