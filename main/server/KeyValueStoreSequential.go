@@ -36,14 +36,23 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
-	val, ok := kvs.datastore[args.Key]
 	kvs.mutexClock.Unlock()
 
-	if !ok {
-		return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", args.Key)
+	message := Message{common.GenerateUniqueID(), "Get", args, kvs.logicalClock, 0}
+	kvs.addToSortQueue(message)
+
+	for {
+		if kvs.queue[0].Id == message.Id {
+			val, ok := kvs.datastore[args.Key]
+			if !ok {
+				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", args.Key)
+			}
+			kvs.removeByID(message.Id)
+			response.Reply = val
+			break
+		}
 	}
 
-	response.Reply = val
 	return nil
 }
 
