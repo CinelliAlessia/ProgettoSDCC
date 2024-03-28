@@ -13,6 +13,10 @@ type Response struct {
 	Reply string
 }
 
+type Datastore struct {
+	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
+}
+
 // KeyValueStoreService è un'interfaccia che deve essere implementata da tutti i servizi che vogliono essere
 type KeyValueStoreService interface {
 	Get(args Args, reply *Response) error
