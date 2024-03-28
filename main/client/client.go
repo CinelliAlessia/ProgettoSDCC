@@ -65,6 +65,10 @@ func sequential() {
 
 	time.Sleep(time.Millisecond * 1000)
 
+	fmt.Print("\nContinuare con la get: ")
+	var choice int
+	_, err = fmt.Scan(&choice)
+
 	// GET
 	conn = randomConnect()
 	if conn == nil {
