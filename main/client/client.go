@@ -6,6 +6,7 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
+	"time"
 )
 
 func main() {
@@ -61,6 +62,8 @@ func sequential() {
 	}
 
 	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
+
+	time.Sleep(time.Millisecond * 1000)
 
 	// GET
 	conn = randomConnect()
