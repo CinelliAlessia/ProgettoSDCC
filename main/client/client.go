@@ -6,7 +6,6 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
-	"time"
 )
 
 func main() {
@@ -45,7 +44,8 @@ func main() {
 func sequential() {
 	// Test consistenza sequenziale
 
-	args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
+	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
+	args := common.Args{Key: "PROVA", Value: "CIAO"}
 	reply := common.Response{}
 
 	// PUT
@@ -60,10 +60,9 @@ func sequential() {
 		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
 		return
 	}
-
 	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
 
-	time.Sleep(time.Millisecond * 1000)
+	//time.Sleep(time.Millisecond * 1000)
 
 	fmt.Print("\nContinuare con la get: ")
 	//var choice int
