@@ -10,7 +10,6 @@ import (
 
 // KeyValueStoreSequential rappresenta il servizio di memorizzazione chiave-valore specializzato nel sequenziale
 type KeyValueStoreSequential struct {
-	//datastore common.Datastore
 	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
 
 	logicalClock int // Orologio logico scalare
@@ -31,9 +30,6 @@ type Message struct {
 // Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
 
-	//fmt.Println("MAPPA GET:")
-	//fmt.Println(kvs.datastore)
-
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
@@ -42,12 +38,12 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	kvs.addToSortQueue(message)
 
 	for {
-		if kvs.queue[0].Id == message.Id {
+		if kvs.queue[0].Id == message.Id && kvs.queue[0].LogicalClock == message.LogicalClock {
 			val, ok := kvs.datastore[args.Key]
 			if !ok {
 				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", args.Key)
 			}
-			kvs.removeByID(message.Id)
+			kvs.removeMessage(message)
 			response.Reply = val
 			break
 		}
@@ -66,9 +62,8 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
 
-	message := Message{common.GenerateUniqueID(), "Put", args, kvs.logicalClock, 0}
-
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
+	message := Message{common.GenerateUniqueID(), "Put", args, kvs.logicalClock, 0}
 	var reply *bool
 	err := sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
 	if err != nil {
@@ -101,9 +96,6 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 
 // RealFunction esegue l'operazione di put e di delete realmente
 func (kvs *KeyValueStoreSequential) RealFunction(args Message, _ *common.Response) error {
-	// Stampa la mappa
-	//fmt.Println("DATASTORE prima dell'evento di scrittura:")
-	//fmt.Println(kvs.datastore)
 
 	if args.TypeOfMessage == "Put" { // Scrittura
 		kvs.mutexClock.Lock()

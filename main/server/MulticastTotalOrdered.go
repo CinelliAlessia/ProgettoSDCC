@@ -27,36 +27,24 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
 
 	// Aggiunta della richiesta in coda
-	//kvs.addToSortQueue(message)
-
-	kvs.mu.Lock()
-	kvs.queue = append(kvs.queue, message)
-
-	// Ordina la coda in base al logicalClock
-	sort.Slice(kvs.queue, func(i, j int) bool {
-		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
-	})
-	kvs.mu.Unlock()
+	kvs.addToSortQueue(message)
 
 	// Aggiornamento del clock
 	kvs.mutexClock.Lock()
 	kvs.logicalClock = myMax(message.LogicalClock, kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
-	//fmt.Printf("Il mio clock logico è: %d\n", kvs.logicalClock)
-	//kvs.printMessageQueue() // DEBUG
-
 	// Invio ack a tutti i server
 	kvs.sendAck(message)
 
 	// Ciclo finché controlSendToApplication non restituisce true
 	for {
-		canSend := kvs.controlSendToApplication(&message)
+		canSend := kvs.controlSendToApplication(message)
 		if canSend {
 
 			// Invio a livello applicativo
-			var replySaveInDatastore *common.Response
-			err := kvs.RealFunction(message, replySaveInDatastore)
+			var replySaveInDatastore common.Response
+			err := kvs.RealFunction(message, &replySaveInDatastore)
 			if err != nil {
 				return err
 			}
@@ -81,6 +69,7 @@ func myMax(clock int, clock2 int) int {
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
+/*
 func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
 
 	// Trova il messaggio nella coda
@@ -105,48 +94,44 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 
 	*reply = true
 	return nil
+} */
+
+// ReceiveAck gestisce gli ack dei messaggi ricevuti.
+// Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
+func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
+	fmt.Println("ReceiveAck: Ho ricevuto un ack")
+
+	// Aggiorna il messaggio nella coda
+	*reply = kvs.updateMessage(message)
+
+	return nil
 }
 
 func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 	kvs.mu.Lock()
-	defer kvs.mu.Unlock()
-
-	// Verifica se il messaggio è già presente nella coda
-	for i, msg := range kvs.queue {
-		if msg == message {
-			fmt.Println("AAA Ack arrivato ma la richiesta no ")
-			// Se il messaggio è già presente, confronta il numero di acknowledgment
-			if message.NumberAck > msg.NumberAck {
-				// Se il nuovo messaggio ha un numero di acknowledgment maggiore, sostituisci il vecchio messaggio
-				kvs.queue[i] = message
-				return
-			} else {
-				// Altrimenti, esci dalla funzione senza aggiungere il nuovo messaggio
-				return
-			}
-		}
-	}
-
-	// Se il messaggio non è già presente, aggiungilo alla coda
 	kvs.queue = append(kvs.queue, message)
 
 	// Ordina la coda in base al logicalClock
 	sort.Slice(kvs.queue, func(i, j int) bool {
 		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
 	})
+	kvs.mu.Unlock()
 }
 
 // controlSendToApplication
-func (kvs *KeyValueStoreSequential) controlSendToApplication(message *Message) bool {
+func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bool {
 	//4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
 	//da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
 	//(quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 	//timestamp potenzialmente minore o uguale a quello di msg_i).
-	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck == common.Replicas {
+	fmt.Println("controlSendToApplication: Controllo")
+	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck == common.Replicas /*&& kvs.queue[0].LogicalClock == message.LogicalClock*/ {
 		// Invia il messaggio all'applicazione
 		fmt.Println("controlSendToApplication: Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla mia coda")
-		kvs.removeByID(message.Id)
+		kvs.removeMessage(message)
 		return true
+	} else {
+		fmt.Println("ID ", kvs.queue[0].Id, message.Id, "Ack ", kvs.queue[0].NumberAck, common.Replicas)
 	}
 	return false
 }
@@ -156,7 +141,6 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 	fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto")
 
 	reply := false
-	//err := sendToOtherServer("KeyValueStoreSequential.ReceiveAck", message, &reply)
 
 	for i := 0; i < common.Replicas; i++ {
 		go func(replicaPort string) {
@@ -167,7 +151,6 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 				return
 			}
 
-			// Chiama il metodo "rpcName" sul server
 			for {
 				err = conn.Call("KeyValueStoreSequential.ReceiveAck", message, &reply)
 				if err != nil {
@@ -183,10 +166,16 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 	}
 }
 
-// findByID Ritorna un messaggio cercandolo by id
-func (kvs *KeyValueStoreSequential) findByID(id string) *Message {
+// printMessageQueue è una funzione di debug che stampa la coda
+func (kvs *KeyValueStoreSequential) printMessageQueue() {
 	for i := range kvs.queue {
-		if kvs.queue[i].Id == id {
+		fmt.Println("Id: ", kvs.queue[i].Id, "Value: ", kvs.queue[i].Args.Value, "ACK: ", kvs.queue[i].NumberAck)
+	}
+}
+
+func (kvs *KeyValueStoreSequential) findMessage(message Message) *Message {
+	for i := range kvs.queue {
+		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
 			return &kvs.queue[i]
 		}
 	}
@@ -194,34 +183,29 @@ func (kvs *KeyValueStoreSequential) findByID(id string) *Message {
 }
 
 // removeByID Rimuove un messaggio dalla coda basato sull'ID
-func (kvs *KeyValueStoreSequential) removeByID(id string) {
+func (kvs *KeyValueStoreSequential) removeMessage(message Message) {
 	for i := range kvs.queue {
-		if kvs.queue[i].Id == id {
+		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
 			// Rimuovi l'elemento dalla slice
 			kvs.queue = append(kvs.queue[:i], kvs.queue[i+1:]...)
-			fmt.Println("removeByID: Messaggio con ID", id, "rimosso dalla coda")
+			fmt.Println("removeByID: Messaggio con ID", message.Id, "rimosso dalla coda")
 			return
 		}
 	}
-	fmt.Println("removeByID: Messaggio con ID", id, "non trovato nella coda")
+	fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
 }
 
 // updateMessageByID aggiorna il messaggio in coda corrispondente all'id del messaggio passato in argomento
-func (kvs *KeyValueStoreSequential) updateMessageByID(newMessage Message) {
+func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 	for i := range kvs.queue {
-		if kvs.queue[i].Id == newMessage.Id {
+		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
 			kvs.mu.Lock()
 			kvs.queue[i].NumberAck++
 			kvs.mu.Unlock()
+
 			fmt.Println("NumeroAck ", kvs.queue[i].NumberAck)
-			break
+			return true
 		}
 	}
-}
-
-// printMessageQueue è una funzione di debug che stampa la coda
-func (kvs *KeyValueStoreSequential) printMessageQueue() {
-	for i := range kvs.queue {
-		fmt.Println("Id: ", kvs.queue[i].Id, "Value: ", kvs.queue[i].Args.Value, "ACK: ", kvs.queue[i].NumberAck)
-	}
+	return false
 }
