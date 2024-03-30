@@ -31,8 +31,8 @@ type Message struct {
 // Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
 
-	fmt.Println("MAPPA GET:")
-	fmt.Println(kvs.datastore)
+	//fmt.Println("MAPPA GET:")
+	//fmt.Println(kvs.datastore)
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
@@ -52,6 +52,8 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 			break
 		}
 	}
+	fmt.Println("DATASTORE:")
+	fmt.Println(kvs.datastore)
 
 	return nil
 }
@@ -100,8 +102,8 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 // RealFunction esegue l'operazione di put e di delete realmente
 func (kvs *KeyValueStoreSequential) RealFunction(args Message, _ *common.Response) error {
 	// Stampa la mappa
-	fmt.Println("DATASTORE prima dell'evento di scrittura:")
-	fmt.Println(kvs.datastore)
+	//fmt.Println("DATASTORE prima dell'evento di scrittura:")
+	//fmt.Println(kvs.datastore)
 
 	if args.TypeOfMessage == "Put" { // Scrittura
 		kvs.mutexClock.Lock()
@@ -117,7 +119,7 @@ func (kvs *KeyValueStoreSequential) RealFunction(args Message, _ *common.Respons
 		return fmt.Errorf("command not found")
 	}
 
-	fmt.Println("DATASTORE dopo dell'evento di scrittura:")
+	fmt.Println("DATASTORE:")
 	fmt.Println(kvs.datastore)
 
 	return nil
