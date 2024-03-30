@@ -208,12 +208,13 @@ func (kvs *KeyValueStoreSequential) removeByID(id string) {
 
 // updateMessageByID aggiorna il messaggio in coda corrispondente all'id del messaggio passato in argomento
 func (kvs *KeyValueStoreSequential) updateMessageByID(newMessage Message) {
-	fmt.Println("NumeroAck ", newMessage.NumberAck)
 	for i := range kvs.queue {
 		if kvs.queue[i].Id == newMessage.Id {
 			kvs.mu.Lock()
 			kvs.queue[i].NumberAck++
 			kvs.mu.Unlock()
+			fmt.Println("NumeroAck ", kvs.queue[i].NumberAck)
+			break
 		}
 	}
 }
