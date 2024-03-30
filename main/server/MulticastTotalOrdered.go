@@ -97,11 +97,11 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 
 	// TODO: partono due ReceiveAck in contemporanea, entrambi incrementano l'ack a due e entrambi lo impostano a 2. ma uno era 2 e l'altro 3
 	// devo ricevere un puntatore al messaggio e incrementarlo con i lucchetti, cosi non va bene.
-	newMessage.NumberAck++
+	kvs.updateMessageByID(message)
 	fmt.Println("ReceiveAck: Ho ricevuto un ack")
 
 	// Aggiorna il messaggio nella coda
-	kvs.updateMessageByID(newMessage)
+	//kvs.updateMessageByID(newMessage)
 
 	*reply = true
 	return nil
@@ -184,13 +184,13 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 }
 
 // findByID Ritorna un messaggio cercandolo by id
-func (kvs *KeyValueStoreSequential) findByID(id string) Message {
+func (kvs *KeyValueStoreSequential) findByID(id string) *Message {
 	for i := range kvs.queue {
 		if kvs.queue[i].Id == id {
-			return kvs.queue[i]
+			return &kvs.queue[i]
 		}
 	}
-	return Message{}
+	return &Message{}
 }
 
 // removeByID Rimuove un messaggio dalla coda basato sull'ID
@@ -212,7 +212,7 @@ func (kvs *KeyValueStoreSequential) updateMessageByID(newMessage Message) {
 	for i := range kvs.queue {
 		if kvs.queue[i].Id == newMessage.Id {
 			kvs.mu.Lock()
-			kvs.queue[i] = newMessage
+			kvs.queue[i].NumberAck++
 			kvs.mu.Unlock()
 		}
 	}
