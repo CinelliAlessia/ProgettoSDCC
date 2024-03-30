@@ -1,10 +1,11 @@
-// KeyValueStoreSequential.go
+// MulticastTotalOrdered.go
 
 package main
 
 import (
 	"fmt"
 	"main/common"
+	"net/rpc"
 	"sort"
 	"time"
 )
@@ -26,16 +27,24 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
 
 	// Aggiunta della richiesta in coda
-	kvs.addToSortQueue(message)
+	//kvs.addToSortQueue(message)
+
+	kvs.mu.Lock()
+	kvs.queue = append(kvs.queue, message)
+
+	// Ordina la coda in base al logicalClock
+	sort.Slice(kvs.queue, func(i, j int) bool {
+		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
+	})
+	kvs.mu.Unlock()
 
 	// Aggiornamento del clock
 	kvs.mutexClock.Lock()
 	kvs.logicalClock = myMax(message.LogicalClock, kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
-	fmt.Printf("Il mio clock logico è: %d\n", kvs.logicalClock)
-
-	kvs.printMessageQueue() // DEBUG
+	//fmt.Printf("Il mio clock logico è: %d\n", kvs.logicalClock)
+	//kvs.printMessageQueue() // DEBUG
 
 	// Invio ack a tutti i server
 	kvs.sendAck(message)
@@ -77,17 +86,24 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 	// Trova il messaggio nella coda
 	newMessage := kvs.findByID(message.Id)
 	if newMessage.Id == "" {
-		// TODO: ricevo prima l'ack che la notifica che c'è un evento dovrei aggiungerlo ma ci sarebbero problemi
-		// se me ne arrivano due di ack prima della richiesta? :(
-		kvs.addToSortQueue(message)
+		// PROBLEMA RISOLTO: ricevo prima l'ack che la notifica che c'è un evento dovrei aggiungerlo ma ci sarebbero problemi
+		// se me ne arrivano due di ack prima della richiesta? :( -> risolto, viene rinviato l'ack se io rispondo false
+		*reply = false
+		return nil
+		// kvs.addToSortQueue(message)
 	}
 
 	// Incrementa il conteggio degli ack
+
+	// TODO: partono due ReceiveAck in contemporanea, entrambi incrementano l'ack a due e entrambi lo impostano a 2. ma uno era 2 e l'altro 3
+	// devo ricevere un puntatore al messaggio e incrementarlo con i lucchetti, cosi non va bene.
 	newMessage.NumberAck++
 	fmt.Println("ReceiveAck: Ho ricevuto un ack")
 
 	// Aggiorna il messaggio nella coda
 	kvs.updateMessageByID(newMessage)
+
+	*reply = true
 	return nil
 }
 
@@ -123,7 +139,7 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 // controlSendToApplication
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message *Message) bool {
 	//4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
-	//	da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
+	//da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
 	//(quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 	//timestamp potenzialmente minore o uguale a quello di msg_i).
 	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck == common.Replicas {
@@ -140,21 +156,37 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 	fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto")
 
 	reply := false
-	err := sendToOtherServer("KeyValueStoreSequential.ReceiveAck", message, &reply)
-	if err != nil {
-		return
-	}
+	//err := sendToOtherServer("KeyValueStoreSequential.ReceiveAck", message, &reply)
 
+	for i := 0; i < common.Replicas; i++ {
+		go func(replicaPort string) {
+
+			conn, err := rpc.Dial("tcp", ":"+replicaPort)
+			if err != nil {
+				fmt.Printf("sendAck: Errore durante la connessione al server "+replicaPort+": ", err)
+				return
+			}
+
+			// Chiama il metodo "rpcName" sul server
+			for {
+				err = conn.Call("KeyValueStoreSequential.ReceiveAck", message, &reply)
+				if err != nil {
+					fmt.Println("sendAck: Errore durante la chiamata RPC receiveAck ", err)
+					return
+				}
+
+				if reply {
+					break // Esci dal ciclo se reply è true
+				}
+			}
+		}(common.ReplicaPorts[i])
+	}
 }
 
 // findByID Ritorna un messaggio cercandolo by id
 func (kvs *KeyValueStoreSequential) findByID(id string) Message {
-	//fmt.Println("findByID: ID associato al messaggio " + id)
 	for i := range kvs.queue {
-		//fmt.Println("findByID: paragone con " + kvs.queue[i].Id)
-
 		if kvs.queue[i].Id == id {
-			fmt.Println("findByID: TROVATO")
 			return kvs.queue[i]
 		}
 	}
