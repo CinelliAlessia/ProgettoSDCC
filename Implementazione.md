@@ -94,9 +94,21 @@ di scrittura da parte degli altri server.
 - La terza replica ha le porte mappate come segue: "8083:${RPC_PORT}". Questo significa che la porta 8083 sull'host sarà mappata alla porta specificata da ${RPC_PORT} nel container della terza replica.
 
 
-
-
-
-
-
 - Mi arriva prima un ack e dopo la richiesta di append
+
+
+
+**Multicast causalmente ordinato:**
+In questo secondo scenario, un messaggio viene consegnato solo se tutti i messaggi che lo precedono
+causalmente (secondo la relazione di causa-effetto) sono stati già consegnati. Si tratta di un
+indebolimento del multicast totalmente ordinato.
+Mantenendo le assunzioni sulla comunicazione affidabile e FIFO ordered, introduciamo un algoritmo che fa
+uso del clock logico vettoriale per risolvere il problema del multicast causalmente ordinato in modo
+completamente distribuito:
+-> pi invia un messaggio m con timestamp t(m) basato sul clock logico vettoriale Vi, dove stavolta Vj[i] conta
+il numero di messaggi che pi ha inviato a pj (per cui c’è una differenza con l’utilizzo standard dei clock logici
+vettoriali).
+-> pj riceve m da pi e ne ritarda la consegna al livello applicativo (ponendo m in una coda d’attesa) finché
+non si verificano entrambe le seguenti condizioni:
+1) t(m)[i] = Vj[i]+1 (m è il messaggio successivo che pj si aspetta da pi).
+2) t(m)[k] <= Vj[k] per ogni k != i (per ogni processo pk, pj ha visto almeno gli stessi messaggi di pk visti da pi).
