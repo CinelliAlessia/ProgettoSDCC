@@ -36,6 +36,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	kvs.mutexClock.Unlock()
 
 	id := common.GenerateUniqueID()
+	id = "b"
 
 	message := Message{id, "Get", args, kvs.logicalClock, 0}
 	kvs.addToSortQueue(message)
@@ -69,8 +70,11 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
 
+	id := common.GenerateUniqueID()
+	id = "a"
+
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	message := Message{common.GenerateUniqueID(), "Put", args, kvs.logicalClock, 0}
+	message := Message{id, "Put", args, kvs.logicalClock, 0}
 	var reply *bool
 	err := sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
 	if err != nil {

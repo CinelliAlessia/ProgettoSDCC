@@ -1,4 +1,4 @@
-// MulticastTotalOrdered.go
+// MulticastTotalOrdered.go Totally Ordered Multicast
 
 package main
 
