@@ -45,7 +45,7 @@ func sequential() {
 	// Test consistenza sequenziale
 
 	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
-	args := common.Args{Key: "PROVA", Value: "CIAO"}
+	args := common.Args{Key: common.GenerateUniqueID(), Value: "CIAO"}
 	reply := common.Response{}
 
 	// PUT
@@ -61,10 +61,10 @@ func sequential() {
 		return
 	}
 	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
-
+	//TODO Problema Client: Se viene eliminato il timer non avviene la corretta esecuzione
 	//time.Sleep(time.Millisecond * 1000)
 
-	fmt.Print("\nContinuare con la get: ")
+	//fmt.Print("\nContinuare con la get: ")
 	//var choice int
 	//_, err = fmt.Scan(&choice)
 
@@ -102,3 +102,33 @@ func randomConnect() *rpc.Client {
 	}
 	return conn
 }
+
+func callPut(conn *rpc.Client, args common.Args, reply common.Response) error {
+	err := conn.Call("KeyValueStoreSequential.Put", args, &reply)
+	if err != nil {
+		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC")
+	}
+	fmt.Println("CLIENT: Richiesta put effettuata: " + reply.Reply)
+	return nil
+}
+func callGet(conn *rpc.Client, args common.Args, reply common.Response) error {
+	err := conn.Call("KeyValueStoreSequential.Get", args, &reply)
+	if err != nil {
+		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC")
+	}
+	fmt.Println("CLIENT: Richiesta get effettuata: " + reply.Reply)
+	return nil
+}
+func callDelete(conn *rpc.Client, args common.Args, reply common.Response) error {
+	err := conn.Call("KeyValueStoreSequential.Delete", args, &reply)
+	if err != nil {
+		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC")
+	}
+	fmt.Println("CLIENT: Richiesta delete effettuata: " + reply.Reply)
+	return nil
+}
+
+//time.Sleep(time.Millisecond * 1000)
+//fmt.Print("\nContinuare con la get: ")
+//var choice int
+//_, err = fmt.Scan(&choice)
