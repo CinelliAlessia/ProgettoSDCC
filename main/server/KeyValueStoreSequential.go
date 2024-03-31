@@ -29,20 +29,27 @@ type Message struct {
 
 // Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
+	fmt.Println("Richiesta GET")
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
 
-	message := Message{common.GenerateUniqueID(), "Get", args, kvs.logicalClock, 0}
+	id := common.GenerateUniqueID()
+
+	message := Message{id, "Get", args, kvs.logicalClock, 0}
 	kvs.addToSortQueue(message)
 
 	for {
 		if kvs.queue[0].Id == message.Id && kvs.queue[0].LogicalClock == message.LogicalClock {
-			val, ok := kvs.datastore[args.Key]
+			kvs.mutexClock.Lock()
+			val, ok := kvs.datastore[message.Args.Key]
 			if !ok {
-				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", args.Key)
+				fmt.Println("Key non trovata nel datastore", message.Args.Key)
+				fmt.Println(kvs.datastore)
+				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", id)
 			}
+			kvs.mutexClock.Unlock()
 			kvs.removeMessage(message)
 			response.Reply = val
 			break
@@ -95,24 +102,27 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente
-func (kvs *KeyValueStoreSequential) RealFunction(args Message, _ *common.Response) error {
+func (kvs *KeyValueStoreSequential) RealFunction(message Message, _ *common.Response) error {
 
-	if args.TypeOfMessage == "Put" { // Scrittura
+	if message.TypeOfMessage == "Put" { // Scrittura
 		kvs.mutexClock.Lock()
-		kvs.datastore[args.Args.Key] = args.Args.Value
+		fmt.Println("Key inserita ", message.Args.Key)
+		kvs.datastore[message.Args.Key] = message.Args.Value
+		fmt.Println("DATASTORE:")
+		fmt.Println(kvs.datastore)
 		kvs.mutexClock.Unlock()
 
-	} else if args.TypeOfMessage == "Delete" { // Scrittura
+	} else if message.TypeOfMessage == "Delete" { // Scrittura
 		kvs.mutexClock.Lock()
-		delete(kvs.datastore, args.Args.Key)
+		fmt.Println("Key eliminata ", message.Args.Key)
+		delete(kvs.datastore, message.Args.Key)
+		fmt.Println("DATASTORE:")
+		fmt.Println(kvs.datastore)
 		kvs.mutexClock.Unlock()
 
 	} else {
 		return fmt.Errorf("command not found")
 	}
-
-	fmt.Println("DATASTORE:")
-	fmt.Println(kvs.datastore)
 
 	return nil
 }
