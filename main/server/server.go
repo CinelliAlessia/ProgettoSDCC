@@ -16,8 +16,9 @@ func main() {
 
 	// ----- CONSISTENZA CAUSALE -----
 	kvCausale := &KeyValueStoreCausale{
-		data:        make(map[string]string),
+		datastore:   make(map[string]string),
 		vectorClock: make([]int, 0), // Inizializzazione dell'orologio vettoriale
+		queue:       make([]MessageC, 0),
 	}
 
 	// ----- CONSISTENZA SEQUENZIALE -----
