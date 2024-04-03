@@ -10,19 +10,26 @@ Questo progetto consiste nel realizzare un server che dia garanzia, a scelta del
 
 ***SEQUENZIALE:***
 
-*Multicast Totalmente Ordinato*
+**Multicast Totalmente Ordinato**
 
 1. Un client effettua una chiamata RPC con la propria richiesta ad un singolo server (scelto random).
-2. Il server che riceve la richiesta la gestisce in maniera differente a seconda se è un evento interno o esterno.
+2. Il server che riceve la richiesta incrementa il suo clock logico scalare e lo allega alla richiesta.
+3. La gestione avviene in maniera differente a seconda se è un evento interno o esterno.
 
-*Gestione dell'evento interno GET*
-   1. Incrementa il suo clock logico scalare 
-   2. La aggiunge a una coda locale ordinata per timestamp della richiesta.
-   3. La esegue se la richiesta è la prima nella coda. 
+*Gestione dell'evento interno: GET*
+   1. Aggiunge la richiesta a una coda locale ordinata per timestamp.
+   2. La esegue se la richiesta è la prima nella coda. 
 
-*Gestione degli eventi di PUT e DELETE*
-   1. Il server ricevente la richiesta dal client, incrementa il suo clock logico scalare e lo associa alla richiesta, successivamente la inoltra la tutti i server (incluso se stesso).
+*Gestione degli eventi esterni: PUT e DELETE*
+   1. Inoltra in broadcast la richiesta a tutti i server (incluso se stesso).
    2. Ciascun server che riceve la richiesta:
       1. La aggiunge a una coda locale ordinata per timestamp della richiesta.
       2. Invia un ack a tutti i server per indicare che lui ha letto quel messaggio.
-      3. Esegue la richiesta ricevuta esclusivamente se: la richiesta è la prima nella sua coda (ha timestamp minore di tutte le altre) AND ha ricevuto tutti gli ack relativi a quella richiesta.
+      3. Esegue la richiesta ricevuta esclusivamente se: 
+         - La richiesta è la prima nella sua coda (ha timestamp minore di tutte le altre in coda).
+         - Sono stati ricevuti tutti gli ack relativi a quella richiesta.
+
+***CAUSALE:***
+
+**Multicast Causalmente Ordinato**
+
