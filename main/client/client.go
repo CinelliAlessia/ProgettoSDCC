@@ -87,6 +87,45 @@ func sequential() {
 
 func causal() {
 	// Test consistenza causale
+
+	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
+	args := common.Args{Key: common.GenerateUniqueID(), Value: "CIAO"}
+	reply := common.Response{}
+
+	// PUT
+	conn := randomConnect()
+	if conn == nil {
+		fmt.Println("CLIENT: Errore durante la connessione")
+		return
+	}
+
+	err := conn.Call("KeyValueStoreCausale.Put", args, &reply)
+	if err != nil {
+		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
+		return
+	}
+	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
+
+	//time.Sleep(time.Millisecond * 1000)
+	//fmt.Print("\nContinuare con la get: ")
+	//var choice int
+	//_, err = fmt.Scan(&choice)
+
+	// GET
+	conn = randomConnect()
+	if conn == nil {
+		fmt.Println("CLIENT: Errore durante la connessione 2")
+		return
+	}
+	// Effettua la chiamata RPC
+	err = conn.Call("KeyValueStoreCausale.Get", args, &reply)
+	if err != nil {
+		fmt.Println("CLIENT: Errore durante la chiamata RPC Get:", err)
+		return
+	}
+
+	fmt.Println("CLIENT: Richiesta get effettuata " + reply.Reply)
+	// comandi random a server random, li conosce tutti e fine
 }
 
 func randomConnect() *rpc.Client {
