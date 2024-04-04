@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"main/common"
 	"net"
 	"net/rpc"
 	"os"
@@ -15,16 +16,19 @@ import (
 
 func main() {
 
+	/*---LOCALE---*/
 	// Legge l'argomento passato
-	if len(os.Args) < 3 {
+	/*if len(os.Args) < 2 {
 		fmt.Println("Usare: ", os.Args[0], "<Porta di ascolto>", "<ID_Server>")
 		os.Exit(1)
 	}
 
-	port := os.Args[1]
-
 	// Legge l'ID del server passato come argomento dalla riga di comando
-	idStr := os.Args[2]
+	idStr := os.Args[1]*/
+
+	/*---DOCKER---*/
+	// Ottieni la porta da una variabile d'ambiente o assegna un valore predefinito
+	idStr := os.Getenv("SERVER_ID")
 
 	// Converti l'ID del server in un intero
 	id, err := strconv.Atoi(idStr)
@@ -32,6 +36,7 @@ func main() {
 		fmt.Println("Errore:", err)
 		os.Exit(1)
 	}
+	port := common.ReplicaPorts[id]
 
 	// Inizializzazione delle strutture KeyValueStoreCausale e KeyValueStoreSequential
 
@@ -61,21 +66,6 @@ func main() {
 		fmt.Println("SERVER: Errore durante la registrazione di KeyValueStoreSequential", err)
 		return
 	}
-
-	// Ottieni la porta da una variabile d'ambiente o assegna un valore predefinito
-	/*
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8080" // Porta predefinita se RPC_PORT non è impostata !!! lettura file di config?
-		}
-
-		fmt.Println("Inserisci la porta:")
-		var port string
-		_, err = fmt.Scanln(&port)
-		if err != nil {
-			fmt.Println("SERVER: Errore durante la lettura dell'input:", err)
-			return
-	}*/
 
 	// Avvio del listener RPC sulla porta specificata
 	fmt.Println("LA MIA PORTA", port)

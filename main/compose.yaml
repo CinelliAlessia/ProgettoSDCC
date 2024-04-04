@@ -8,7 +8,7 @@ services:
     stdin_open: true
     tty: true
     environment:
-      SERVER_ID: "1"
+      SERVER_ID: "0"
     ports:
       - "8085:8085"
     networks:
@@ -21,7 +21,7 @@ services:
     stdin_open: true
     tty: true
     environment:
-      SERVER_ID: "2"
+      SERVER_ID: "1"
     ports:
       - "8086:8086"
     networks:
@@ -34,7 +34,7 @@ services:
     stdin_open: true
     tty: true
     environment:
-      SERVER_ID: "3"
+      SERVER_ID: "2"
     ports:
       - "8087:8087"
     networks:
@@ -48,7 +48,9 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-      - server
+      - server1
+      - server2
+      - server3
     networks:
       - my_network
     ports:
