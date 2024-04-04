@@ -15,8 +15,8 @@ type KeyValueStoreSequential struct {
 	logicalClock int // Orologio logico scalare
 	mutexClock   sync.Mutex
 
-	queue []Message
-	mu    sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
+	queue      []Message
+	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 }
 
 type Message struct {
@@ -50,8 +50,8 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 				fmt.Println(kvs.datastore)
 				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", id)
 			}
-			kvs.mutexClock.Unlock()
 			kvs.removeMessage(message)
+			kvs.mutexClock.Unlock()
 			response.Reply = val
 			break
 		}
@@ -76,7 +76,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := Message{id, "Put", args, kvs.logicalClock, 0}
 	var reply *bool
-	err := sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
+	err := kvs.sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 
 	var reply *bool
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	err := sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
+	err := kvs.sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, _ *common.Resp
 }
 
 // sendToOtherServer invia a tutti i server la richiesta rpcName
-func sendToOtherServer(rpcName string, message Message, response *bool) error {
+func (kvs *KeyValueStoreSequential) sendToOtherServer(rpcName string, message Message, response *bool) error {
 
 	//var responseValues [common.Replicas]common.Response
 	for i := 0; i < common.Replicas; i++ {
