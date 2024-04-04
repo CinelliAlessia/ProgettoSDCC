@@ -1,31 +1,59 @@
 version: '3.7'
 
 services:
-  server:
+  server1:
     build:
       context: .
       dockerfile: DockerfileServer
-    deploy:
-      mode: replicated
-      replicas: 3
+    stdin_open: true
+    tty: true
+    environment:
+      SERVER_ID: "1"
+    ports:
+      - "8085:8085"
     networks:
       - my_network
+
+  server2:
+    build:
+      context: .
+      dockerfile: DockerfileServer
+    stdin_open: true
+    tty: true
+    environment:
+      SERVER_ID: "2"
     ports:
-      - "8081:8085"
-      - "8082:8086"
-      - "8083:8086"
+      - "8086:8086"
+    networks:
+      - my_network
+
+  server3:
+    build:
+      context: .
+      dockerfile: DockerfileServer
+    stdin_open: true
+    tty: true
+    environment:
+      SERVER_ID: "3"
+    ports:
+      - "8087:8087"
+    networks:
+      - my_network
+
 
   client:
     build:
       context: .
       dockerfile: DockerfileClient
     stdin_open: true
+    tty: true
     depends_on:
       - server
     networks:
       - my_network
     ports:
-      - "${CLIENT_PORT}:${CLIENT_PORT}"
+      - "8081:8081"
 
 networks:
   my_network:
+    driver: bridge
