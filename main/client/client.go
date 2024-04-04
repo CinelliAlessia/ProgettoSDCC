@@ -6,6 +6,7 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
+	"time"
 )
 
 func main() {
@@ -106,7 +107,7 @@ func causal() {
 	}
 	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
 
-	//time.Sleep(time.Millisecond * 1000)
+	time.Sleep(time.Millisecond * 1000)
 	//fmt.Print("\nContinuare con la get: ")
 	//var choice int
 	//_, err = fmt.Scan(&choice)
