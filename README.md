@@ -32,6 +32,8 @@ Questo progetto consiste nel realizzare un server che dia garanzia, a scelta del
          - La richiesta è la prima nella sua coda (ha timestamp minore di tutte le altre in coda).
          - Sono stati ricevuti tutti gli ack relativi a quella richiesta.
 
+- L'invio dell'ack a tutti i server avviene in maniera asincrona.
+
 ***CAUSALE:***
 
 **Multicast Causalmente Ordinato**

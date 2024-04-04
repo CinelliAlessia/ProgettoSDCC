@@ -31,34 +31,34 @@ type Message struct {
 
 // Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
-	fmt.Println("Richiesta GET")
+	fmt.Println("Richiesta GET di", args.Key)
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
 
 	id := common.GenerateUniqueID()
-	id = "b"
 
 	message := Message{id, "Get", args, kvs.logicalClock, 0}
 	kvs.addToSortQueue(message)
 
 	for {
 		if kvs.queue[0].Id == message.Id && kvs.queue[0].LogicalClock == message.LogicalClock {
-			kvs.mutexClock.Lock()
+			// la seconda condizione dell'if credo sia inutile, se l'id è davvero univoco
+			// proprio perché è un id associato al messaggio e non una key
 			val, ok := kvs.datastore[message.Args.Key]
 			if !ok {
 				fmt.Println("Key non trovata nel datastore", message.Args.Key)
 				fmt.Println(kvs.datastore)
-				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", id)
+				return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", message.Args.Key)
 			}
 			kvs.removeMessage(message)
-			kvs.mutexClock.Unlock()
 			response.Reply = val
 			break
 		}
 	}
-	fmt.Println("DATASTORE:")
+
+	fmt.Println("Comando GET eseguito correttamente, DATASTORE:")
 	fmt.Println(kvs.datastore)
 
 	return nil
@@ -66,17 +66,17 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
-	fmt.Println("KeyValueStoreSequential: Comando PUT eseguito")
+	fmt.Println("Richiesta PUT di", args.Key, args.Value)
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
 
 	id := common.GenerateUniqueID()
-	id = "a"
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := Message{id, "Put", args, kvs.logicalClock, 0}
+
 	var reply *bool
 	err := kvs.sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
 	if err != nil {
@@ -94,10 +94,10 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.logicalClock++
 	kvs.mutexClock.Unlock()
 
+	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := Message{common.GenerateUniqueID(), "Delete", args, kvs.logicalClock, 0}
 
 	var reply *bool
-	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	err := kvs.sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message, reply)
 	if err != nil {
 		return err
@@ -135,30 +135,30 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, _ *common.Resp
 
 // sendToOtherServer invia a tutti i server la richiesta rpcName
 func (kvs *KeyValueStoreSequential) sendToOtherServer(rpcName string, message Message, response *bool) error {
+	// NON CONTROLLO MAI IL VALORE DI RESPONSE; ESSENDO UNIVOCO PER TUTTE E TRE POTREI ANCHE LEGGERLO IN MANIERA ERRATA
 
 	//var responseValues [common.Replicas]common.Response
 	for i := 0; i < common.Replicas; i++ {
 		i := i
 		go func(replicaPort string) {
 
-			// Connessione al server RPC casuale
-			var conn *rpc.Client
-			var err error
+			var serverName string
 
 			if os.Getenv("CONFIG") == "1" {
 				/*---LOCALE---*/
-				// Connessione al server RPC casuale
-				fmt.Println("sendToOtherServer: Contatto il server:", ":"+replicaPort)
-				conn, err = rpc.Dial("tcp", ":"+replicaPort)
-
-			} else {
+				serverName = ":" + replicaPort
+			} else if os.Getenv("CONFIG") == "2" {
 				/*---DOCKER---*/
-				// Connessione al server RPC casuale
-				fmt.Println("sendToOtherServer: Contatto il server:", "server"+strconv.Itoa(i+1)+":"+replicaPort)
-				conn, err = rpc.Dial("tcp", "server"+strconv.Itoa(i+1)+":"+replicaPort)
+				serverName = "server" + strconv.Itoa(i+1) + ":" + replicaPort
+			} else {
+				fmt.Println("VARIABILE DI AMBIENTE ERRATA")
+				return
 			}
+
+			fmt.Println("sendToOtherServer: Contatto il server:", serverName)
+			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
-				fmt.Printf("KeyValueStoreSequential: Errore durante la connessione al server:"+replicaPort, err)
+				fmt.Printf("sendToOtherServer: Errore durante la connessione al server:"+replicaPort, err)
 				return
 			}
 

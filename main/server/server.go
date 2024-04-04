@@ -8,6 +8,7 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
+	"time"
 )
 
 // server.go
@@ -78,6 +79,9 @@ func main() {
 		return
 	}
 
+	// Avvio della goroutine per stampare il datastore
+	go printDatastore(kvSequential)
+
 	// Ciclo per accettare e gestire le connessioni in arrivo
 	for {
 		conn, err := listener.Accept()
@@ -88,5 +92,13 @@ func main() {
 
 		// Avvia la gestione della connessione in un goroutine
 		go rpc.ServeConn(conn)
+	}
+}
+
+// Funzione per stampare il datastore ogni 100 millisecondi
+func printDatastore(kv *KeyValueStoreSequential) {
+	for {
+		time.Sleep(500 * time.Millisecond)
+		fmt.Println("Datastore:", kv.datastore)
 	}
 }

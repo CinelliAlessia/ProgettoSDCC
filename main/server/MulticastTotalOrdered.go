@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"main/common"
 	"net/rpc"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -22,22 +24,23 @@ import (
 
 // MulticastTotalOrdered gestione dell'evento esterno ricevuto da un server
 func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply *bool) error {
-
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
-	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
+	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiunta della richiesta in coda
 	kvs.addToSortQueue(message)
 
-	// Aggiornamento del clock
+	// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 	kvs.mutexClock.Lock()
 	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
-	// Invio ack a tutti i server
+	// Invio ack a tutti i server per notificare la ricezione della richiesta
 	kvs.sendAck(message)
 
 	// Ciclo finché controlSendToApplication non restituisce true
+	// Controllo quando la richiesta può essere eseguita a livello applicativo
+	*reply = false
 	for {
 		canSend := kvs.controlSendToApplication(message)
 		if canSend {
@@ -50,14 +53,17 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 			}
 
 			*reply = true
-			break // Esci dal ciclo se controlSendToApplication restituisce true
+			break
 		}
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 100)
 	}
 
-	return nil
+	if *reply {
+		return nil
+	}
+	return fmt.Errorf("MulticastTotalOrdered non andato a buon fine")
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
@@ -91,7 +97,7 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
 // Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
 func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
-	fmt.Println("ReceiveAck: Ho ricevuto un ack")
+	fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiorna il messaggio nella coda
 	*reply = kvs.updateMessage(message)
@@ -128,23 +134,38 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bo
 		kvs.removeMessage(message)
 		return true
 	} else {
-		fmt.Println("ID ", kvs.queue[0].Id, message.Id, "Ack ", kvs.queue[0].NumberAck, common.Replicas)
+		//fmt.Println("ID ", kvs.queue[0].Id, message.Id, "Ack ", kvs.queue[0].NumberAck, common.Replicas)
 	}
 	return false
 }
 
 // sendAck invia a tutti i server un Ack
 func (kvs *KeyValueStoreSequential) sendAck(message Message) {
-	fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto")
+	fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	reply := false
 
 	for i := 0; i < common.Replicas; i++ {
-		go func(replicaPort string) {
+		i := i
+		go func(replicaPort string) { // Invio tutti gli ack in maniera asincrona
 
-			conn, err := rpc.Dial("tcp", ":"+replicaPort)
+			var serverName string
+
+			if os.Getenv("CONFIG") == "1" {
+				/*---LOCALE---*/
+				serverName = ":" + replicaPort
+			} else if os.Getenv("CONFIG") == "2" {
+				/*---DOCKER---*/
+				serverName = "server" + strconv.Itoa(i+1) + ":" + replicaPort
+			} else {
+				fmt.Println("VARIABILE DI AMBIENTE ERRATA")
+				return
+			}
+
+			//fmt.Println("sendAck: Contatto il server:", serverName)
+			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
-				fmt.Printf("sendAck: Errore durante la connessione al server "+replicaPort+": ", err)
+				fmt.Printf("sendAck: Errore durante la connessione al server:"+replicaPort, err)
 				return
 			}
 
@@ -157,6 +178,7 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 
 				if reply {
 					break // Esci dal ciclo se reply è true
+					// reply false vuol dire che il server contattato ha ricevuto un ack di una richiesta a lui non nota
 				}
 			}
 		}(common.ReplicaPorts[i])
@@ -182,17 +204,20 @@ func (kvs *KeyValueStoreSequential) findMessage(message Message) *Message {
 // removeByID Rimuove un messaggio dalla coda basato sull'ID
 func (kvs *KeyValueStoreSequential) removeMessage(message Message) {
 	for i := range kvs.queue {
+		kvs.mutexQueue.Lock()
 		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
 			// Rimuovi l'elemento dalla slice
 			kvs.queue = append(kvs.queue[:i], kvs.queue[i+1:]...)
-			fmt.Println("removeByID: Messaggio con ID", message.Id, "rimosso dalla coda")
+			//fmt.Println("removeByID: Messaggio con ID", message.Id, "rimosso dalla coda")
+			kvs.mutexQueue.Unlock()
 			return
 		}
+		kvs.mutexQueue.Unlock()
 	}
-	fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
+	//fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
 }
 
-// updateMessageByID aggiorna il messaggio in coda corrispondente all'id del messaggio passato in argomento
+// updateMessage aggiorna il messaggio in coda corrispondente all'id del messaggio passato in argomento
 func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 	for i := range kvs.queue {
 		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
@@ -200,7 +225,7 @@ func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 			kvs.queue[i].NumberAck++
 			kvs.mutexQueue.Unlock()
 
-			fmt.Println("NumeroAck ", kvs.queue[i].NumberAck)
+			fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 			return true
 		}
 	}
