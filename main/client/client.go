@@ -6,6 +6,8 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -27,6 +29,7 @@ func main() {
 		}
 
 		// Esegui l'operazione scelta
+		//choice := 2
 		switch choice {
 		case 1:
 			fmt.Println("Scelta di consistenza causale")
@@ -63,7 +66,7 @@ func sequential() {
 	}
 	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
 	//TODO Problema Client: Se viene eliminato il timer non avviene la corretta esecuzione
-	//time.Sleep(time.Millisecond * 1000)
+	time.Sleep(time.Millisecond * 1000)
 
 	//fmt.Print("\nContinuare con la get: ")
 	//var choice int
@@ -133,9 +136,23 @@ func randomConnect() *rpc.Client {
 	// Genera un numero casuale tra 0 e il numero di repliche - 1
 	randomIndex := rand.Intn(common.Replicas)
 
-	// Connessione al server RPC casuale
-	fmt.Println("CLIENT: Contatto il server " + common.ReplicaPorts[randomIndex])
-	conn, err := rpc.Dial("tcp", ":"+common.ReplicaPorts[randomIndex])
+	var conn *rpc.Client
+	var err error
+
+	if os.Getenv("CONFIG") == "1" {
+		/*---LOCALE---*/
+		// Connessione al server RPC casuale
+		fmt.Println("CLIENT: Contatto il server:", ":"+common.ReplicaPorts[randomIndex])
+		conn, err = rpc.Dial("tcp", ":"+common.ReplicaPorts[randomIndex])
+
+	} else if os.Getenv("CONFIG") == "2" {
+		/*---DOCKER---*/
+		// Connessione al server RPC casuale
+		fmt.Println("CLIENT: Contatto il server:", "server"+strconv.Itoa(randomIndex+1)+":"+common.ReplicaPorts[randomIndex])
+		conn, err = rpc.Dial("tcp", "server"+strconv.Itoa(randomIndex+1)+":"+common.ReplicaPorts[randomIndex])
+	} else {
+		fmt.Println("VARIABILE DI AMBIENTE ERRATA")
+	}
 	if err != nil {
 		fmt.Println("CLIENT: Errore durante la connessione al server:", err)
 		return nil

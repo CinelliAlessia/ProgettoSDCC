@@ -16,19 +16,22 @@ import (
 
 func main() {
 
-	/*---LOCALE---*/
-	// Legge l'argomento passato
-	/*if len(os.Args) < 2 {
-		fmt.Println("Usare: ", os.Args[0], "<Porta di ascolto>", "<ID_Server>")
-		os.Exit(1)
+	var idStr string
+
+	if os.Getenv("CONFIG") == "1" {
+		/*---LOCALE---*/
+		if len(os.Args) < 2 { //Legge l'argomento passato
+			fmt.Println("Usare: ", os.Args[0], "<ID_Server>")
+			os.Exit(1)
+		}
+
+		// Legge l'ID del server passato come argomento dalla riga di comando
+		idStr = os.Args[1]
+	} else {
+		/*---DOCKER---*/
+		// Ottieni la porta da una variabile d'ambiente o assegna un valore predefinito
+		idStr = os.Getenv("SERVER_ID")
 	}
-
-	// Legge l'ID del server passato come argomento dalla riga di comando
-	idStr := os.Args[1]*/
-
-	/*---DOCKER---*/
-	// Ottieni la porta da una variabile d'ambiente o assegna un valore predefinito
-	idStr := os.Getenv("SERVER_ID")
 
 	// Converti l'ID del server in un intero
 	id, err := strconv.Atoi(idStr)
@@ -43,7 +46,7 @@ func main() {
 	// ----- CONSISTENZA CAUSALE -----
 	kvCausale := &KeyValueStoreCausale{
 		datastore:   make(map[string]string),
-		vectorClock: make([]int, 0), // Inizializzazione dell'orologio vettoriale
+		vectorClock: [common.Replicas]int{}, // Array di lunghezza fissa inizializzato a zero
 		queue:       make([]MessageC, 0),
 		id:          id,
 	}
@@ -75,6 +78,15 @@ func main() {
 		return
 	}
 
-	// Accettazione delle connessioni in arrivo
-	rpc.Accept(listener)
+	// Ciclo per accettare e gestire le connessioni in arrivo
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("SERVER: Errore nell'accettare la connessione:", err)
+			continue
+		}
+
+		// Avvia la gestione della connessione in un goroutine
+		go rpc.ServeConn(conn)
+	}
 }

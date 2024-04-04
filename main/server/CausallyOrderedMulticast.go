@@ -40,7 +40,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, repl
 
 	// Aggiornamento del clock
 	kvc.mutexClock.Lock()
-	for i := range len(kvc.vectorClock) {
+	for i := 0; i < common.Replicas; i++ {
 		kvc.vectorClock[i] = common.Max(message.VectorClock[i], kvc.vectorClock[i])
 	}
 	kvc.mutexClock.Unlock()
@@ -94,8 +94,8 @@ livello applicativo finché non si verificano entrambe le seguenti condizioni:
 */
 func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool {
 	// Verifica se il messaggio è il prossimo atteso
-	expectedTimestamp := make([]int, len(kvc.vectorClock))
-	copy(expectedTimestamp, kvc.vectorClock)
+	expectedTimestamp := make([]int, common.Replicas)
+	//copy(expectedTimestamp, kvc.vectorClock)
 
 	senderID := 0                 // Dovrai definire un modo per identificare l'ID del mittente
 	expectedTimestamp[senderID]++ // Il messaggio successivo che pj si aspetta da pi

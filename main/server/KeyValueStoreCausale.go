@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"main/common"
 	"net/rpc"
+	"os"
+	"strconv"
 	"sync"
 )
 
@@ -12,7 +14,7 @@ type KeyValueStoreCausale struct {
 	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
 	id        int
 
-	vectorClock []int // Orologio vettoriale
+	vectorClock [common.Replicas]int // Orologio vettoriale
 	mutexClock  sync.Mutex
 
 	queue      []MessageC
@@ -23,7 +25,7 @@ type MessageC struct {
 	Id            string
 	TypeOfMessage string
 	Args          common.Args
-	VectorClock   []int // Orologio vettoriale
+	VectorClock   [common.Replicas]int // Orologio vettoriale
 	NumberAck     int
 }
 
@@ -112,11 +114,26 @@ func (kvc *KeyValueStoreCausale) sendToOtherServer(rpcName string, message Messa
 
 	//var responseValues [common.Replicas]common.Response
 	for i := 0; i < common.Replicas; i++ {
+		i := i
 		go func(replicaPort string) {
+			// Connessione al server RPC casuale
+			var conn *rpc.Client
+			var err error
 
-			conn, err := rpc.Dial("tcp", ":"+replicaPort)
+			if os.Getenv("CONFIG") == "1" {
+				/*---LOCALE---*/
+				// Connessione al server RPC casuale
+				fmt.Println("sendToOtherServer: Contatto il server:", ":"+replicaPort)
+				conn, err = rpc.Dial("tcp", ":"+replicaPort)
+
+			} else {
+				/*---DOCKER---*/
+				// Connessione al server RPC casuale
+				fmt.Println("sendToOtherServer: Contatto il server:", "server"+strconv.Itoa(i+1)+":"+replicaPort)
+				conn, err = rpc.Dial("tcp", "server"+strconv.Itoa(i+1)+":"+replicaPort)
+			}
 			if err != nil {
-				fmt.Printf("KeyValueStoreCausale: Errore durante la connessione al server "+replicaPort+": ", err)
+				fmt.Printf("KeyValueStoreCausale: Errore durante la connessione al server:"+replicaPort, err)
 				return
 			}
 

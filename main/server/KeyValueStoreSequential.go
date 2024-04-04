@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"main/common"
 	"net/rpc"
+	"os"
+	"strconv"
 	"sync"
 )
 
@@ -136,11 +138,27 @@ func (kvs *KeyValueStoreSequential) sendToOtherServer(rpcName string, message Me
 
 	//var responseValues [common.Replicas]common.Response
 	for i := 0; i < common.Replicas; i++ {
+		i := i
 		go func(replicaPort string) {
 
-			conn, err := rpc.Dial("tcp", ":"+replicaPort)
+			// Connessione al server RPC casuale
+			var conn *rpc.Client
+			var err error
+
+			if os.Getenv("CONFIG") == "1" {
+				/*---LOCALE---*/
+				// Connessione al server RPC casuale
+				fmt.Println("sendToOtherServer: Contatto il server:", ":"+replicaPort)
+				conn, err = rpc.Dial("tcp", ":"+replicaPort)
+
+			} else {
+				/*---DOCKER---*/
+				// Connessione al server RPC casuale
+				fmt.Println("sendToOtherServer: Contatto il server:", "server"+strconv.Itoa(i+1)+":"+replicaPort)
+				conn, err = rpc.Dial("tcp", "server"+strconv.Itoa(i+1)+":"+replicaPort)
+			}
 			if err != nil {
-				fmt.Printf("KeyValueStoreSequential: Errore durante la connessione al server "+replicaPort+": ", err)
+				fmt.Printf("KeyValueStoreSequential: Errore durante la connessione al server:"+replicaPort, err)
 				return
 			}
 
