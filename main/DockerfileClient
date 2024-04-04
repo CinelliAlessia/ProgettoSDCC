@@ -1,3 +1,18 @@
-FROM ubuntu:latest
+FROM golang:latest
 
-ENTRYPOINT ["top", "-b"]
+WORKDIR /main
+
+# Copio e scarico le dipendenze del modulo Go
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+# Copio il resto del codice sorgente
+COPY go.work .
+COPY common common
+COPY client client
+
+EXPOSE ${CLIENT_PORT}
+
+# Avvia il tuo client Go
+CMD ["bash", "-c", "cd client && go run ."]

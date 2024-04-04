@@ -1,6 +1,18 @@
-FROM ubuntu:latest
+FROM golang:latest
 
-ENTRYPOINT ["top", "-b"]
+WORKDIR /main
 
-EXPOSE 8080
-ENV RPC_PORT 8080
+# Copio e scarico le dipendenze del modulo Go
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+# Copio il resto del codice sorgente
+COPY go.work .
+COPY common common
+COPY server server
+
+EXPOSE ${PORT}
+
+# Avvia il tuo server Go
+CMD ["bash", "-c", "cd server && go run ."]
