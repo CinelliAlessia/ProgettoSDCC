@@ -1,6 +1,9 @@
 *DIPENDENZE*
 - Aggiunta dipendenza esterna import "github.com/google/uuid" in KeyValueStoreSequential
 
+*LOCALE e DOCKER*
+- Per variare da utilizzo locale e utilizzo docker cambiare unicamente la variabile globale nel file start.sh
+
 **Garanzie Consistenza**
 
 Questo progetto consiste nel realizzare un server che dia garanzia, a scelta del client, di avere repliche di datatstore che rispettino la consistenza sequenziale o la consistenza causale. 
