@@ -11,9 +11,9 @@ import (
 )
 
 // Algoritmo distribuito MULTICAST TOT. ORDINATO:
-// Ogni messaggio abbia come timestamp il clock logico scalare del processo che lo invia. V
-//1. pi invia in multicast (incluso se stesso) il messaggio di update msg_i. V
-//2. msg_i viene posto da ogni processo destinatario pj in una coda locale queue_j, ordinata in base al valore del timestamp. V
+// Ogni messaggio abbia come timestamp il clock logico scalare del processo che lo invia.
+//1. pi invia in multicast (incluso se stesso) il messaggio di update msg_i.
+//2. msg_i viene posto da ogni processo destinatario pj in una coda locale queue_j, ordinata in base al valore del timestamp.
 //3. pj invia in multicast un messaggio di ack della ricezione di msg_i.
 //4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
 //	da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
@@ -31,7 +31,7 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 
 	// Aggiornamento del clock
 	kvs.mutexClock.Lock()
-	kvs.logicalClock = myMax(message.LogicalClock, kvs.logicalClock)
+	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	// Invio ack a tutti i server
@@ -58,14 +58,6 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 	}
 
 	return nil
-}
-
-func myMax(clock int, clock2 int) int {
-	if clock > clock2 {
-		return clock
-	} else {
-		return clock2
-	}
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
@@ -110,7 +102,7 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 // addToSortQueue aggiunge un messaggio alla coda locale, ordinandola in base al timeStamp, a parità di timestamp
 // l'ordinamento è deterministico, per garantire ordinamento totale, ordinandolo in base all'id.
 func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
-	kvs.mu.Lock()
+	kvs.mutexQueue.Lock()
 	kvs.queue = append(kvs.queue, message)
 
 	// Ordina la coda in base al logicalClock
@@ -121,7 +113,7 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
 	})
 
-	kvs.mu.Unlock()
+	kvs.mutexQueue.Unlock()
 }
 
 // controlSendToApplication verifica se è possibile inviare la richiesta a livello apllicativo
@@ -204,9 +196,9 @@ func (kvs *KeyValueStoreSequential) removeMessage(message Message) {
 func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 	for i := range kvs.queue {
 		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
-			kvs.mu.Lock()
+			kvs.mutexQueue.Lock()
 			kvs.queue[i].NumberAck++
-			kvs.mu.Unlock()
+			kvs.mutexQueue.Unlock()
 
 			fmt.Println("NumeroAck ", kvs.queue[i].NumberAck)
 			return true
