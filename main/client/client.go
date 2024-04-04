@@ -29,28 +29,30 @@ func main() {
 		}
 
 		// Esegui l'operazione scelta
+		//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
+		args := common.Args{Key: "dai funziona", Value: "CIAO"}
+		reply := common.Response{}
+
 		//choice := 2
 		switch choice {
 		case 1:
 			fmt.Println("Scelta di consistenza causale")
-			causal()
+			causal(args, &reply)
 			break
 		case 2:
 			fmt.Println("Scelta di consistenza sequenziale")
-			sequential()
+			sequential(args, &reply)
 			break
 		default:
 			fmt.Println("Scelta non valida. Riprova.")
 		}
+
+		//callGet(conn,args,&reply)
 	}
 }
 
-func sequential() {
+func sequential(args common.Args, response *common.Response) {
 	// Test consistenza sequenziale
-
-	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
-	args := common.Args{Key: common.GenerateUniqueID(), Value: "CIAO"}
-	reply := common.Response{}
 
 	// PUT
 	conn := randomConnect()
@@ -59,42 +61,36 @@ func sequential() {
 		return
 	}
 
-	err := conn.Call("KeyValueStoreSequential.Put", args, &reply)
+	err := conn.Call("KeyValueStoreSequential.Put", args, &response.Reply)
 	if err != nil {
 		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
 		return
 	}
-	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
+	fmt.Println("CLIENT: Richiesta put effettuata " + response.Reply)
+
 	//TODO Problema Client: Se viene eliminato il timer non avviene la corretta esecuzione
 	time.Sleep(time.Millisecond * 1000)
 
-	//fmt.Print("\nContinuare con la get: ")
-	//var choice int
-	//_, err = fmt.Scan(&choice)
-
 	// GET
 	conn = randomConnect()
 	if conn == nil {
 		fmt.Println("CLIENT: Errore durante la connessione 2")
 		return
 	}
+
 	// Effettua la chiamata RPC
-	err = conn.Call("KeyValueStoreSequential.Get", args, &reply)
+	err = conn.Call("KeyValueStoreSequential.Get", args, &response.Reply)
 	if err != nil {
 		fmt.Println("CLIENT: Errore durante la chiamata RPC Get:", err)
 		return
 	}
 
-	fmt.Println("CLIENT: Richiesta get effettuata " + reply.Reply)
+	fmt.Println("CLIENT: Richiesta get effettuata " + response.Reply)
 	// comandi random a server random, li conosce tutti e fine
 }
 
-func causal() {
+func causal(args common.Args, response *common.Response) {
 	// Test consistenza causale
-
-	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
-	args := common.Args{Key: common.GenerateUniqueID(), Value: "CIAO"}
-	reply := common.Response{}
 
 	// PUT
 	conn := randomConnect()
@@ -103,17 +99,14 @@ func causal() {
 		return
 	}
 
-	err := conn.Call("KeyValueStoreCausale.Put", args, &reply)
+	err := conn.Call("KeyValueStoreCausale.Put", args, &response.Reply)
 	if err != nil {
 		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
 		return
 	}
-	fmt.Println("CLIENT: Richiesta put effettuata " + reply.Reply)
+	fmt.Println("CLIENT: Richiesta put effettuata " + response.Reply)
 
 	time.Sleep(time.Millisecond * 1000)
-	//fmt.Print("\nContinuare con la get: ")
-	//var choice int
-	//_, err = fmt.Scan(&choice)
 
 	// GET
 	conn = randomConnect()
@@ -122,13 +115,13 @@ func causal() {
 		return
 	}
 	// Effettua la chiamata RPC
-	err = conn.Call("KeyValueStoreCausale.Get", args, &reply)
+	err = conn.Call("KeyValueStoreCausale.Get", args, &response.Reply)
 	if err != nil {
 		fmt.Println("CLIENT: Errore durante la chiamata RPC Get:", err)
 		return
 	}
 
-	fmt.Println("CLIENT: Richiesta get effettuata " + reply.Reply)
+	fmt.Println("CLIENT: Richiesta get effettuata " + response.Reply)
 	// comandi random a server random, li conosce tutti e fine
 }
 
