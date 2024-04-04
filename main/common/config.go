@@ -15,3 +15,11 @@ func GenerateUniqueID() string {
 	id := uuid.New()
 	return id.String()
 }
+
+func Max(clock int, clock2 int) int {
+	if clock > clock2 {
+		return clock
+	} else {
+		return clock2
+	}
+}
