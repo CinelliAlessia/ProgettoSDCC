@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+const (
+	put    = ".Put"
+	get    = ".Get"
+	delete = ".Delete"
+)
+
 func main() {
 
 	for {
@@ -45,84 +51,25 @@ func main() {
 			fmt.Println("Scelta non valida. Riprova.")
 		}
 
-		go run1(rpcName)
-		go run2(rpcName)
-		go run3(rpcName)
-		go run4(rpcName)
+		done := make(chan bool)
+		go run1(rpcName, done)
+		go run2(rpcName, done)
+		go run3(rpcName, done)
+		go run4(rpcName, done)
+		time.Sleep(time.Millisecond * 100)
+		go run1(rpcName, done)
+		go run2(rpcName, done)
+		go run3(rpcName, done)
+		go run4(rpcName, done)
+
+		// Attendi il completamento di tutte le goroutine
+		for i := 0; i < 8; i++ {
+			println("OK", i)
+			<-done
+		}
+
+		fmt.Println("Finito richieste")
 	}
-}
-
-func sequential(args common.Args, response *common.Response) {
-	// Test consistenza sequenziale
-
-	// PUT
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-
-	err := conn.Call("KeyValueStoreSequential.Put", args, &response.Reply)
-	if err != nil {
-		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
-		return
-	}
-	fmt.Println("CLIENT: Richiesta put effettuata " + response.Reply)
-
-	//TODO Problema Client: Se viene eliminato il timer non avviene la corretta esecuzione
-	time.Sleep(time.Millisecond * 1000)
-
-	// GET
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione 2")
-		return
-	}
-
-	// Effettua la chiamata RPC
-	err = conn.Call("KeyValueStoreSequential.Get", args, &response.Reply)
-	if err != nil {
-		fmt.Println("CLIENT: Errore durante la chiamata RPC Get:", err)
-		return
-	}
-
-	fmt.Println("CLIENT: Richiesta get effettuata " + response.Reply)
-	// comandi random a server random, li conosce tutti e fine
-}
-func causal(args common.Args, response *common.Response) {
-	// Test consistenza causale
-
-	// PUT
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-
-	err := conn.Call("KeyValueStoreCausale.Put", args, &response.Reply)
-	if err != nil {
-		fmt.Println("CLIENT: Errore durante la chiamata RPC Put:", err)
-		return
-	}
-	fmt.Println("CLIENT: Richiesta put effettuata " + response.Reply)
-
-	time.Sleep(time.Millisecond * 1000)
-
-	// GET
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione 2")
-		return
-	}
-	// Effettua la chiamata RPC
-	err = conn.Call("KeyValueStoreCausale.Get", args, &response.Reply)
-	if err != nil {
-		fmt.Println("CLIENT: Errore durante la chiamata RPC Get:", err)
-		return
-	}
-
-	fmt.Println("CLIENT: Richiesta get effettuata " + response.Reply)
-	// comandi random a server random, li conosce tutti e fine
 }
 
 func randomConnect() *rpc.Client {
@@ -142,7 +89,7 @@ func randomConnect() *rpc.Client {
 		return nil
 	}
 
-	//fmt.Println("CLIENT: Contatto il server:", serverName)
+	fmt.Println("CLIENT: Contatto il server:", serverName)
 	conn, err := rpc.Dial("tcp", serverName)
 
 	if err != nil {
@@ -151,6 +98,7 @@ func randomConnect() *rpc.Client {
 	}
 	return conn
 }
+
 func specificConnect(index int) *rpc.Client {
 	if index >= common.Replicas {
 		return nil
@@ -178,28 +126,39 @@ func specificConnect(index int) *rpc.Client {
 	return conn
 }
 
-func callPut(conn *rpc.Client, args common.Args, reply *common.Response, rpcName string) error {
-	err := conn.Call(rpcName+".Put", args, reply)
-	if err != nil {
-		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC")
-	}
-	//fmt.Println("CLIENT: Richiesta put effettuata: " + reply.Reply)
-	return nil
+func randomDelay() {
+	// Genera un numero casuale compreso tra 0 e 999 (max un secondo)
+	delay := rand.Intn(1000)
+
+	// Introduce un ritardo casuale
+	time.Sleep(time.Duration(delay) * time.Millisecond)
 }
-func callGet(conn *rpc.Client, args common.Args, reply *common.Response, rpcName string) error {
-	err := conn.Call(rpcName+".Get", args, reply)
-	if err != nil {
-		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC")
+
+func executeCall(rpcName, key string, values ...string) {
+	var value string
+	if len(values) > 0 {
+		value = values[0]
 	}
-	//fmt.Println("CLIENT: Richiesta get effettuata: " + reply.Reply)
-	return nil
+
+	args := common.Args{Key: key, Value: value}
+	reply := common.Response{}
+	conn := randomConnect()
+	if conn == nil {
+		fmt.Println("CLIENT: Errore durante la connessione")
+		return
+	}
+	err := call(conn, args, &reply, rpcName)
+	if err != nil {
+		return
+	}
+	fmt.Println("Run", rpcName, key+":"+value, reply.Reply)
 }
-func callDelete(conn *rpc.Client, args common.Args, reply *common.Response, rpcName string) error {
-	err := conn.Call(rpcName+".Delete", args, reply)
+
+func call(conn *rpc.Client, args common.Args, reply *common.Response, rpcName string) error {
+	err := conn.Call(rpcName, args, reply)
 	if err != nil {
 		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC")
 	}
-	//fmt.Println("CLIENT: Richiesta delete effettuata: " + reply.Reply)
 	return nil
 }
 
@@ -208,176 +167,35 @@ func callDelete(conn *rpc.Client, args common.Args, reply *common.Response, rpcN
 //var choice int
 //_, err = fmt.Scan(&choice)
 
-func run1(rpcName string) {
+func run1(rpcName string, done chan bool) {
 
-	// Esegui l'operazione scelta
+	executeCall(rpcName+put, "y", "0")
+	executeCall(rpcName+put, "x", "1")
+	executeCall(rpcName+get, "x")
+	executeCall(rpcName+get, "y")
 
-	args := common.Args{Key: "y", Value: "0"}
-	reply := common.Response{}
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err := callPut(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run1 put y:0", reply.Reply)
-
-	args = common.Args{Key: "x", Value: "1"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callPut(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run1 put x:1", reply.Reply)
-
-	args = common.Args{Key: "x"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run1 get x:", reply.Reply)
-
-	args = common.Args{Key: "y"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run1 get y:", reply.Reply)
+	done <- true
 }
 
-func run2(rpcName string) {
+func run2(rpcName string, done chan bool) {
 
-	// Esegui l'operazione scelta
-	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
-	args := common.Args{Key: "y", Value: "1"}
-	reply := common.Response{}
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err := callPut(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run2 put y:1", reply.Reply)
+	executeCall(rpcName+put, "y", "1")
+	executeCall(rpcName+get, "y")
+	executeCall(rpcName+get, "x")
 
-	args = common.Args{Key: "y"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run2 get y:", reply.Reply)
-
-	args = common.Args{Key: "x"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run2 get x:", reply.Reply)
+	done <- true
 }
 
-func run3(rpcName string) {
-
-	args := common.Args{Key: "x"}
-	reply := common.Response{}
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err := callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run3 get x:", reply.Reply)
-
-	args = common.Args{Key: "y"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run3 get y:", reply.Reply)
+func run3(rpcName string, done chan bool) {
+	executeCall(rpcName+get, "x")
+	executeCall(rpcName+get, "y")
+	done <- true
 }
 
-func run4(rpcName string) {
+func run4(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "x", "0")
+	executeCall(rpcName+get, "y")
+	executeCall(rpcName+get, "x")
 
-	// Esegui l'operazione scelta
-	//args := common.Args{Key: common.GenerateUniqueID(), Value: "ciao"}
-	args := common.Args{Key: "x", Value: "0"}
-	reply := common.Response{}
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err := callPut(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run4 put x:0", reply.Reply)
-
-	args = common.Args{Key: "y"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run4 get y:", reply.Reply)
-
-	args = common.Args{Key: "x"}
-	reply = common.Response{}
-	conn = randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-	err = callGet(conn, args, &reply, rpcName)
-	if err != nil {
-		return
-	}
-	fmt.Println("Run4 get x:", reply.Reply)
+	done <- true
 }
