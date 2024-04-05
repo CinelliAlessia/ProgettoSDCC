@@ -34,53 +34,29 @@ type Message struct {
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
 	fmt.Println("Richiesta GET di", args.Key)
 
-	id := common.GenerateUniqueID() //Id univoco da assegnare al messaggio
-
 	// Incrementa il clock logico e genera il messaggio da inviare a livello applicativo
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
-	message := Message{id, "Get", args, kvs.logicalClock, 3}
+	message := Message{common.GenerateUniqueID(), "Get", args, kvs.logicalClock, 3}
 	kvs.mutexClock.Unlock()
 
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
+
+	// Controllo in while se il messaggio può essere inviato a livello applicativo
 	for {
 		canSend := kvs.controlSendToApplication(message)
 		if canSend {
-
 			// Invio a livello applicativo
 			err := kvs.RealFunction(message, response)
 			if err != nil {
 				return err
 			}
-
 			break
 		}
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 100)
 	}
-	/*
-		for {
-			if kvs.queue[0].Id == message.Id {
-				// la seconda condizione dell'if credo sia inutile, se l'id è davvero univoco
-				// proprio perché è un id associato al messaggio e non una key
-				val, ok := kvs.datastore[message.Args.Key]
-				if !ok {
-					fmt.Println("Key non trovata nel datastore", message.Args.Key)
-					fmt.Println(kvs.datastore)
-					return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", message.Args.Key)
-				}
-				response.Reply = val
-
-				fmt.Println("CONTROLLO GET OK")
-
-				kvs.removeMessageToQueue(message)
-				break
-			} else {
-				fmt.Println("CONTROLLO GET", kvs.queue[0].Id, kvs.queue[0].Args.Key, kvs.queue[0].LogicalClock, "messaggio", message.Id, message.Args.Key, message.Args.Value, message.LogicalClock)
-			}
-			time.Sleep(time.Millisecond * 500)
-		}*/
 	return nil
 }
 
@@ -88,14 +64,17 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
 	fmt.Println("Richiesta PUT di", args.Key, args.Value)
 
-	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
+
+	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	id := common.GenerateUniqueID()
 	message := Message{id, "Put", args, kvs.logicalClock, 0}
+
 	kvs.mutexClock.Unlock()
 
-	err := kvs.sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message)
+	// Invio la richiesta a tutti i server per sincronizzare i datastore
+	err := kvs.sendToOtherServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
 	if err != nil {
 		return err
 	}
@@ -116,7 +95,8 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 
 	kvs.mutexClock.Unlock()
 
-	err := kvs.sendToOtherServer("KeyValueStoreSequential.MulticastTotalOrdered", message)
+	// Invio la richiesta a tutti i server per sincronizzare i datastore
+	err := kvs.sendToOtherServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
 	if err != nil {
 		return err
 	}
@@ -132,7 +112,7 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 		kvs.datastore[message.Args.Key] = message.Args.Value
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
 		delete(kvs.datastore, message.Args.Key)
-	} else if message.TypeOfMessage == "Get" {
+	} else if message.TypeOfMessage == "Get" { // Lettura
 		val, ok := kvs.datastore[message.Args.Key]
 		if !ok {
 			fmt.Println("Key non trovata nel datastore", message.Args.Key)
@@ -160,7 +140,6 @@ func (kvs *KeyValueStoreSequential) sendToOtherServer(rpcName string, message Me
 	// Raccoglie i risultati dalle chiamate RPC
 	for i := 0; i < common.Replicas; i++ {
 		if err := <-resultChan; err != nil {
-			// Gestisci l'errore in base alle tue esigenze
 			return err
 		}
 	}

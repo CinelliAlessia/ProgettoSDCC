@@ -1,5 +1,3 @@
-// MulticastTotalOrdered.go Totally Ordered Multicast
-
 package main
 
 import (
@@ -12,20 +10,10 @@ import (
 	"time"
 )
 
-// Algoritmo distribuito MULTICAST TOT. ORDINATO:
-// Ogni messaggio abbia come timestamp il clock logico scalare del processo che lo invia.
-//1. pi invia in multicast (incluso se stesso) il messaggio di update msg_i.
-//2. msg_i viene posto da ogni processo destinatario pj in una coda locale queue_j, ordinata in base al valore del timestamp.
-//3. pj invia in multicast un messaggio di ack della ricezione di msg_i.
-//4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
-//	da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
-//(quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
-//timestamp potenzialmente minore o uguale a quello di msg_i).
-
-// MulticastTotalOrdered gestione dell'evento esterno ricevuto da un server
-func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply *bool) error {
+// TotalOrderedMulticast gestione dell'evento esterno ricevuto da un server
+func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply *bool) error {
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
-	fmt.Println("MulticastTotalOrdered: Ho ricevuto la richiesta che mi è stata inoltrata da un server", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+	fmt.Println("TotalOrderedMulticast: Ho ricevuto la richiesta che mi è stata inoltrata da un server", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiunta della richiesta in coda
 	kvs.addToSortQueue(message)
@@ -63,7 +51,7 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 	if *reply {
 		return nil
 	}
-	return fmt.Errorf("MulticastTotalOrdered non andato a buon fine")
+	return fmt.Errorf("TotalOrderedMulticast non andato a buon fine")
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.

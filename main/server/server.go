@@ -11,30 +11,28 @@ import (
 	"time"
 )
 
-// server.go
-// Questo è il codice dei server replica, che vengono contattati dai client tramite una procedura rpc
-// e rispondono in maniera adeguata.
-
+// Questo è il codice dei server replica, che vengono contattati dai client tramite una procedura rpc.
 func main() {
 
 	var idStr string
 
-	if os.Getenv("CONFIG") == "1" {
-		/*---LOCALE---*/
-		if len(os.Args) < 2 { //Legge l'argomento passato
+	// CONFIG è una variabile d'ambiente utilizzata per identificare se il programma verrà eseguito in locale oppure su docker.
+	if os.Getenv("CONFIG") == "1" { /*---LOCALE---*/
+
+		if len(os.Args) < 2 { // Controllo se è stato passato per argomento l'id del server
 			fmt.Println("Usare: ", os.Args[0], "<ID_Server>")
 			os.Exit(1)
 		}
 
 		// Legge l'ID del server passato come argomento dalla riga di comando
 		idStr = os.Args[1]
-	} else {
-		/*---DOCKER---*/
+	} else { /*---DOCKER---*/
+
 		// Ottieni la porta da una variabile d'ambiente o assegna un valore predefinito
 		idStr = os.Getenv("SERVER_ID")
 	}
 
-	// Converti l'ID del server in un intero
+	// Converti l'ID del server in un intero per calcolare il numero di porta su cui mettersi in ascolto
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		fmt.Println("Errore:", err)
@@ -42,7 +40,7 @@ func main() {
 	}
 	port := common.ReplicaPorts[id]
 
-	// Inizializzazione delle strutture KeyValueStoreCausale e KeyValueStoreSequential
+	// Inizializzazione delle strutture
 
 	// ----- CONSISTENZA CAUSALE -----
 	kvCausale := &KeyValueStoreCausale{
@@ -79,11 +77,11 @@ func main() {
 		return
 	}
 
-	// Avvio della goroutine per stampare il datastore
+	// Avvio della goroutine per stampare la coda e il datastore
 	go printQueue(kvSequential)
 	go printDatastore(kvSequential)
 
-	// Ciclo per accettare e gestire le connessioni in arrivo
+	// Ciclo per accettare e gestire le connessioni in arrivo in maniera asincrona
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -96,7 +94,7 @@ func main() {
 	}
 }
 
-// Funzione per stampare il datastore ogni 500 millisecondi
+// Funzione debug: Stampa la queue del server replica
 func printQueue(kv *KeyValueStoreSequential) {
 	for {
 		time.Sleep(1500 * time.Millisecond)
@@ -111,7 +109,7 @@ func printQueue(kv *KeyValueStoreSequential) {
 	}
 }
 
-// Funzione per stampare il datastore ogni 500 millisecondi
+// Funzione debug: Stampa il datastore del server replica
 func printDatastore(kv *KeyValueStoreSequential) {
 	for {
 		time.Sleep(1500 * time.Millisecond)
