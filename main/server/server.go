@@ -80,7 +80,7 @@ func main() {
 	}
 
 	// Avvio della goroutine per stampare il datastore
-	go printDatastore(kvSequential)
+	go printQueue(kvSequential)
 
 	// Ciclo per accettare e gestire le connessioni in arrivo
 	for {
@@ -95,10 +95,17 @@ func main() {
 	}
 }
 
-// Funzione per stampare il datastore ogni 100 millisecondi
-func printDatastore(kv *KeyValueStoreSequential) {
+// Funzione per stampare il datastore ogni 500 millisecondi
+func printQueue(kv *KeyValueStoreSequential) {
 	for {
-		time.Sleep(500 * time.Millisecond)
-		fmt.Println("Datastore:", kv.datastore)
+		time.Sleep(1000 * time.Millisecond)
+
+		// Controllo se il datastore è vuoto
+		if len(kv.queue) == 0 {
+			fmt.Println("Queue vuota")
+			continue // Salta alla prossima iterazione del ciclo
+		}
+
+		fmt.Println("Queue:", kv.queue)
 	}
 }
