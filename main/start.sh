@@ -3,6 +3,8 @@
 # Imposta la variabile di ambiente
 export CONFIG=1 # 1 locale, 2 docker
 
+pkill gnome-terminal
+
 if [ "$CONFIG" -eq 1 ]; then
 
   # Percorsi dei file Go

@@ -67,8 +67,6 @@ func main() {
 			println("OK", i)
 			<-done
 		}
-
-		fmt.Println("Finito richieste")
 	}
 }
 
