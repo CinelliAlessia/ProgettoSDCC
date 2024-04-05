@@ -67,34 +67,6 @@ func (kvs *KeyValueStoreSequential) MulticastTotalOrdered(message Message, reply
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
-/*
-func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
-
-	// Trova il messaggio nella coda
-	newMessage := kvs.findByID(message.Id)
-	if newMessage.Id == "" {
-		// PROBLEMA RISOLTO: ricevo prima l'ack che la notifica che c'è un evento dovrei aggiungerlo ma ci sarebbero problemi
-		// se me ne arrivano due di ack prima della richiesta? :( -> risolto, viene rinviato l'ack se io rispondo false
-		*reply = false
-		return nil
-		// kvs.addToSortQueue(message)
-	}
-
-	// Incrementa il conteggio degli ack
-
-	// TODO: partono due ReceiveAck in contemporanea, entrambi incrementano l'ack a due e entrambi lo impostano a 2. ma uno era 2 e l'altro 3
-	// devo ricevere un puntatore al messaggio e incrementarlo con i lucchetti, cosi non va bene.
-	kvs.updateMessageByID(message)
-	fmt.Println("ReceiveAck: Ho ricevuto un ack")
-
-	// Aggiorna il messaggio nella coda
-	//kvs.updateMessageByID(newMessage)
-
-	*reply = true
-	return nil
-} */
-
-// ReceiveAck gestisce gli ack dei messaggi ricevuti.
 // Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
 func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
 	fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
@@ -109,6 +81,7 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 // l'ordinamento è deterministico, per garantire ordinamento totale, ordinandolo in base all'id.
 func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 	kvs.mutexQueue.Lock()
+	defer kvs.mutexQueue.Unlock()
 	kvs.queue = append(kvs.queue, message)
 
 	// Ordina la coda in base al logicalClock
@@ -118,23 +91,18 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 		}
 		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
 	})
-
-	kvs.mutexQueue.Unlock()
 }
 
-// controlSendToApplication verifica se è possibile inviare la richiesta a livello apllicativo
+// controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo
 // 4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
 // da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
 // (quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 // timestamp potenzialmente minore o uguale a quello di msg_i)
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bool {
-
-	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck == common.Replicas /*&& kvs.queue[0].LogicalClock == message.LogicalClock*/ {
+	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck >= common.Replicas {
 		//fmt.Println("controlSendToApplication: Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla mia coda")
-		kvs.removeMessage(message)
+		kvs.removeMessageToQueue(message)
 		return true
-	} else {
-		//fmt.Println("ID ", kvs.queue[0].Id, message.Id, "Ack ", kvs.queue[0].NumberAck, common.Replicas)
 	}
 	return false
 }
@@ -202,17 +170,13 @@ func (kvs *KeyValueStoreSequential) findMessage(message Message) *Message {
 }
 
 // removeByID Rimuove un messaggio dalla coda basato sull'ID
-func (kvs *KeyValueStoreSequential) removeMessage(message Message) {
-	for i := range kvs.queue {
-		kvs.mutexQueue.Lock()
-		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
-			// Rimuovi l'elemento dalla slice
-			kvs.queue = append(kvs.queue[:i], kvs.queue[i+1:]...)
-			//fmt.Println("removeByID: Messaggio con ID", message.Id, "rimosso dalla coda")
-			kvs.mutexQueue.Unlock()
-			return
-		}
-		kvs.mutexQueue.Unlock()
+func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
+	kvs.mutexQueue.Lock()
+	defer kvs.mutexQueue.Unlock()
+	if kvs.queue[0].Id == message.Id {
+		// Rimuovi l'elemento dalla slice
+		kvs.queue = kvs.queue[1:]
+		return
 	}
 	//fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
 }
