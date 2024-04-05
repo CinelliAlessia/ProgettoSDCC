@@ -13,7 +13,7 @@ import (
 // TotalOrderedMulticast gestione dell'evento esterno ricevuto da un server
 func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply *bool) error {
 	// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
-	fmt.Println("TotalOrderedMulticast: Ho ricevuto la richiesta che mi è stata inoltrata da un server", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+	//fmt.Println("TotalOrderedMulticast: Ho ricevuto la richiesta che mi è stata inoltrata da un server", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiunta della richiesta in coda
 	kvs.addToSortQueue(message)
@@ -57,7 +57,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
 // Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
 func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
-	fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+	//fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiorna il messaggio nella coda
 	*reply = kvs.updateMessage(message)
@@ -97,7 +97,7 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bo
 
 // sendAck invia a tutti i server un Ack
 func (kvs *KeyValueStoreSequential) sendAck(message Message) {
-	fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+	//fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	reply := false
 
@@ -177,7 +177,7 @@ func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 			kvs.queue[i].NumberAck++
 			kvs.mutexQueue.Unlock()
 
-			fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+			//fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 			return true
 		}
 	}

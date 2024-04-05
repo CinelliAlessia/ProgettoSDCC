@@ -78,8 +78,8 @@ func main() {
 	}
 
 	// Avvio della goroutine per stampare la coda e il datastore
-	go printQueue(kvSequential)
-	go printDatastore(kvSequential)
+	//go printQueue(kvSequential)
+	//go printDatastore(kvSequential)
 
 	// Ciclo per accettare e gestire le connessioni in arrivo in maniera asincrona
 	for {

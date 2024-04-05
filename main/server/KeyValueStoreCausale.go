@@ -123,13 +123,13 @@ func (kvc *KeyValueStoreCausale) sendToOtherServer(rpcName string, message Messa
 			if os.Getenv("CONFIG") == "1" {
 				/*---LOCALE---*/
 				// Connessione al server RPC casuale
-				fmt.Println("sendToOtherServer: Contatto il server:", ":"+replicaPort)
+				fmt.Println("sendToAllServer: Contatto il server:", ":"+replicaPort)
 				conn, err = rpc.Dial("tcp", ":"+replicaPort)
 
 			} else {
 				/*---DOCKER---*/
 				// Connessione al server RPC casuale
-				fmt.Println("sendToOtherServer: Contatto il server:", "server"+strconv.Itoa(i+1)+":"+replicaPort)
+				fmt.Println("sendToAllServer: Contatto il server:", "server"+strconv.Itoa(i+1)+":"+replicaPort)
 				conn, err = rpc.Dial("tcp", "server"+strconv.Itoa(i+1)+":"+replicaPort)
 			}
 			if err != nil {

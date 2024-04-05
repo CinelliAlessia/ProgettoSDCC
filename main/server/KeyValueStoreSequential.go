@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"main/common"
 	"net/rpc"
 	"os"
@@ -32,7 +33,7 @@ type Message struct {
 
 // Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
-	fmt.Println("Richiesta GET di", args.Key)
+	//fmt.Println("Richiesta GET di", args.Key)
 
 	// Incrementa il clock logico e genera il messaggio da inviare a livello applicativo
 	kvs.mutexClock.Lock()
@@ -62,7 +63,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
-	fmt.Println("Richiesta PUT di", args.Key, args.Value)
+	//fmt.Println("Richiesta PUT di", args.Key, args.Value)
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
@@ -74,7 +75,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.mutexClock.Unlock()
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := kvs.sendToOtherServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
+	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
 	if err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.mutexClock.Unlock()
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := kvs.sendToOtherServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
+	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
 	if err != nil {
 		return err
 	}
@@ -110,8 +111,12 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 		kvs.datastore[message.Args.Key] = message.Args.Value
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "with logicalClock", message.LogicalClock)
+
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
 		delete(kvs.datastore, message.Args.Key)
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+
 	} else if message.TypeOfMessage == "Get" { // Lettura
 		val, ok := kvs.datastore[message.Args.Key]
 		if !ok {
@@ -123,12 +128,11 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 	} else {
 		return fmt.Errorf("command not found")
 	}
-
 	return nil
 }
 
-// sendToOtherServer invia a tutti i server la richiesta rpcName
-func (kvs *KeyValueStoreSequential) sendToOtherServer(rpcName string, message Message) error {
+// sendToAllServer invia a tutti i server la richiesta rpcName
+func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Message) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
 
@@ -150,23 +154,20 @@ func (kvs *KeyValueStoreSequential) sendToOtherServer(rpcName string, message Me
 func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, resultChan chan<- error, replicaIndex int) {
 	var serverName string
 
-	if os.Getenv("CONFIG") == "1" {
-		/*---LOCALE---*/
+	if os.Getenv("CONFIG") == "1" { /*---LOCALE---*/
 		serverName = ":" + common.ReplicaPorts[replicaIndex]
-	} else if os.Getenv("CONFIG") == "2" {
-		/*---DOCKER---*/
+	} else if os.Getenv("CONFIG") == "2" { /*---DOCKER---*/
 		serverName = "server" + strconv.Itoa(replicaIndex+1) + ":" + common.ReplicaPorts[replicaIndex]
-	} else {
-		// Gestione dell'errore se la variabile di ambiente non è corretta
+	} else { // Gestione dell'errore se la variabile di ambiente non è corretta
 		resultChan <- fmt.Errorf("VARIABILE DI AMBIENTE ERRATA")
 		return
 	}
 
-	fmt.Println("sendToOtherServer: Contatto il server:", serverName)
+	//fmt.Println("sendToAllServer: Contatto", serverName)
 	conn, err := rpc.Dial("tcp", serverName)
 	if err != nil {
 		// Gestione dell'errore durante la connessione al server
-		resultChan <- fmt.Errorf("errore durante la connessione al server %s: %v", serverName, err)
+		resultChan <- fmt.Errorf("errore durante la connessione con %s: %v", serverName, err)
 		return
 	}
 

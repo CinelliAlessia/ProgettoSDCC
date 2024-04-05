@@ -133,6 +133,7 @@ func randomDelay() {
 }
 
 func executeCall(rpcName, key string, values ...string) {
+	randomDelay()
 	var value string
 	if len(values) > 0 {
 		value = values[0]

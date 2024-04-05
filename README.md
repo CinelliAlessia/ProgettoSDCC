@@ -1,5 +1,7 @@
 *DIPENDENZE*
-- Aggiunta dipendenza esterna import "github.com/google/uuid" in KeyValueStoreSequential
+- Aggiunta dipendenza esterna:
+  - import "github.com/google/uuid" in KeyValueStoreSequential
+  - import "github.com/fatih/color" ma prima go get -u github.com/fatih/color
 
 *LOCALE e DOCKER*
 - Per variare da utilizzo locale e utilizzo docker cambiare unicamente la variabile globale nel file start.sh
