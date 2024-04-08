@@ -98,6 +98,7 @@ func specificConnect(index int) *rpc.Client {
 
 func randomDelay() {
 	// Genera un numero casuale compreso tra 0 e 999 (max un secondo)
+	//TODO: time.newTimer?
 	delay := rand.Intn(1000)
 
 	// Introduce un ritardo casuale

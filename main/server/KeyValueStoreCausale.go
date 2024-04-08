@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"main/common"
 	"net/rpc"
 	"sync"
@@ -26,14 +27,15 @@ type MessageC struct {
 	TypeOfMessage string
 	Args          common.Args
 	VectorClock   [common.Replicas]int // Orologio vettoriale
-	NumberAck     int
 }
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
+	//fmt.Println("Richiesta GET di", args.Key)
+
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
-	message := MessageC{common.GenerateUniqueID(), kvc.id, "Get", args, kvc.vectorClock, 3}
+	message := MessageC{common.GenerateUniqueID(), kvc.id, "Get", args, kvc.vectorClock}
 	kvc.mutexClock.Unlock()
 
 	kvc.addToQueue(message)
@@ -58,13 +60,13 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response) error {
-	fmt.Println("KeyValueStoreCausale: Comando PUT eseguito")
+	//fmt.Println("Richiesta PUT di", args.Key, args.Value)
 
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	message := MessageC{common.GenerateUniqueID(), kvc.id, "Put", args, kvc.vectorClock, 0}
+	message := MessageC{common.GenerateUniqueID(), kvc.id, "Put", args, kvc.vectorClock}
 	kvc.mutexClock.Unlock()
 
 	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message)
@@ -78,12 +80,11 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Response) error {
-	fmt.Println("KeyValueStoreCausale: Comando PUT eseguito")
 
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	message := MessageC{common.GenerateUniqueID(), kvc.id, "Delete", args, kvc.vectorClock, 0}
+	message := MessageC{common.GenerateUniqueID(), kvc.id, "Delete", args, kvc.vectorClock}
 	kvc.mutexClock.Unlock()
 
 	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message)
@@ -141,27 +142,27 @@ func (kvc *KeyValueStoreCausale) callRPC(rpcName string, message MessageC, resul
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente
-func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, _ *common.Response) error {
+func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common.Response) error {
 
 	if message.TypeOfMessage == "Put" { // Scrittura
-		kvc.mutexClock.Lock()
-		fmt.Println("Key inserita ", message.Args.Key)
 		kvc.datastore[message.Args.Key] = message.Args.Value
-		fmt.Println("DATASTORE:")
-		fmt.Println(kvc.datastore)
-		kvc.mutexClock.Unlock()
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
-		kvc.mutexClock.Lock()
-		fmt.Println("Key eliminata ", message.Args.Key)
 		delete(kvc.datastore, message.Args.Key)
-		fmt.Println("DATASTORE:")
-		fmt.Println(kvc.datastore)
-		kvc.mutexClock.Unlock()
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 
+	} else if message.TypeOfMessage == "Get" { // Lettura
+		val, ok := kvc.datastore[message.Args.Key]
+		if !ok {
+			fmt.Println("Key non trovata nel datastore", message.Args.Key)
+			fmt.Println(kvc.datastore)
+			return fmt.Errorf("KeyValueStoreCausale: key '%s' not found", message.Args.Key)
+		}
+		response.Reply = val
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key)
 	} else {
 		return fmt.Errorf("command not found")
 	}
-
 	return nil
 }

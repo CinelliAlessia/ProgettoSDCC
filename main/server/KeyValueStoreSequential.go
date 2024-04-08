@@ -104,32 +104,6 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	return nil
 }
 
-// RealFunction esegue l'operazione di put e di delete realmente
-func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *common.Response) error {
-
-	if message.TypeOfMessage == "Put" { // Scrittura
-		kvs.datastore[message.Args.Key] = message.Args.Value
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "with logicalClock", message.LogicalClock)
-
-	} else if message.TypeOfMessage == "Delete" { // Scrittura
-		delete(kvs.datastore, message.Args.Key)
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
-
-	} else if message.TypeOfMessage == "Get" { // Lettura
-		val, ok := kvs.datastore[message.Args.Key]
-		if !ok {
-			fmt.Println("Key non trovata nel datastore", message.Args.Key)
-			fmt.Println(kvs.datastore)
-			return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", message.Args.Key)
-		}
-		response.Reply = val
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key, "with logicalClock", message.LogicalClock)
-	} else {
-		return fmt.Errorf("command not found")
-	}
-	return nil
-}
-
 // sendToAllServer invia a tutti i server la richiesta rpcName
 func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Message) error {
 	// Canale per ricevere i risultati delle chiamate RPC
@@ -173,4 +147,30 @@ func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, res
 
 	// Aggiungi il risultato al canale dei risultati
 	resultChan <- nil
+}
+
+// RealFunction esegue l'operazione di put e di delete realmente
+func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *common.Response) error {
+
+	if message.TypeOfMessage == "Put" { // Scrittura
+		kvs.datastore[message.Args.Key] = message.Args.Value
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "with logicalClock", message.LogicalClock)
+
+	} else if message.TypeOfMessage == "Delete" { // Scrittura
+		delete(kvs.datastore, message.Args.Key)
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+
+	} else if message.TypeOfMessage == "Get" { // Lettura
+		val, ok := kvs.datastore[message.Args.Key]
+		if !ok {
+			fmt.Println("Key non trovata nel datastore", message.Args.Key)
+			fmt.Println(kvs.datastore)
+			return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", message.Args.Key)
+		}
+		response.Reply = val
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key, "with logicalClock", message.LogicalClock)
+	} else {
+		return fmt.Errorf("command not found")
+	}
+	return nil
 }

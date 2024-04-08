@@ -36,13 +36,6 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, repl
 
 	kvc.addToQueue(message)
 
-	// Aggiornamento del clock
-	kvc.mutexClock.Lock()
-	for i := 0; i < common.Replicas; i++ {
-		kvc.vectorClock[i] = common.Max(message.VectorClock[i], kvc.vectorClock[i])
-	}
-	kvc.mutexClock.Unlock()
-
 	// Ciclo finché controlSendToApplication non restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
 	*reply = false
@@ -62,7 +55,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, repl
 		}
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 1000)
 	}
 	return nil
 }
@@ -94,20 +87,28 @@ livello applicativo finché non si verificano entrambe le seguenti condizioni:
 */
 func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool {
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
-	if message.VectorClock[message.IdSender] == kvc.vectorClock[message.IdSender]+1 {
+	if message.IdSender != kvc.id && message.VectorClock[message.IdSender] == kvc.vectorClock[message.IdSender]+1 {
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
-		for indx := range len(message.VectorClock) {
-			if indx != message.IdSender && message.VectorClock[indx] > kvc.vectorClock[indx] {
+		for index := range message.VectorClock {
+			if index != message.IdSender && message.VectorClock[index] > kvc.vectorClock[index] {
 				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
-				fmt.Println("Index", indx, "message.Id", message.IdSender, "", message.VectorClock[indx], "", kvc.vectorClock[indx])
+				fmt.Println("Index", index, "message.Id", message.IdSender, "", message.VectorClock[index], "", kvc.vectorClock[index])
 				return false
 			}
 		}
 		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
+		fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso (no +1):", kvc.vectorClock, "id", message.IdSender)
+		kvc.mutexClock.Lock()
+		kvc.vectorClock[message.IdSender] = message.VectorClock[message.IdSender]
+		kvc.mutexClock.Unlock()
+		return true
+	} else if message.IdSender == kvc.id {
+		fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", kvc.vectorClock, "id", message.IdSender)
 		return true
 	}
 	// Una delle condizioni non è soddisfatta, il messaggio non può essere consegnato al livello applicativo
+	fmt.Println("La condizione NON è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso (no +1):", kvc.vectorClock, "id", message.IdSender)
 	return false
 }
 
