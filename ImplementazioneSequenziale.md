@@ -23,5 +23,5 @@ timestamp potenzialmente minore o uguale a quello di msg_i).
 
 *PROBLEMA*
 - Mi arriva prima un ack e dopo la richiesta di append => Ignoro e rispondo "false" cosi che mi venga re-inviata.
-- 
-
+- Errore Pacchetto 163: Due dei tre server replica ricevono tutti e 3 gli ack, uno soltanto non ha ricevuto un ack (Strano): gli altri due server vanno avanti nell'elaborazione dei pacchetti perché hanno tutti gli ack dei successivi, il server che ha perso l'ack rimane bloccato. => Le assunzioni per eseguire il multicast totalmente ordinato prevedono che la comunicazione sia affidabile, potrei risolvere il problema allo stesso modo di cui sopra? La parte di codice più indagata è la sincronizzazione con l'incremento dell'ack.
+![img.png](resources/img.png) 
