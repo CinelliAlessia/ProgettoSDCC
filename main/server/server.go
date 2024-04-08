@@ -89,16 +89,14 @@ func main() {
 		}
 
 		// Avvia la gestione della connessione in un goroutine
-		go func() {
-			defer func(conn net.Conn) {
-				err := conn.Close()
-				if err != nil {
-					return
-				}
-			}(conn) // Chiudi la connessione al termine della gestione della richiesta
-			// Serve la richiesta
+		go func(conn net.Conn) {
 			rpc.ServeConn(conn)
-		}()
+
+			err := conn.Close()
+			if err != nil {
+				fmt.Println("SERVER: Errore nella chiusura della connessione:", err)
+			}
+		}(conn)
 	}
 }
 

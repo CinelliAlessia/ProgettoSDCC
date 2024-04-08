@@ -38,12 +38,10 @@ func main() {
 		case 1:
 			fmt.Println("Scelta di consistenza causale")
 			rpcName = "KeyValueStoreCausale"
-			//causal(args, &reply)
 			break
 		case 2:
 			fmt.Println("Scelta di consistenza sequenziale")
 			rpcName = "KeyValueStoreSequential"
-			//sequential(args, &reply)
 			break
 		default:
 			fmt.Println("Scelta non valida. Riprova.")
@@ -103,7 +101,7 @@ func randomDelay() {
 	delay := rand.Intn(1000)
 
 	// Introduce un ritardo casuale
-	time.Sleep(time.Duration(delay) * time.Millisecond)
+	time.Sleep(time.Millisecond * time.Duration(delay))
 }
 
 func executeCall(rpcName, key string, values ...string) {

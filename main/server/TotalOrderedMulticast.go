@@ -58,12 +58,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply
 // Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
 func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) error {
 	//fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
-
-	// Aggiorna il messaggio nella coda
-	kvs.mutexQueue.Lock()
 	*reply = kvs.updateMessage(message)
-	kvs.mutexQueue.Unlock()
-
 	return nil
 }
 
@@ -83,6 +78,33 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 	})
 }
 
+// removeByID Rimuove un messaggio dalla coda basato sull'ID
+func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
+	kvs.mutexQueue.Lock()
+	defer kvs.mutexQueue.Unlock()
+	if kvs.queue[0].Id == message.Id {
+		// Rimuovi l'elemento dalla slice
+		kvs.queue = kvs.queue[1:]
+		return
+	}
+	fmt.Println("AAA removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
+}
+
+// updateMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
+func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
+	// Aggiorna il messaggio nella coda
+	kvs.mutexQueue.Lock()
+	defer kvs.mutexQueue.Unlock()
+	for i := range kvs.queue {
+		if kvs.queue[i].Id == message.Id {
+			kvs.queue[i].NumberAck++
+			//fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+			return true
+		}
+	}
+	return false
+}
+
 // controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo
 // 4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
 // da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
@@ -99,23 +121,17 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bo
 
 // sendAck invia a tutti i server un Ack
 func (kvs *KeyValueStoreSequential) sendAck(message Message) {
-	reply := false
-
 	for i := 0; i < common.Replicas; i++ {
 		i := i
 		go func(replicaPort string) {
+			reply := false
+
 			serverName := common.GetServerName(replicaPort, i)
 			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
 				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
 				return
 			}
-			defer func(conn *rpc.Client) {
-				err := conn.Close()
-				if err != nil {
-					return
-				}
-			}(conn)
 
 			for {
 				err = sendAckRPC(conn, message, &reply)
@@ -128,6 +144,12 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 					break
 				}
 				fmt.Printf("AAA sendAck: il server %s non è riuscito ad incrementare il numero di ack!\n", replicaPort)
+			}
+
+			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
+			err = conn.Close()
+			if err != nil {
+				return
 			}
 		}(common.ReplicaPorts[i])
 	}
@@ -149,28 +171,4 @@ func (kvs *KeyValueStoreSequential) findMessage(message Message) *Message {
 		}
 	}
 	return &Message{}
-}
-
-// removeByID Rimuove un messaggio dalla coda basato sull'ID
-func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
-	kvs.mutexQueue.Lock()
-	defer kvs.mutexQueue.Unlock()
-	if kvs.queue[0].Id == message.Id {
-		// Rimuovi l'elemento dalla slice
-		kvs.queue = kvs.queue[1:]
-		return
-	}
-	fmt.Println("AAA removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
-}
-
-// updateMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
-func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
-	for i := range kvs.queue {
-		if kvs.queue[i].Id == message.Id {
-			kvs.queue[i].NumberAck++
-			//fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
-			return true
-		}
-	}
-	return false
 }
