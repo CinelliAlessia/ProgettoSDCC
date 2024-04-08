@@ -125,6 +125,7 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 			return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", message.Args.Key)
 		}
 		response.Reply = val
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key, "with logicalClock", message.LogicalClock)
 	} else {
 		return fmt.Errorf("command not found")
 	}
