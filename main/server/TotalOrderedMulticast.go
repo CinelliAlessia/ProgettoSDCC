@@ -60,7 +60,9 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message Message, reply *bool) err
 	//fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiorna il messaggio nella coda
+	kvs.mutexQueue.Lock()
 	*reply = kvs.updateMessage(message)
+	kvs.mutexQueue.Unlock()
 
 	return nil
 }
@@ -169,14 +171,11 @@ func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
 	//fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
 }
 
-// updateMessage aggiorna il messaggio in coda corrispondente all'id del messaggio passato in argomento
+// updateMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
 func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 	for i := range kvs.queue {
-		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
-			kvs.mutexQueue.Lock()
+		if kvs.queue[i].Id == message.Id {
 			kvs.queue[i].NumberAck++
-			kvs.mutexQueue.Unlock()
-
 			//fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 			return true
 		}
