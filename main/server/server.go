@@ -8,7 +8,6 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
-	"time"
 )
 
 // Questo è il codice dei server replica, che vengono contattati dai client tramite una procedura rpc.
@@ -85,41 +84,40 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("SERVER: Errore nell'accettare la connessione:", err)
+			fmt.Println("SERVER: Errore nell'accettare la connessione dal client:", err)
 			continue
 		}
 
 		// Avvia la gestione della connessione in un goroutine
-		go rpc.ServeConn(conn)
+		go func() {
+			defer func(conn net.Conn) {
+				err := conn.Close()
+				if err != nil {
+					return
+				}
+			}(conn) // Chiudi la connessione al termine della gestione della richiesta
+			// Serve la richiesta
+			rpc.ServeConn(conn)
+		}()
 	}
 }
 
 // Funzione debug: Stampa la queue del server replica
 func printQueue(kv *KeyValueStoreSequential) {
-	for {
-		time.Sleep(1500 * time.Millisecond)
-
-		// Controllo se il datastore è vuoto
-		if len(kv.queue) == 0 {
-			fmt.Println("Queue vuota")
-			continue // Salta alla prossima iterazione del ciclo
-		}
-
-		fmt.Println("Queue:", kv.queue)
+	// Controllo se il datastore è vuoto
+	if len(kv.queue) == 0 {
+		fmt.Println("Queue vuota")
 	}
+
+	fmt.Println("Queue:", kv.queue)
 }
 
 // Funzione debug: Stampa il datastore del server replica
 func printDatastore(kv *KeyValueStoreSequential) {
-	for {
-		time.Sleep(1500 * time.Millisecond)
 
-		// Controllo se il datastore è vuoto
-		if len(kv.datastore) == 0 {
-			fmt.Println("Datastore vuota")
-			continue // Salta alla prossima iterazione del ciclo
-		}
-
-		fmt.Println("Datastore:", kv.datastore)
+	// Controllo se il datastore è vuoto
+	if len(kv.datastore) == 0 {
+		fmt.Println("Datastore vuota")
 	}
+	fmt.Println("Datastore:", kv.datastore)
 }
