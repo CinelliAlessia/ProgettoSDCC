@@ -5,12 +5,13 @@ import (
 	"main/common"
 	"net/rpc"
 	"sync"
+	"time"
 )
 
 // KeyValueStoreCausale rappresenta il servizio di memorizzazione chiave-valore
 type KeyValueStoreCausale struct {
 	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-	id        int
+	id        int               // Id che identifica il server stesso
 
 	vectorClock [common.Replicas]int // Orologio vettoriale
 	mutexClock  sync.Mutex
@@ -20,7 +21,8 @@ type KeyValueStoreCausale struct {
 }
 
 type MessageC struct {
-	Id            string
+	Id            string // Id del messaggio stesso
+	IdSender      int    // IdSender rappresenta l'indice del server che invia il messaggio
 	TypeOfMessage string
 	Args          common.Args
 	VectorClock   [common.Replicas]int // Orologio vettoriale
@@ -29,35 +31,28 @@ type MessageC struct {
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
-	fmt.Println("Richiesta GET")
-
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
+	message := MessageC{common.GenerateUniqueID(), kvc.id, "Get", args, kvc.vectorClock, 3}
 	kvc.mutexClock.Unlock()
 
-	id := common.GenerateUniqueID()
-	id = "b"
+	kvc.addToQueue(message)
 
-	message := MessageC{id, "Get", args, kvc.vectorClock, 0}
-	kvc.addToSortQueue(message)
-
+	// Controllo in while se il messaggio può essere inviato a livello applicativo
 	for {
-		if kvc.queue[0].Id == message.Id /*&& sort come si deve*/ {
-			kvc.mutexClock.Lock()
-			val, ok := kvc.datastore[message.Args.Key]
-			if !ok {
-				fmt.Println("Key non trovata nel datastore", message.Args.Key)
-				fmt.Println(kvc.datastore)
-				return fmt.Errorf("KeyValueStoreCausale: key '%s' not found", id)
+		canSend := kvc.controlSendToApplication(message)
+		if canSend {
+			// Invio a livello applicativo
+			err := kvc.RealFunction(message, response)
+			if err != nil {
+				return err
 			}
-			kvc.removeMessage(message)
-			kvc.mutexClock.Unlock()
-			response.Reply = val
 			break
 		}
+
+		// Altrimenti, attendi un breve periodo prima di riprovare
+		time.Sleep(time.Millisecond * 100)
 	}
-	fmt.Println("DATASTORE:")
-	fmt.Println(kvc.datastore)
 	return nil
 }
 
@@ -67,15 +62,12 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
-	kvc.mutexClock.Unlock()
-
-	id := common.GenerateUniqueID()
-	id = "a"
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	message := MessageC{id, "Put", args, kvc.vectorClock, 0}
-	var reply *bool
-	err := kvc.sendToOtherServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, reply)
+	message := MessageC{common.GenerateUniqueID(), kvc.id, "Put", args, kvc.vectorClock, 0}
+	kvc.mutexClock.Unlock()
+
+	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message)
 	if err != nil {
 		return err
 	}
@@ -90,15 +82,11 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
+	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
+	message := MessageC{common.GenerateUniqueID(), kvc.id, "Delete", args, kvc.vectorClock, 0}
 	kvc.mutexClock.Unlock()
 
-	id := common.GenerateUniqueID()
-	id = "a"
-
-	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	message := MessageC{id, "Delete", args, kvc.vectorClock, 0}
-	var reply *bool
-	err := kvc.sendToOtherServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, reply)
+	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message)
 	if err != nil {
 		return err
 	}
@@ -107,36 +95,49 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 	return nil
 }
 
-// sendToOtherServer invia a tutti i server la richiesta rpcName
-func (kvc *KeyValueStoreCausale) sendToOtherServer(rpcName string, message MessageC, response *bool) error {
+// sendToAllServer invia a tutti i server la richiesta rpcName
+func (kvc *KeyValueStoreCausale) sendToAllServer(rpcName string, message MessageC) error {
+	// Canale per ricevere i risultati delle chiamate RPC
+	resultChan := make(chan error, common.Replicas)
 
-	//var responseValues [common.Replicas]common.Response
+	// Itera su tutte le repliche e avvia le chiamate RPC
 	for i := 0; i < common.Replicas; i++ {
-		i := i
-		go func(replicaPort string) {
-			serverName := common.GetServerName(replicaPort, i)
-			conn, err := rpc.Dial("tcp", serverName)
-			if err != nil {
-				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
-				return
-			}
-			defer func(conn *rpc.Client) {
-				err := conn.Close()
-				if err != nil {
-					return
-				}
-			}(conn)
+		go kvc.callRPC(rpcName, message, resultChan, i)
+	}
 
-			// Chiama il metodo "rpcName" sul server
-			err = conn.Call(rpcName, message, &response)
-			if err != nil {
-				fmt.Println("KeyValueStoreCausale: Errore durante la chiamata RPC "+rpcName+": ", err)
-				return
-			}
-
-		}(common.ReplicaPorts[i])
+	// Raccoglie i risultati dalle chiamate RPC
+	for i := 0; i < common.Replicas; i++ {
+		if err := <-resultChan; err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// callRPC è una funzione ausiliaria per effettuare la chiamata RPC a una replica specifica
+func (kvc *KeyValueStoreCausale) callRPC(rpcName string, message MessageC, resultChan chan<- error, replicaIndex int) {
+
+	serverName := common.GetServerName(common.ReplicaPorts[replicaIndex], replicaIndex)
+
+	//fmt.Println("sendToAllServer: Contatto", serverName)
+	conn, err := rpc.Dial("tcp", serverName)
+	if err != nil {
+		// Gestione dell'errore durante la connessione al server
+		resultChan <- fmt.Errorf("errore durante la connessione con %s: %v", serverName, err)
+		return
+	}
+
+	// Chiama il metodo "rpcName" sul server
+	var response bool
+	err = conn.Call(rpcName, message, &response)
+	if err != nil {
+		// Gestione dell'errore durante la chiamata RPC
+		resultChan <- fmt.Errorf("errore durante la chiamata RPC %s a %s: %v", rpcName, serverName, err)
+		return
+	}
+
+	// Aggiungi il risultato al canale dei risultati
+	resultChan <- nil
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente

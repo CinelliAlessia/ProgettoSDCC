@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"main/common"
-	"reflect"
-	"sort"
 	"time"
 )
 
@@ -36,7 +34,7 @@ Questa implementazione garantisce che i messaggi vengano consegnati solo quando 
 func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, reply *bool) error {
 	fmt.Println("CausallyOrderedMulticast: Ho ricevuto la richiesta che mi è stata inoltrata da un server")
 
-	kvc.addToSortQueue(message)
+	kvc.addToQueue(message)
 
 	// Aggiornamento del clock
 	kvc.mutexClock.Lock()
@@ -46,6 +44,8 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, repl
 	kvc.mutexClock.Unlock()
 
 	// Ciclo finché controlSendToApplication non restituisce true
+	// Controllo quando la richiesta può essere eseguita a livello applicativo
+	*reply = false
 	for {
 		canSend := kvc.controlSendToApplication(message)
 		if canSend {
@@ -58,7 +58,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, repl
 			}
 
 			*reply = true
-			break // Esci dal ciclo se controlSendToApplication restituisce true
+			break
 		}
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
@@ -67,14 +67,14 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, repl
 	return nil
 }
 
-func (kvc *KeyValueStoreCausale) addToSortQueue(message MessageC) {
+func (kvc *KeyValueStoreCausale) addToQueue(message MessageC) {
 	kvc.mutexQueue.Lock()
 	defer kvc.mutexQueue.Unlock()
 
 	kvc.queue = append(kvc.queue, message)
 
 	// Ordina la coda in base all'orologio vettoriale e altri criteri
-	sort.Slice(kvc.queue, func(i, j int) bool {
+	/* sort.Slice(kvc.queue, func(i, j int) bool {
 		// Confronto basato sull'orologio vettoriale
 		for idx := range kvc.queue[i].VectorClock {
 			if kvc.queue[i].VectorClock[idx] != kvc.queue[j].VectorClock[idx] {
@@ -83,7 +83,7 @@ func (kvc *KeyValueStoreCausale) addToSortQueue(message MessageC) {
 		}
 		// Se l'orologio vettoriale è lo stesso, ordina in base all'ID
 		return kvc.queue[i].Id < kvc.queue[j].Id
-	})
+	}) */
 }
 
 /*
@@ -93,36 +93,32 @@ livello applicativo finché non si verificano entrambe le seguenti condizioni:
   - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
 */
 func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool {
-	// Verifica se il messaggio è il prossimo atteso
-	expectedTimestamp := make([]int, common.Replicas)
-	//copy(expectedTimestamp, kvc.vectorClock)
+	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
+	if message.VectorClock[message.IdSender] == kvc.vectorClock[message.IdSender]+1 {
 
-	senderID := 0                 // Dovrai definire un modo per identificare l'ID del mittente
-	expectedTimestamp[senderID]++ // Il messaggio successivo che pj si aspetta da pi
-
-	if !reflect.DeepEqual(expectedTimestamp, message.VectorClock) {
-		return false
-	}
-
-	// Verifica se il messaggio ha ricevuto tutti gli ack
-	if message.NumberAck == common.Replicas {
-		// Il messaggio ha ricevuto tutti gli ack, quindi può essere rimosso dalla coda
-		kvc.removeMessage(message)
+		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
+		for indx := range len(message.VectorClock) {
+			if indx != message.IdSender && message.VectorClock[indx] > kvc.vectorClock[indx] {
+				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
+				fmt.Println("Index", indx, "message.Id", message.IdSender, "", message.VectorClock[indx], "", kvc.vectorClock[indx])
+				return false
+			}
+		}
+		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
 		return true
 	}
-
+	// Una delle condizioni non è soddisfatta, il messaggio non può essere consegnato al livello applicativo
 	return false
 }
 
 // removeByID Rimuove un messaggio dalla coda basato sull'ID del messaggio
-func (kvc *KeyValueStoreCausale) removeMessage(message MessageC) {
-	for i := range kvc.queue {
-		if kvc.queue[i].Id == message.Id {
-			// Rimuovi l'elemento dalla slice
-			kvc.queue = append(kvc.queue[:i], kvc.queue[i+1:]...)
-			fmt.Println("removeByID: Messaggio con ID", message.Id, "rimosso dalla coda")
-			return
-		}
+func (kvc *KeyValueStoreCausale) removeMessageToQueue(message MessageC) {
+	kvc.mutexQueue.Lock()
+	defer kvc.mutexQueue.Unlock()
+	if kvc.queue[0].Id == message.Id {
+		// Rimuovi l'elemento dalla slice
+		kvc.queue = kvc.queue[1:]
+		return
 	}
-	fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
+	fmt.Println("AAA removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
 }
