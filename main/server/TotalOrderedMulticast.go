@@ -46,6 +46,8 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 100)
+		printQueue(kvs)
+		printDatastore(kvs)
 	}
 
 	if *reply {
@@ -126,6 +128,12 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 				fmt.Printf("sendAck: Errore durante la connessione al server:"+replicaPort, err)
 				return
 			}
+			defer func(conn *rpc.Client) {
+				err := conn.Close()
+				if err != nil {
+					return
+				}
+			}(conn)
 
 			for {
 				err = conn.Call("KeyValueStoreSequential.ReceiveAck", message, &reply)
@@ -138,15 +146,9 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 					break // Esci dal ciclo se reply è true
 					// reply false vuol dire che il server contattato ha ricevuto un ack di una richiesta a lui non nota
 				}
+				fmt.Println("AAA sendAck: il server", replicaPort, "non è riuscito ad incrementare il numero di ack!")
 			}
 		}(common.ReplicaPorts[i])
-	}
-}
-
-// printMessageQueue è una funzione di debug che stampa la coda
-func (kvs *KeyValueStoreSequential) printMessageQueue() {
-	for i := range kvs.queue {
-		fmt.Println("Id: ", kvs.queue[i].Id, "Value: ", kvs.queue[i].Args.Value, "ACK: ", kvs.queue[i].NumberAck)
 	}
 }
 
@@ -168,7 +170,7 @@ func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
 		kvs.queue = kvs.queue[1:]
 		return
 	}
-	//fmt.Println("removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
+	fmt.Println("AAA removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
 }
 
 // updateMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
