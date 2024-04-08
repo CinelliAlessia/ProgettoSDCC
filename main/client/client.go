@@ -64,7 +64,6 @@ func main() {
 
 		// Attendi il completamento di tutte le goroutine
 		for i := 0; i < 8; i++ {
-			println("OK", i)
 			<-done
 		}
 	}
@@ -87,7 +86,7 @@ func randomConnect() *rpc.Client {
 		return nil
 	}
 
-	fmt.Println("CLIENT: Contatto il server:", serverName)
+	fmt.Println("CLIENT: Contatto il server", serverName)
 	conn, err := rpc.Dial("tcp", serverName)
 
 	if err != nil {
