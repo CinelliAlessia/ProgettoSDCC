@@ -6,8 +6,6 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
-	"os"
-	"strconv"
 	"time"
 )
 
@@ -72,19 +70,7 @@ func main() {
 func randomConnect() *rpc.Client {
 	// Genera un numero casuale tra 0 e il numero di repliche - 1
 	randomIndex := rand.Intn(common.Replicas)
-
-	var serverName string
-
-	if os.Getenv("CONFIG") == "1" {
-		/*---LOCALE---*/
-		serverName = ":" + common.ReplicaPorts[randomIndex]
-	} else if os.Getenv("CONFIG") == "2" {
-		/*---DOCKER---*/
-		serverName = "server" + strconv.Itoa(randomIndex+1) + ":" + common.ReplicaPorts[randomIndex]
-	} else {
-		fmt.Println("VARIABILE DI AMBIENTE ERRATA")
-		return nil
-	}
+	serverName := common.GetServerName(common.ReplicaPorts[randomIndex], randomIndex)
 
 	fmt.Println("CLIENT: Contatto il server", serverName)
 	conn, err := rpc.Dial("tcp", serverName)
@@ -100,18 +86,7 @@ func specificConnect(index int) *rpc.Client {
 	if index >= common.Replicas {
 		return nil
 	}
-	var serverName string
-
-	if os.Getenv("CONFIG") == "1" {
-		/*---LOCALE---*/
-		serverName = ":" + common.ReplicaPorts[index]
-	} else if os.Getenv("CONFIG") == "2" {
-		/*---DOCKER---*/
-		serverName = "server" + strconv.Itoa(index+1) + ":" + common.ReplicaPorts[index]
-	} else {
-		fmt.Println("VARIABILE DI AMBIENTE ERRATA")
-		return nil
-	}
+	serverName := common.GetServerName(common.ReplicaPorts[index], index)
 
 	fmt.Println("CLIENT: Contatto il server:", serverName)
 	conn, err := rpc.Dial("tcp", serverName)

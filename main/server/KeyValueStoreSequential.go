@@ -6,8 +6,6 @@ import (
 	"github.com/fatih/color"
 	"main/common"
 	"net/rpc"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -153,16 +151,8 @@ func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Mess
 
 // callRPC è una funzione ausiliaria per effettuare la chiamata RPC a una replica specifica
 func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, resultChan chan<- error, replicaIndex int) {
-	var serverName string
 
-	if os.Getenv("CONFIG") == "1" { /*---LOCALE---*/
-		serverName = ":" + common.ReplicaPorts[replicaIndex]
-	} else if os.Getenv("CONFIG") == "2" { /*---DOCKER---*/
-		serverName = "server" + strconv.Itoa(replicaIndex+1) + ":" + common.ReplicaPorts[replicaIndex]
-	} else { // Gestione dell'errore se la variabile di ambiente non è corretta
-		resultChan <- fmt.Errorf("VARIABILE DI AMBIENTE ERRATA")
-		return
-	}
+	serverName := common.GetServerName(common.ReplicaPorts[replicaIndex], replicaIndex)
 
 	//fmt.Println("sendToAllServer: Contatto", serverName)
 	conn, err := rpc.Dial("tcp", serverName)

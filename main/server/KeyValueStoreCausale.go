@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"main/common"
 	"net/rpc"
-	"os"
-	"strconv"
 	"sync"
 )
 
@@ -116,26 +114,18 @@ func (kvc *KeyValueStoreCausale) sendToOtherServer(rpcName string, message Messa
 	for i := 0; i < common.Replicas; i++ {
 		i := i
 		go func(replicaPort string) {
-			// Connessione al server RPC casuale
-			var conn *rpc.Client
-			var err error
-
-			if os.Getenv("CONFIG") == "1" {
-				/*---LOCALE---*/
-				// Connessione al server RPC casuale
-				fmt.Println("sendToAllServer: Contatto il server:", ":"+replicaPort)
-				conn, err = rpc.Dial("tcp", ":"+replicaPort)
-
-			} else {
-				/*---DOCKER---*/
-				// Connessione al server RPC casuale
-				fmt.Println("sendToAllServer: Contatto il server:", "server"+strconv.Itoa(i+1)+":"+replicaPort)
-				conn, err = rpc.Dial("tcp", "server"+strconv.Itoa(i+1)+":"+replicaPort)
-			}
+			serverName := common.GetServerName(replicaPort, i)
+			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
-				fmt.Printf("KeyValueStoreCausale: Errore durante la connessione al server:"+replicaPort, err)
+				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
 				return
 			}
+			defer func(conn *rpc.Client) {
+				err := conn.Close()
+				if err != nil {
+					return
+				}
+			}(conn)
 
 			// Chiama il metodo "rpcName" sul server
 			err = conn.Call(rpcName, message, &response)

@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"main/common"
 	"net/rpc"
-	"os"
 	"sort"
-	"strconv"
 	"time"
 )
 
@@ -101,31 +99,15 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bo
 
 // sendAck invia a tutti i server un Ack
 func (kvs *KeyValueStoreSequential) sendAck(message Message) {
-	//fmt.Println("sendAck: Invio un ack a tutti specificando il messaggio ricevuto", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
-
 	reply := false
 
 	for i := 0; i < common.Replicas; i++ {
 		i := i
-		go func(replicaPort string) { // Invio tutti gli ack in maniera asincrona
-
-			var serverName string
-
-			if os.Getenv("CONFIG") == "1" {
-				/*---LOCALE---*/
-				serverName = ":" + replicaPort
-			} else if os.Getenv("CONFIG") == "2" {
-				/*---DOCKER---*/
-				serverName = "server" + strconv.Itoa(i+1) + ":" + replicaPort
-			} else {
-				fmt.Println("VARIABILE DI AMBIENTE ERRATA")
-				return
-			}
-
-			//fmt.Println("sendAck: Contatto il server:", serverName)
+		go func(replicaPort string) {
+			serverName := common.GetServerName(replicaPort, i)
 			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
-				fmt.Printf("sendAck: Errore durante la connessione al server:"+replicaPort, err)
+				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
 				return
 			}
 			defer func(conn *rpc.Client) {
@@ -136,20 +118,28 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 			}(conn)
 
 			for {
-				err = conn.Call("KeyValueStoreSequential.ReceiveAck", message, &reply)
+				err = sendAckRPC(conn, message, &reply)
 				if err != nil {
-					fmt.Println("sendAck: Errore durante la chiamata RPC receiveAck ", err)
+					fmt.Printf("sendAck: Errore durante la chiamata RPC receiveAck %v\n", err)
 					return
 				}
 
 				if reply {
-					break // Esci dal ciclo se reply è true
-					// reply false vuol dire che il server contattato ha ricevuto un ack di una richiesta a lui non nota
+					break
 				}
-				fmt.Println("AAA sendAck: il server", replicaPort, "non è riuscito ad incrementare il numero di ack!")
+				fmt.Printf("AAA sendAck: il server %s non è riuscito ad incrementare il numero di ack!\n", replicaPort)
 			}
 		}(common.ReplicaPorts[i])
 	}
+}
+
+// sendAckRPC invia l'ack tramite RPC e gestisce eventuali errori
+func sendAckRPC(conn *rpc.Client, message Message, reply *bool) error {
+	err := conn.Call("KeyValueStoreSequential.ReceiveAck", message, reply)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (kvs *KeyValueStoreSequential) findMessage(message Message) *Message {
