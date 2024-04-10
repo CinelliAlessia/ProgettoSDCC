@@ -98,17 +98,19 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 			}
 		}
 		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
-		fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso (no +1):", kvc.vectorClock, "id", message.IdSender)
 		kvc.mutexClock.Lock()
 		kvc.vectorClock[message.IdSender] = message.VectorClock[message.IdSender]
 		kvc.mutexClock.Unlock()
+		fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", message.VectorClock, "id", message.IdSender)
 		return true
 	} else if message.IdSender == kvc.id {
 		fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", kvc.vectorClock, "id", message.IdSender)
 		return true
 	}
 	// Una delle condizioni non è soddisfatta, il messaggio non può essere consegnato al livello applicativo
-	fmt.Println("La condizione NON è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso (no +1):", kvc.vectorClock, "id", message.IdSender)
+	newVect := kvc.vectorClock
+	newVect[message.IdSender]++
+	fmt.Println("La condizione NON è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", newVect, "id", message.IdSender)
 	return false
 }
 

@@ -6,7 +6,6 @@ import (
 	"main/common"
 	"net/rpc"
 	"sync"
-	"time"
 )
 
 // KeyValueStoreCausale rappresenta il servizio di memorizzazione chiave-valore
@@ -38,23 +37,12 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Get", args, kvc.vectorClock}
 	kvc.mutexClock.Unlock()
 
-	kvc.addToQueue(message)
-
-	// Controllo in while se il messaggio può essere inviato a livello applicativo
-	for {
-		canSend := kvc.controlSendToApplication(message)
-		if canSend {
-			// Invio a livello applicativo
-			err := kvc.RealFunction(message, response)
-			if err != nil {
-				return err
-			}
-			break
-		}
-
-		// Altrimenti, attendi un breve periodo prima di riprovare
-		time.Sleep(time.Millisecond * 100)
+	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message)
+	if err != nil {
+		return err
 	}
+
+	response.Reply = "true"
 	return nil
 }
 
