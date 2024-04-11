@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"main/common"
 	"net/rpc"
 	"sort"
@@ -19,6 +20,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply
 	// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 	kvs.mutexClock.Lock()
 	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
+	fmt.Println(color.BlueString("RICEVUTO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "with clock", message.LogicalClock, "my clock", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
@@ -44,8 +46,8 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, reply
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 100)
-		printQueue(kvs)
-		printDatastore(kvs)
+		//printQueue(kvs)
+		//printDatastore(kvs)
 	}
 
 	if *reply {
@@ -78,7 +80,7 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 	})
 }
 
-// removeByID Rimuove un messaggio dalla coda basato sull'ID
+// removeMessageToQueue Rimuove un messaggio dalla coda basato sull'ID
 func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
@@ -87,7 +89,7 @@ func (kvs *KeyValueStoreSequential) removeMessageToQueue(message Message) {
 		kvs.queue = kvs.queue[1:]
 		return
 	}
-	fmt.Println("AAA removeByID: Messaggio con ID", message.Id, "non trovato nella coda")
+	//fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda")
 }
 
 // updateMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
@@ -98,7 +100,6 @@ func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 	for i := range kvs.queue {
 		if kvs.queue[i].Id == message.Id {
 			kvs.queue[i].NumberAck++
-			//fmt.Println("NumeroAck", kvs.queue[i].NumberAck, "di", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 			return true
 		}
 	}
@@ -112,7 +113,7 @@ func (kvs *KeyValueStoreSequential) updateMessage(message Message) bool {
 // timestamp potenzialmente minore o uguale a quello di msg_i)
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bool {
 	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck >= common.Replicas {
-		//fmt.Println("controlSendToApplication: Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla mia coda")
+		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
 		kvs.removeMessageToQueue(message)
 		return true
 	}
@@ -122,11 +123,10 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message Message) bo
 // sendAck invia a tutti i server un Ack
 func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 	for i := 0; i < common.Replicas; i++ {
-		i := i
-		go func(replicaPort string) {
-			reply := false
+		go func(replicaPort string, index int) {
 
-			serverName := common.GetServerName(replicaPort, i)
+			reply := false
+			serverName := common.GetServerName(replicaPort, index)
 			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
 				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
@@ -143,20 +143,22 @@ func (kvs *KeyValueStoreSequential) sendAck(message Message) {
 				if reply {
 					break
 				}
-				fmt.Printf("AAA sendAck: il server %s non è riuscito ad incrementare il numero di ack!\n", replicaPort)
+				//fmt.Printf("sendAck: il server %s non è riuscito ad incrementare il numero di ack!\n", replicaPort)
 			}
 
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
 			err = conn.Close()
 			if err != nil {
+				fmt.Println("Errore durante la chiusura della connessione in TotalOrderedMulticast.sendAckRPC:", err)
 				return
 			}
-		}(common.ReplicaPorts[i])
+		}(common.ReplicaPorts[i], i)
 	}
 }
 
 // sendAckRPC invia l'ack tramite RPC e gestisce eventuali errori
 func sendAckRPC(conn *rpc.Client, message Message, reply *bool) error {
+	common.RandomDelay()
 	err := conn.Call("KeyValueStoreSequential.ReceiveAck", message, reply)
 	if err != nil {
 		return err

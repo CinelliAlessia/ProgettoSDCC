@@ -3,9 +3,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"main/common"
 	"math/rand"
 	"net/rpc"
+	"strings"
 )
 
 const (
@@ -45,15 +47,37 @@ func main() {
 			fmt.Println("Scelta non valida. Riprova.")
 		}
 
+		/*
+			// Esecuzione delle rpc
+			done := make(chan bool)
+			cycles := 25
+
+			for i := 0; i < cycles; i++ {
+				go run1(rpcName, done)
+				go run2(rpcName, done)
+				go run3(rpcName, done)
+				go run4(rpcName, done)
+			}
+
+			// Attendi il completamento di tutte le goroutine
+			for i := 0; i < cycles*4; i++ {
+				<-done
+			}*/
+
+		fmt.Println("\nOrdinamento goroutine (ma con i ritardi): \nClient1: \nPut-giorno:18 Put-mese:02 \nClient2: \nPut-giorno:16 Put-mese:02 " +
+			"\nClient3: \nGet-giorno Get-mese Put-giorno:20 Put-mese:07")
 		// Esecuzione delle rpc
 		done := make(chan bool)
-		go run1(rpcName, done)
-		go run2(rpcName, done)
-		go run3(rpcName, done)
-		go run4(rpcName, done)
+		cycles := 1
+
+		for i := 0; i < cycles; i++ {
+			go client1(rpcName, done)
+			go client2(rpcName, done)
+			go client3(rpcName, done)
+		}
 
 		// Attendi il completamento di tutte le goroutine
-		for i := 0; i < 4; i++ {
+		for i := 0; i < cycles*3; i++ {
 			<-done
 		}
 	}
@@ -113,24 +137,31 @@ func executeCall(rpcName, key string, values ...string) {
 	}
 
 	// TODO: Qui posso usare un id auto-incrementativo per un DEBUG accurato
-	fmt.Println("Run", rpcName, key+":"+value)
+	//fmt.Println("Run", rpcName, key+":"+value)
 	err := delayedCall(conn, args, &reply, rpcName)
 	if err != nil {
 		return
 	}
-
 }
 
 // delayedCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
 // Prima di effettuare la chiamata, applica un ritardo casuale per simulare condizioni reali di rete.
 func delayedCall(conn *rpc.Client, args common.Args, reply *common.Response, rpcName string) error {
+	debugName := strings.SplitAfter(rpcName, ".")
+
 	// Applica un ritardo casuale
 	common.RandomDelay()
+	fmt.Println(color.BlueString("RUN"), debugName[1], args.Key+":"+args.Value)
 
 	// Effettua la chiamata RPC
 	err := conn.Call(rpcName, args, reply)
 	if err != nil {
-		return fmt.Errorf("CLIENT: Errore durante la chiamata RPC in client.call")
+		return fmt.Errorf("errore durante la chiamata RPC in client.call: %s", err)
+	}
+
+	err = conn.Close()
+	if err != nil {
+		return fmt.Errorf("errore durante la chiusura della connessione in client.call: %s", err)
 	}
 	return nil
 }
@@ -155,15 +186,35 @@ func run2(rpcName string, done chan bool) {
 }
 
 func run3(rpcName string, done chan bool) {
-	executeCall(rpcName+get, "x")
+	executeCall(rpcName+put, "x", "9")
 	executeCall(rpcName+get, "y")
 	done <- true
 }
 
 func run4(rpcName string, done chan bool) {
 	executeCall(rpcName+put, "x", "0")
-	executeCall(rpcName+get, "y")
+	executeCall(rpcName+put, "y", "3")
 	executeCall(rpcName+get, "x")
 
+	done <- true
+}
+
+func client1(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "giorno", "18")
+	executeCall(rpcName+put, "mese", "02")
+	done <- true
+}
+
+func client2(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "giorno", "16")
+	executeCall(rpcName+put, "mese", "09")
+	done <- true
+}
+
+func client3(rpcName string, done chan bool) {
+	executeCall(rpcName+get, "giorno")
+	executeCall(rpcName+get, "mese")
+	executeCall(rpcName+put, "giorno", "20")
+	executeCall(rpcName+put, "mese", "07")
 	done <- true
 }

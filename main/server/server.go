@@ -90,24 +90,39 @@ func main() {
 
 		// Avvia la gestione della connessione in un goroutine
 		go func(conn net.Conn) {
+			// Servi la connessione RPC
 			rpc.ServeConn(conn)
 
-			err := conn.Close()
-			if err != nil {
-				fmt.Println("SERVER: Errore nella chiusura della connessione:", err)
-			}
+			defer func() {
+				err := conn.Close()
+				if err != nil {
+					//fmt.Println("SERVER: Errore nella chiusura della connessione:", err)
+				}
+			}()
 		}(conn)
 	}
 }
 
 // Funzione debug: Stampa la queue del server replica
-func printQueue(kv *KeyValueStoreSequential) {
-	// Controllo se il datastore è vuoto
-	if len(kv.queue) == 0 {
-		fmt.Println("Queue vuota")
+func printQueue(kv interface{}) {
+	switch kv := kv.(type) {
+	case *KeyValueStoreSequential:
+		// Controllo se il datastore è vuoto
+		if len(kv.queue) == 0 {
+			fmt.Println("Queue vuota")
+			return
+		}
+		fmt.Println("Queue:", kv.queue)
+	case *KeyValueStoreCausale:
+		// Controllo se il datastore è vuoto
+		if len(kv.queue) == 0 {
+			fmt.Println("Queue vuota")
+			return
+		}
+		fmt.Println("Queue:", kv.queue)
+	default:
+		fmt.Println("Tipo di KeyValueStore non supportato")
 	}
-
-	fmt.Println("Queue:", kv.queue)
 }
 
 // Funzione debug: Stampa il datastore del server replica

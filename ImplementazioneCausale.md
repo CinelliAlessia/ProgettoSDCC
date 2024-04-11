@@ -95,4 +95,7 @@ Quando un processo P_j riceve un messaggio multicast M da P_i:
    - Altrimenti, ritarda la consegna di M e attendi.
 
 *PROBLEMA*
-- Identificazione dei server
+- Identificazione dei server -> Docker !!!
+
+Sembra funzionare meglio rispetto la sequenziale.
+Introdurre Ovunque i ritardi di rete. 

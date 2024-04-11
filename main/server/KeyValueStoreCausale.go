@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// KeyValueStoreCausale rappresenta il servizio di memorizzazione chiave-valore
+// KeyValueStoreCausale rappresenta la struttura di memorizzazione chiave-valore per garantire consistenza causale
 type KeyValueStoreCausale struct {
 	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
 	id        int               // Id che identifica il server stesso
@@ -84,6 +84,27 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 	return nil
 }
 
+// RealFunction esegue l'operazione di put e di delete realmente
+func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common.Response) error {
+
+	if message.TypeOfMessage == "Put" { // Scrittura
+		kvc.datastore[message.Args.Key] = message.Args.Value
+	} else if message.TypeOfMessage == "Delete" { // Scrittura
+		delete(kvc.datastore, message.Args.Key)
+	} else if message.TypeOfMessage == "Get" { // Lettura
+		val, ok := kvc.datastore[message.Args.Key]
+		if !ok {
+			fmt.Println("Key non trovata nel datastore", message.Args.Key, kvc.datastore)
+			return fmt.Errorf("KeyValueStoreCausale: key '%s' not found", message.Args.Key)
+		}
+		response.Reply = val
+	} else {
+		return fmt.Errorf("command not found")
+	}
+	fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, message.VectorClock)
+	return nil
+}
+
 // sendToAllServer invia a tutti i server la richiesta rpcName
 func (kvc *KeyValueStoreCausale) sendToAllServer(rpcName string, message MessageC) error {
 	// Canale per ricevere i risultati delle chiamate RPC
@@ -118,6 +139,7 @@ func (kvc *KeyValueStoreCausale) callRPC(rpcName string, message MessageC, resul
 
 	// Chiama il metodo "rpcName" sul server
 	var response bool
+	common.RandomDelay()
 	err = conn.Call(rpcName, message, &response)
 	if err != nil {
 		// Gestione dell'errore durante la chiamata RPC
@@ -125,32 +147,13 @@ func (kvc *KeyValueStoreCausale) callRPC(rpcName string, message MessageC, resul
 		return
 	}
 
+	err = conn.Close()
+	if err != nil {
+		// Gestione dell'errore durante la chiamata RPC
+		resultChan <- fmt.Errorf("errore durante la connessione in KeyValueStoreCausale.callRPC: %s", err)
+		return
+	}
+
 	// Aggiungi il risultato al canale dei risultati
 	resultChan <- nil
-}
-
-// RealFunction esegue l'operazione di put e di delete realmente
-func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common.Response) error {
-
-	if message.TypeOfMessage == "Put" { // Scrittura
-		kvc.datastore[message.Args.Key] = message.Args.Value
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
-
-	} else if message.TypeOfMessage == "Delete" { // Scrittura
-		delete(kvc.datastore, message.Args.Key)
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
-
-	} else if message.TypeOfMessage == "Get" { // Lettura
-		val, ok := kvc.datastore[message.Args.Key]
-		if !ok {
-			fmt.Println("Key non trovata nel datastore", message.Args.Key)
-			fmt.Println(kvc.datastore)
-			return fmt.Errorf("KeyValueStoreCausale: key '%s' not found", message.Args.Key)
-		}
-		response.Reply = val
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key)
-	} else {
-		return fmt.Errorf("command not found")
-	}
-	return nil
 }
