@@ -129,7 +129,8 @@ func executeCall(rpcName, key string, values ...string) {
 	}
 
 	args := common.Args{Key: key, Value: value}
-	reply := common.Response{}
+	response := common.Response{}
+
 	conn := randomConnect()
 	if conn == nil {
 		fmt.Println("CLIENT: Errore durante la connessione")
@@ -138,7 +139,7 @@ func executeCall(rpcName, key string, values ...string) {
 
 	// TODO: Qui posso usare un id auto-incrementativo per un DEBUG accurato
 	//fmt.Println("Run", rpcName, key+":"+value)
-	err := delayedCall(conn, args, &reply, rpcName)
+	err := delayedCall(conn, args, &response, rpcName)
 	if err != nil {
 		return
 	}
@@ -146,18 +147,21 @@ func executeCall(rpcName, key string, values ...string) {
 
 // delayedCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
 // Prima di effettuare la chiamata, applica un ritardo casuale per simulare condizioni reali di rete.
-func delayedCall(conn *rpc.Client, args common.Args, reply *common.Response, rpcName string) error {
-	debugName := strings.SplitAfter(rpcName, ".")
+func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
 
 	// Applica un ritardo casuale
 	common.RandomDelay()
+
+	debugName := strings.SplitAfter(rpcName, ".")
 	fmt.Println(color.BlueString("RUN"), debugName[1], args.Key+":"+args.Value)
 
 	// Effettua la chiamata RPC
-	err := conn.Call(rpcName, args, reply)
+	err := conn.Call(rpcName, args, response)
 	if err != nil {
 		return fmt.Errorf("errore durante la chiamata RPC in client.call: %s", err)
 	}
+
+	fmt.Println(color.GreenString("RISPOSTA"), debugName[1], args.Key+":"+args.Value, response.Value, response.Result)
 
 	err = conn.Close()
 	if err != nil {
