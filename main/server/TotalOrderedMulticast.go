@@ -24,8 +24,8 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, respo
 
 	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
 	if kvs.id != message.IdSender {
-		kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ?
-		fmt.Println(color.BlueString("RICEVUTO da server"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+		//kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ?
+		kvs.printDebugBlue("RICEVUTO da server", message)
 	}
 
 	kvs.mutexClock.Unlock()
@@ -182,4 +182,10 @@ func (kvs *KeyValueStoreSequential) findMessage(message Message) *Message {
 		}
 	}
 	return &Message{}
+}
+
+func (kvs *KeyValueStoreSequential) printDebugBlue(blueString string, message Message) {
+	if common.GetDebug() {
+		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+	}
 }

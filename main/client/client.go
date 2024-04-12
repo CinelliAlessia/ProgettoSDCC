@@ -139,18 +139,22 @@ func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, 
 }
 
 func debugPrintRun(rpcName string, args common.Args) {
-	debugName := strings.SplitAfter(rpcName, ".")
-	name := "." + debugName[1]
+	if common.GetDebug() {
+		debugName := strings.SplitAfter(rpcName, ".")
+		name := "." + debugName[1]
 
-	switch name {
-	case put:
-		fmt.Println(color.BlueString("RUN Put"), args.Key+":"+args.Value)
-	case get:
-		fmt.Println(color.BlueString("RUN Get"), args.Key)
-	case delete:
-		fmt.Println(color.BlueString("RUN Delete"), args.Key)
-	default:
-		fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
+		switch name {
+		case put:
+			fmt.Println(color.BlueString("RUN Put"), args.Key+":"+args.Value)
+		case get:
+			fmt.Println(color.BlueString("RUN Get"), args.Key)
+		case delete:
+			fmt.Println(color.BlueString("RUN Delete"), args.Key)
+		default:
+			fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
+		}
+	} else {
+		return
 	}
 }
 

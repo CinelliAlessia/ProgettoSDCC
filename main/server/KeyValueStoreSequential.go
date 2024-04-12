@@ -41,7 +41,8 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
 	message := Message{common.GenerateUniqueID(), kvs.id, "Get", args, kvs.logicalClock, 3}
-	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+	kvs.printDebugBlue("RICEVUTO da client", message)
+	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	// TODO: problema, la get anche con timestamp maggiore prende la precedenza perché le altre richieste non si sono ancora messe in coda
@@ -73,7 +74,8 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := Message{common.GenerateUniqueID(), kvs.id, "Put", args, kvs.logicalClock, 0}
-	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+	kvs.printDebugBlue("RICEVUTO da client", message)
+	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
@@ -96,7 +98,8 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	id := common.GenerateUniqueID()
 	message := Message{id, kvs.id, "Delete", args, kvs.logicalClock, 0}
-	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+	kvs.printDebugBlue("RICEVUTO da client", message)
+	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se

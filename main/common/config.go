@@ -43,6 +43,18 @@ func GetServerName(replicaPort string, id int) string {
 	}
 }
 
+// GetDebug restituisce
+func GetDebug() bool {
+	if os.Getenv("DEBUG") == "1" {
+		return true
+	} else if os.Getenv("DEBUG") == "0" {
+		return false
+	} else {
+		fmt.Println("VARIABILE DI AMBIENTE ERRATA")
+		return true
+	}
+}
+
 // RandomDelay Genera un numero casuale compreso tra 0 e 999 (max un secondo)
 func RandomDelay() {
 	delay := rand.Intn(1000)

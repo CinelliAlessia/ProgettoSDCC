@@ -17,8 +17,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 	kvc.addToQueue(message)
 
 	if kvc.id != message.IdSender {
-		//kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ?
-		fmt.Println(color.BlueString("RICEVUTO da server"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+		kvc.printDebugBlue("RICEVUTO da server", message)
 	}
 
 	// Ciclo finché controlSendToApplication restituisce true
@@ -95,4 +94,10 @@ func (kvc *KeyValueStoreCausale) removeMessageToQueue(message MessageC) {
 		return
 	}
 	//fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda.")
+}
+
+func (kvc *KeyValueStoreCausale) printDebugBlue(blueString string, message MessageC) {
+	if common.GetDebug() {
+		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	}
 }
