@@ -15,14 +15,16 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message Message, respo
 	//fmt.Println("TotalOrderedMulticast: Ho ricevuto la richiesta che mi è stata inoltrata da un server", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 
 	// Aggiunta della richiesta in coda
-	kvs.addToSortQueue(message)
+	if kvs.id != message.IdSender {
+		kvs.addToSortQueue(message)
+	}
 
 	// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 	kvs.mutexClock.Lock()
 
 	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
 	if kvs.id != message.IdSender {
-		kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive
+		kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ?
 		fmt.Println(color.BlueString("RICEVUTO da server"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	}
 
@@ -81,7 +83,7 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message Message) {
 		}
 		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
 	})
-	printQueue(kvs)
+	//printQueue(kvs)
 	kvs.mutexQueue.Unlock()
 }
 

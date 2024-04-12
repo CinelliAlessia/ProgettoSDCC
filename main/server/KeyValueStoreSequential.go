@@ -44,7 +44,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
-	// TODO: problema, la get anche con timestamp maggiore prende la precedenza perche le altre richieste non si sono ancora messe in coda
+	// TODO: problema, la get anche con timestamp maggiore prende la precedenza perché le altre richieste non si sono ancora messe in coda
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Controllo in while se il messaggio può essere inviato a livello applicativo
@@ -76,14 +76,14 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
+	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
+
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
 	if err != nil {
 		response.Result = false
 		return err
 	}
-
-	response.Result = true
 	return nil
 }
 
@@ -99,14 +99,14 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
+	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
+
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
 	if err != nil {
 		response.Result = false
 		return err
 	}
-
-	response.Result = true
 	return nil
 }
 
@@ -128,17 +128,17 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 		val, ok := kvs.datastore[message.Args.Key]
 		if !ok {
 			fmt.Println(color.RedString("NON ESEGUITO"), message.TypeOfMessage, message.Args.Key, "datastore:", kvs.datastore, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
-			//fmt.Println("Key non trovata nel datastore", message.Args.Key, kvs.datastore)
 			response.Result = false
 			return nil
 		}
-		response.Result = true
 		response.Value = val
 		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+val, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 		printDatastore(kvs)
 	} else {
 		return fmt.Errorf("command not found")
 	}
+
+	response.Result = true
 	return nil
 }
 
