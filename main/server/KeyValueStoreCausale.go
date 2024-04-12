@@ -31,12 +31,13 @@ type MessageC struct {
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
-	//fmt.Println("Richiesta GET di", args.Key)
 
 	kvc.mutexClock.Lock()
+
 	kvc.vectorClock[kvc.id]++
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Get", args, kvc.vectorClock}
-	fmt.Println(color.BlueString("RICEVUTO"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+
 	kvc.mutexClock.Unlock()
 
 	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
@@ -44,7 +45,6 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 		response.Result = false
 		return err
 	}
-	response.Result = true
 	return nil
 }
 
@@ -57,7 +57,8 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Put", args, kvc.vectorClock}
-	fmt.Println(color.BlueString("RICEVUTO"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+
 	kvc.mutexClock.Unlock()
 
 	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
@@ -65,8 +66,6 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 		response.Result = false
 		return err
 	}
-
-	response.Result = true
 	return nil
 }
 
@@ -77,7 +76,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 	kvc.vectorClock[kvc.id]++
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Delete", args, kvc.vectorClock}
-	fmt.Println(color.BlueString("RICEVUTO"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
 	kvc.mutexClock.Unlock()
 
 	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
@@ -85,8 +84,6 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 		response.Result = false
 		return err
 	}
-
-	response.Result = true
 	return nil
 }
 
@@ -95,19 +92,30 @@ func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 		kvc.datastore[message.Args.Key] = message.Args.Value
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock", kvc.vectorClock)
+
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
 		delete(kvc.datastore, message.Args.Key)
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+
 	} else if message.TypeOfMessage == "Get" { // Lettura
+
 		val, ok := kvc.datastore[message.Args.Key]
 		if !ok {
-			fmt.Println("Key non trovata nel datastore", message.Args.Key, kvc.datastore)
-			return fmt.Errorf("KeyValueStoreCausale: key '%s' not found", message.Args.Key)
+			fmt.Println(color.RedString("NON ESEGUITO"), message.TypeOfMessage, message.Args.Key, "datastore:", kvc.datastore, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+			response.Result = false
+			return nil
 		}
+
 		response.Value = val
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+val, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+
 	} else {
 		return fmt.Errorf("command not found")
 	}
-	fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+
+	printDatastore(kvc)
+	response.Result = true
 	return nil
 }
 
@@ -131,6 +139,7 @@ func (kvc *KeyValueStoreCausale) sendToAllServer(rpcName string, message Message
 }
 
 // callRPC è una funzione ausiliaria per effettuare la chiamata RPC a una replica specifica
+// Utilizzata unicamente per la chiamata RPC CausallyOrderedMulticast
 func (kvc *KeyValueStoreCausale) callRPC(rpcName string, message MessageC, response *common.Response, resultChan chan<- error, replicaIndex int) {
 
 	serverName := common.GetServerName(common.ReplicaPorts[replicaIndex], replicaIndex)

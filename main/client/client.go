@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/rpc"
 	"strings"
+	"time"
 )
 
 const (
@@ -46,40 +47,8 @@ func main() {
 		default:
 			fmt.Println("Scelta non valida. Riprova.")
 		}
-
-		/*
-			// Esecuzione delle rpc
-			done := make(chan bool)
-			cycles := 25
-
-			for i := 0; i < cycles; i++ {
-				go run1(rpcName, done)
-				go run2(rpcName, done)
-				go run3(rpcName, done)
-				go run4(rpcName, done)
-			}
-
-			// Attendi il completamento di tutte le goroutine
-			for i := 0; i < cycles*4; i++ {
-				<-done
-			}*/
-
-		fmt.Println("\nOrdinamento goroutine (ma con i ritardi): \nClient1: \nPut-giorno:18 Put-mese:02 \nClient2: \nPut-giorno:16 Put-mese:02 " +
-			"\nClient3: \nGet-giorno Get-mese Put-giorno:20 Put-mese:07")
-		// Esecuzione delle rpc
-		done := make(chan bool)
-		cycles := 2
-
-		for i := 0; i < cycles; i++ {
-			go client1(rpcName, done)
-			go client2(rpcName, done)
-			go client3(rpcName, done)
-		}
-
-		// Attendi il completamento di tutte le goroutine
-		for i := 0; i < cycles*3; i++ {
-			<-done
-		}
+		//test1(rpcName)
+		test2(rpcName)
 	}
 }
 
@@ -169,59 +138,6 @@ func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, 
 	return nil
 }
 
-func run1(rpcName string, done chan bool) {
-
-	executeCall(rpcName+put, "y", "0")
-	executeCall(rpcName+put, "x", "1")
-	executeCall(rpcName+get, "x")
-	executeCall(rpcName+get, "y")
-
-	done <- true
-}
-
-func run2(rpcName string, done chan bool) {
-
-	executeCall(rpcName+put, "y", "1")
-	executeCall(rpcName+get, "y")
-	executeCall(rpcName+get, "x")
-
-	done <- true
-}
-
-func run3(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "x", "9")
-	executeCall(rpcName+get, "y")
-	done <- true
-}
-
-func run4(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "x", "0")
-	executeCall(rpcName+put, "y", "3")
-	executeCall(rpcName+get, "x")
-
-	done <- true
-}
-
-func client1(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "giorno", "18")
-	executeCall(rpcName+put, "mese", "02")
-	done <- true
-}
-
-func client2(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "giorno", "16")
-	executeCall(rpcName+put, "mese", "09")
-	done <- true
-}
-
-func client3(rpcName string, done chan bool) {
-	executeCall(rpcName+get, "giorno")
-	executeCall(rpcName+get, "mese")
-	executeCall(rpcName+put, "giorno", "20")
-	executeCall(rpcName+put, "mese", "07")
-	done <- true
-}
-
 func debugPrintRun(rpcName string, args common.Args) {
 	debugName := strings.SplitAfter(rpcName, ".")
 	name := "." + debugName[1]
@@ -257,4 +173,100 @@ func debugPrintResponse(rpcName string, args common.Args, response common.Respon
 	default:
 		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
 	}
+}
+
+func test1(rpcName string) {
+
+	// Esecuzione delle rpc
+	done := make(chan bool)
+	cycles := 25
+
+	for i := 0; i < cycles; i++ {
+		go run1(rpcName, done)
+		go run2(rpcName, done)
+		go run3(rpcName, done)
+		go run4(rpcName, done)
+	}
+
+	// Attendi il completamento di tutte le goroutine
+	for i := 0; i < cycles*4; i++ {
+		<-done
+	}
+}
+
+func run1(rpcName string, done chan bool) {
+
+	executeCall(rpcName+put, "y", "0")
+	executeCall(rpcName+put, "x", "1")
+	executeCall(rpcName+get, "x")
+	executeCall(rpcName+get, "y")
+
+	done <- true
+}
+
+func run2(rpcName string, done chan bool) {
+
+	executeCall(rpcName+put, "y", "1")
+	executeCall(rpcName+get, "y")
+	executeCall(rpcName+get, "x")
+
+	done <- true
+}
+
+func run3(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "x", "9")
+	executeCall(rpcName+get, "y")
+	done <- true
+}
+
+func run4(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "x", "0")
+	executeCall(rpcName+put, "y", "3")
+	executeCall(rpcName+get, "x")
+
+	done <- true
+}
+
+func test2(rpcName string) {
+	// Esecuzione delle rpc
+	done := make(chan bool)
+	cycles := 2
+
+	fmt.Println("\nOrdinamento goroutine (senza ritardi di rete) ripetute", cycles, "volte"+
+		"\nClient1: \nPut-giorno:18 Put-mese:02 "+
+		"\nClient2: \nPut-giorno:16 Put-mese:02 "+
+		"\nClient3: \nGet-giorno Get-mese Put-giorno:20 Put-mese:07")
+
+	for i := 0; i < cycles; i++ {
+		go client1(rpcName, done)
+		go client2(rpcName, done)
+		go client3(rpcName, done)
+
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	// Attendi il completamento di tutte le goroutine
+	for i := 0; i < cycles*3; i++ {
+		<-done
+	}
+}
+
+func client1(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "giorno", "18")
+	executeCall(rpcName+put, "mese", "02")
+	done <- true
+}
+
+func client2(rpcName string, done chan bool) {
+	executeCall(rpcName+put, "giorno", "16")
+	executeCall(rpcName+put, "mese", "09")
+	done <- true
+}
+
+func client3(rpcName string, done chan bool) {
+	executeCall(rpcName+get, "giorno")
+	executeCall(rpcName+get, "mese")
+	executeCall(rpcName+put, "giorno", "20")
+	executeCall(rpcName+put, "mese", "07")
+	done <- true
 }

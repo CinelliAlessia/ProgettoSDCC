@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/fatih/color"
 	"main/common"
 	"time"
 )
@@ -13,6 +15,11 @@ import (
 func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, response *common.Response) error {
 
 	kvc.addToQueue(message)
+
+	if kvc.id != message.IdSender {
+		//kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ?
+		fmt.Println(color.BlueString("RICEVUTO da server"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	}
 
 	// Ciclo finché controlSendToApplication restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
@@ -28,7 +35,6 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 			}
 
 			kvc.removeMessageToQueue(message)
-			response.Result = true
 			break
 		}
 		// La richiesta non può essere ancora eseguita, si attende un breve periodo prima di riprovare

@@ -110,14 +110,14 @@ func main() {
 func printQueue(kv interface{}) {
 	switch kv := kv.(type) {
 	case *KeyValueStoreSequential:
-		// Controllo se il datastore è vuoto
+		// Controllo se il queue è vuoto
 		if len(kv.queue) == 0 {
 			fmt.Println("Queue vuota")
 			return
 		}
 		fmt.Println("Queue:", kv.queue)
 	case *KeyValueStoreCausale:
-		// Controllo se il datastore è vuoto
+		// Controllo se il questa è vuoto
 		if len(kv.queue) == 0 {
 			fmt.Println("Queue vuota")
 			return
@@ -129,13 +129,25 @@ func printQueue(kv interface{}) {
 }
 
 // Funzione debug: Stampa il datastore del server replica
-func printDatastore(kv *KeyValueStoreSequential) {
-
-	// Controllo se il datastore è vuoto
-	if len(kv.datastore) == 0 {
-		fmt.Println("Datastore vuota")
+func printDatastore(kv interface{}) {
+	switch kv := kv.(type) {
+	case *KeyValueStoreSequential:
+		// Controllo se il datastore è vuoto
+		if len(kv.datastore) == 0 {
+			fmt.Println("Datastore vuota")
+			return
+		}
+		fmt.Println("Datastore:", kv.datastore)
+	case *KeyValueStoreCausale:
+		// Controllo se il datastore è vuoto
+		if len(kv.datastore) == 0 {
+			fmt.Println("Datastore vuota")
+			return
+		}
+		fmt.Println("Datastore:", kv.datastore)
+	default:
+		fmt.Println("Tipo di KeyValueStore non supportato")
 	}
-	fmt.Println("Datastore:", kv.datastore)
 }
 
 func printDatastoreOnChange(kv *KeyValueStoreSequential) {
