@@ -13,6 +13,7 @@ import (
 // KeyValueStoreSequential rappresenta il servizio di memorizzazione chiave-valore specializzato nel sequenziale
 type KeyValueStoreSequential struct {
 	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
+	id        int               // Id che identifica il server stesso
 
 	logicalClock int // Orologio logico scalare
 	mutexClock   sync.Mutex
@@ -23,23 +24,27 @@ type KeyValueStoreSequential struct {
 
 type Message struct {
 	Id            string
+	IdSender      int // IdSender rappresenta l'indice del server che invia il messaggio
 	TypeOfMessage string
 	Args          common.Args
 	LogicalClock  int
 	NumberAck     int
 }
 
-// Get restituisce il valore associato alla chiave specificata -> è un evento interno, di lettura
+// Get gestisce una chiamata RPC di un evento interno, genera un messaggio e allega il suo clock scalare.
+// Restituisce il valore associato alla chiave specificata, non notifica ad altri server replica l'evento,
+// ma l'esecuzione avviene rispettando l'ordine di programma.
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
-	//fmt.Println("Richiesta GET di", args.Key)
-
 	// Incrementa il clock logico e genera il messaggio da inviare a livello applicativo
+	// Si crea un messaggio con 3 ack "ricevuti" così che per inviarlo a livello applicativo si controllerà
+	// solamente l'ordinamento del messaggio nella coda.
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
-	message := Message{common.GenerateUniqueID(), "Get", args, kvs.logicalClock, 3}
-	fmt.Println(color.BlueString("RICEVUTO"), message.TypeOfMessage, message.Args.Key, "with clock", message.LogicalClock)
+	message := Message{common.GenerateUniqueID(), kvs.id, "Get", args, kvs.logicalClock, 3}
+	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
+	// TODO: problema, la get anche con timestamp maggiore prende la precedenza perche le altre richieste non si sono ancora messe in coda
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Controllo in while se il messaggio può essere inviato a livello applicativo
@@ -53,7 +58,6 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 			}
 			break
 		}
-
 		// Altrimenti, attendi un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 100)
 	}
@@ -68,18 +72,18 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.logicalClock++
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	id := common.GenerateUniqueID()
-	message := Message{id, "Put", args, kvs.logicalClock, 0}
-
+	message := Message{common.GenerateUniqueID(), kvs.id, "Put", args, kvs.logicalClock, 0}
+	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
+	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
 	if err != nil {
+		response.Result = false
 		return err
 	}
 
-	response.Reply = "true"
+	response.Result = true
 	return nil
 }
 
@@ -91,38 +95,47 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	id := common.GenerateUniqueID()
-	message := Message{id, "Delete", args, kvs.logicalClock, 0}
-
+	message := Message{id, kvs.id, "Delete", args, kvs.logicalClock, 0}
+	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message)
+	err := kvs.sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
 	if err != nil {
+		response.Result = false
 		return err
 	}
 
-	response.Reply = "true"
+	response.Result = true
 	return nil
 }
 
-// RealFunction esegue l'operazione di put e di delete realmente
+// RealFunction esegue l'operazione di get, put e di delete realmente, inserendo la risposta adeguata nella struttura common.Response
 func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *common.Response) error {
 
 	if message.TypeOfMessage == "Put" { // Scrittura
+
 		kvs.datastore[message.Args.Key] = message.Args.Value
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "with clock", message.LogicalClock, "my clock", kvs.logicalClock)
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock", kvs.logicalClock)
+		printDatastore(kvs)
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
+
 		delete(kvs.datastore, message.Args.Key)
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "with clock", message.LogicalClock, "my clock", kvs.logicalClock)
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+		printDatastore(kvs)
 	} else if message.TypeOfMessage == "Get" { // Lettura
+
 		val, ok := kvs.datastore[message.Args.Key]
 		if !ok {
-			fmt.Println("Key non trovata nel datastore", message.Args.Key, kvs.datastore)
-			return fmt.Errorf("KeyValueStoreSequential: key '%s' not found", message.Args.Key)
+			fmt.Println(color.RedString("NON ESEGUITO"), message.TypeOfMessage, message.Args.Key, "datastore:", kvs.datastore, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+			//fmt.Println("Key non trovata nel datastore", message.Args.Key, kvs.datastore)
+			response.Result = false
+			return nil
 		}
-		response.Reply = val
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+val, "with clock", message.LogicalClock, "my clock", kvs.logicalClock)
-
+		response.Result = true
+		response.Value = val
+		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+val, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
+		printDatastore(kvs)
 	} else {
 		return fmt.Errorf("command not found")
 	}
@@ -130,13 +143,13 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 }
 
 // sendToAllServer invia a tutti i server la richiesta rpcName
-func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Message) error {
+func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Message, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
 
 	// Itera su tutte le repliche e avvia le chiamate RPC
 	for i := 0; i < common.Replicas; i++ {
-		go kvs.callRPC(rpcName, message, resultChan, i)
+		go kvs.callRPC(rpcName, message, response, resultChan, i)
 	}
 
 	// Raccoglie i risultati dalle chiamate RPC
@@ -149,7 +162,7 @@ func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Mess
 }
 
 // callRPC è una funzione ausiliaria per effettuare la chiamata RPC a una replica specifica
-func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, resultChan chan<- error, replicaIndex int) {
+func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, response *common.Response, resultChan chan<- error, replicaIndex int) {
 
 	serverName := common.GetServerName(common.ReplicaPorts[replicaIndex], replicaIndex)
 
@@ -162,9 +175,8 @@ func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, res
 	}
 
 	// Chiama il metodo "rpcName" sul server
-	var response bool
 	common.RandomDelay()
-	err = conn.Call(rpcName, message, &response)
+	err = conn.Call(rpcName, message, response)
 	if err != nil {
 		// Gestione dell'errore durante la chiamata RPC
 		resultChan <- fmt.Errorf("errore durante la chiamata RPC %s a %s: %v", rpcName, serverName, err)

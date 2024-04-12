@@ -8,7 +8,8 @@ type Args struct {
 
 // Response è una struttura creata per memorizzare la risposta delle chiamate RPC
 type Response struct {
-	Reply string
+	Value  string
+	Result bool
 }
 
 // Datastore mantenuto da ciascun server

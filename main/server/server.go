@@ -54,7 +54,10 @@ func main() {
 		datastore:    make(map[string]string),
 		logicalClock: 0, // Inizializzazione dell'orologio logico scalare
 		queue:        make([]Message, 0),
+		id:           id,
 	}
+
+	//go printDatastoreOnChange(kvSequential)
 
 	// Registrazione dei servizi RPC
 	err = rpc.RegisterName("KeyValueStoreCausale", kvCausale)
@@ -133,4 +136,19 @@ func printDatastore(kv *KeyValueStoreSequential) {
 		fmt.Println("Datastore vuota")
 	}
 	fmt.Println("Datastore:", kv.datastore)
+}
+
+func printDatastoreOnChange(kv *KeyValueStoreSequential) {
+	prevClock := kv.logicalClock
+
+	for {
+		// Se il valore dell'orologio logico è cambiato, stampa il datastore
+		if kv.logicalClock != prevClock {
+			fmt.Printf("Datastore cambiato clock: %d, datastore:\n", kv.logicalClock)
+			for key, value := range kv.datastore {
+				fmt.Printf("%s: %s\n", key, value)
+			}
+			prevClock = kv.logicalClock
+		}
+	}
 }

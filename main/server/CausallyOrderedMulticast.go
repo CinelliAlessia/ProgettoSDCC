@@ -10,29 +10,27 @@ import (
 // non restituisce true, indicando che la richiesta può essere eseguita a livello applicativo. Quando ciò accade,
 // la funzione esegue effettivamente l'operazione a livello applicativo tramite la chiamata a RealFunction e rimuove
 // il messaggio dalla coda. Restituisce un booleano tramite reply per indicare se l'operazione è stata eseguita con successo.
-func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, reply *bool) error {
+func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, response *common.Response) error {
 
 	kvc.addToQueue(message)
 
 	// Ciclo finché controlSendToApplication restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
-	*reply = false
+	response.Result = false
 	for {
 		canSend := kvc.controlSendToApplication(message)
 		if canSend {
 
 			// Invio a livello applicativo
-			var replySaveInDatastore common.Response
-			err := kvc.RealFunction(message, &replySaveInDatastore)
+			err := kvc.RealFunction(message, response)
 			if err != nil {
 				return err
 			}
 
 			kvc.removeMessageToQueue(message)
-			*reply = true
+			response.Result = true
 			break
 		}
-
 		// La richiesta non può essere ancora eseguita, si attende un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 1000)
 	}

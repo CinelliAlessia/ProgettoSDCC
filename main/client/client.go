@@ -68,7 +68,7 @@ func main() {
 			"\nClient3: \nGet-giorno Get-mese Put-giorno:20 Put-mese:07")
 		// Esecuzione delle rpc
 		done := make(chan bool)
-		cycles := 1
+		cycles := 2
 
 		for i := 0; i < cycles; i++ {
 			go client1(rpcName, done)
@@ -152,8 +152,7 @@ func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, 
 	// Applica un ritardo casuale
 	common.RandomDelay()
 
-	debugName := strings.SplitAfter(rpcName, ".")
-	fmt.Println(color.BlueString("RUN"), debugName[1], args.Key+":"+args.Value)
+	debugPrintRun(rpcName, args)
 
 	// Effettua la chiamata RPC
 	err := conn.Call(rpcName, args, response)
@@ -161,7 +160,7 @@ func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, 
 		return fmt.Errorf("errore durante la chiamata RPC in client.call: %s", err)
 	}
 
-	fmt.Println(color.GreenString("RISPOSTA"), debugName[1], args.Key+":"+args.Value, response.Value, response.Result)
+	debugPrintResponse(rpcName, args, *response)
 
 	err = conn.Close()
 	if err != nil {
@@ -221,4 +220,41 @@ func client3(rpcName string, done chan bool) {
 	executeCall(rpcName+put, "giorno", "20")
 	executeCall(rpcName+put, "mese", "07")
 	done <- true
+}
+
+func debugPrintRun(rpcName string, args common.Args) {
+	debugName := strings.SplitAfter(rpcName, ".")
+	name := "." + debugName[1]
+
+	switch name {
+	case put:
+		fmt.Println(color.BlueString("RUN Put"), args.Key+":"+args.Value)
+	case get:
+		fmt.Println(color.BlueString("RUN Get"), args.Key)
+	case delete:
+		fmt.Println(color.BlueString("RUN Delete"), args.Key)
+	default:
+		fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
+	}
+}
+
+func debugPrintResponse(rpcName string, args common.Args, response common.Response) {
+
+	debugName := strings.SplitAfter(rpcName, ".")
+	name := "." + debugName[1]
+
+	switch name {
+	case put:
+		fmt.Println(color.GreenString("RISPOSTA Put"), "key:"+args.Key, "value:"+args.Value, "result:", response.Result)
+	case get:
+		if response.Result {
+			fmt.Println(color.GreenString("RISPOSTA Get"), "key:"+args.Key, "response:"+response.Value)
+		} else {
+			fmt.Println(color.RedString("RISPOSTA Get fallita"), "key:"+args.Key)
+		}
+	case delete:
+		fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.Key, "result:", response.Result)
+	default:
+		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
+	}
 }

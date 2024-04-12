@@ -25,3 +25,12 @@ timestamp potenzialmente minore o uguale a quello di msg_i).
 - Mi arriva prima un ack e dopo la richiesta di append => Ignoro e rispondo "false" cosi che mi venga re-inviata.
 - Errore Pacchetto 163: Due dei tre server replica ricevono tutti e 3 gli ack, uno soltanto non ha ricevuto un ack (Strano): gli altri due server vanno avanti nell'elaborazione dei pacchetti perché hanno tutti gli ack dei successivi, il server che ha perso l'ack rimane bloccato. => Le assunzioni per eseguire il multicast totalmente ordinato prevedono che la comunicazione sia affidabile, potrei risolvere il problema allo stesso modo di cui sopra? La parte di codice più indagata è la sincronizzazione con l'incremento dell'ack.
 ![img.png](resources/img.png) 
+
+- Gestisco in modo sbagliato il clock scalare, io server ricevente a prescindere devo incrementare il mio clock e allegarlo al messaggio. 
+I server riceventi devono prendere il max tra il clock del messaggio e i propri, successivamente devono incrementarlo di uno, ma solo se il messaggio non lo avevano generato loro!!! 
+   - Get corretta
+   - Put e Delete Errate
+     
+
+- Nel server3 si può notare che la richiesta get è arrivata a livello applicativo prima rispetto le due precedenti richieste
+![img_1.png](resources/img_1.png)
