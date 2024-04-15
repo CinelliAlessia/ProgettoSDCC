@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"net/rpc"
 	"strings"
-	"time"
 )
 
 const (
@@ -37,24 +36,79 @@ func main() {
 		var rpcName string
 		switch choice {
 		case 1:
-			fmt.Println("Scelta di consistenza causale")
 			rpcName = "KeyValueStoreCausale"
+			causal(rpcName)
 			break
 		case 2:
-			fmt.Println("Scelta di consistenza sequenziale")
 			rpcName = "KeyValueStoreSequential"
+			sequential(rpcName)
 			break
 		default:
 			fmt.Println("Scelta non valida. Riprova.")
 		}
-
-		/* --- Scegliere il tipo di test che si vuole eseguire --- */
-		//test1(rpcName)
-		//test2(rpcName)
-		//basicTestCE(rpcName)
-		//basicTestSeq(rpcName)
-		mediumTestSeq(rpcName)
 	}
+}
+
+// sequential() Scegliere il tipo di test che si vuole eseguire per verificare le garanzie di consistenza sequenziale
+func sequential(rpcName string) {
+	// Stampa il menu interattivo
+	fmt.Println("\nConsistenza sequenziale, scegli il test da eseguire: ")
+	fmt.Println("1. Basic Test")
+	fmt.Println("2. Medium Test")
+	fmt.Println("3. Complex Test")
+
+	// Leggi l'input dell'utente per l'operazione
+	fmt.Print("Inserisci il numero dell'operazione desiderata: ")
+	var choice int
+	_, err := fmt.Scan(&choice)
+	if err != nil {
+		fmt.Println("Client -> Errore durante la lettura dell'input:", err)
+		return
+	}
+
+	switch choice {
+	case 1:
+		basicTestSeq(rpcName)
+		break
+	case 2:
+		mediumTestSeq(rpcName)
+		break
+	case 3:
+		//complexTestSeq(rpcName)
+		break
+	}
+
+}
+
+// causal() Scegliere il tipo di test che si vuole eseguire per verificare le garanzie di consistenza causale
+func causal(rpcName string) {
+	// Stampa il menu interattivo
+	fmt.Println("\nConsistenza causale, scegli il test da eseguire: ")
+	fmt.Println("1. Basic Test")
+	fmt.Println("2. Medium Test ---> ANCORA NO")
+	fmt.Println("3. Complex Test")
+
+	// Leggi l'input dell'utente per l'operazione
+	fmt.Print("\nInserisci il numero dell'operazione desiderata: ")
+	var choice int
+	_, err := fmt.Scan(&choice)
+	if err != nil {
+		fmt.Println("Client -> Errore durante la lettura dell'input:", err)
+		return
+	}
+
+	switch choice {
+	case 1:
+		basicTestCE(rpcName)
+		break
+	case 2:
+		//mediumTestCE(rpcName)
+		break
+	case 3:
+		complexTestCE(rpcName)
+		break
+	}
+
 }
 
 /* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
@@ -98,38 +152,44 @@ func specificConnect(index int) *rpc.Client {
 	return conn
 }
 
-func executeRandomCall(rpcName, key string, values ...string) {
+func executeRandomCall(rpcName, key string, values ...string) common.Response {
+	var response common.Response
+
 	conn := randomConnect()
 	if conn == nil {
 		fmt.Println("CLIENT: Errore durante la connessione")
-		return
+		return common.Response{}
 	}
 
 	if len(values) > 0 {
-		executeCall(conn, rpcName, key, values[0])
+		response = executeCall(conn, rpcName, key, values[0])
 	} else {
-		executeCall(conn, rpcName, key)
+		response = executeCall(conn, rpcName, key)
 	}
+	return response
 }
 
 // executeSpecificCall:
 //   - index rappresenta l'indice relativo al server da contattare, da 0 a (common.Replicas-1)
-func executeSpecificCall(index int, rpcName, key string, values ...string) {
+func executeSpecificCall(index int, rpcName, key string, values ...string) common.Response {
+	var response common.Response
+
 	conn := specificConnect(index)
 	if conn == nil {
 		fmt.Println("executeSpecificCall: Errore durante la connessione")
-		return
+		return common.Response{}
 	}
 
 	if len(values) > 0 {
-		executeCall(conn, rpcName, key, values[0])
+		response = executeCall(conn, rpcName, key, values[0])
 	} else {
-		executeCall(conn, rpcName, key)
+		response = executeCall(conn, rpcName, key)
 	}
+	return response
 }
 
 // executeCall esegue un comando ad un server random. Il comando da eseguire viene specificato tramite i parametri inseriti
-func executeCall(conn *rpc.Client, rpcName, key string, values ...string) {
+func executeCall(conn *rpc.Client, rpcName, key string, values ...string) common.Response {
 	var value string
 	if len(values) > 0 {
 		value = values[0]
@@ -141,8 +201,9 @@ func executeCall(conn *rpc.Client, rpcName, key string, values ...string) {
 	// TODO: Qui posso usare un id auto-incrementativo per un DEBUG accurato
 	err := delayedCall(conn, args, &response, rpcName)
 	if err != nil {
-		return
+		return common.Response{}
 	}
+	return response
 }
 
 // delayedCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
@@ -210,139 +271,4 @@ func debugPrintResponse(rpcName string, args common.Args, response common.Respon
 	default:
 		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
 	}
-}
-
-/* ----- FUNZIONI DI TEST ----- */
-
-func test1(rpcName string) {
-
-	// Esecuzione delle rpc
-	done := make(chan bool)
-	cycles := 25
-
-	for i := 0; i < cycles; i++ {
-		go run1(rpcName, done)
-		go run2(rpcName, done)
-		go run3(rpcName, done)
-		go run4(rpcName, done)
-	}
-
-	// Attendi il completamento di tutte le goroutine
-	for i := 0; i < cycles*4; i++ {
-		<-done
-	}
-}
-
-func run1(rpcName string, done chan bool) {
-
-	executeRandomCall(rpcName+put, "y", "0")
-	executeRandomCall(rpcName+put, "x", "1")
-	executeRandomCall(rpcName+get, "x")
-	executeRandomCall(rpcName+get, "y")
-
-	done <- true
-}
-
-func run2(rpcName string, done chan bool) {
-
-	executeRandomCall(rpcName+put, "y", "1")
-	executeRandomCall(rpcName+get, "y")
-	executeRandomCall(rpcName+get, "x")
-
-	done <- true
-}
-
-func run3(rpcName string, done chan bool) {
-	executeRandomCall(rpcName+put, "x", "9")
-	executeRandomCall(rpcName+get, "y")
-	done <- true
-}
-
-func run4(rpcName string, done chan bool) {
-	executeRandomCall(rpcName+put, "x", "0")
-	executeRandomCall(rpcName+put, "y", "3")
-	executeRandomCall(rpcName+get, "x")
-
-	done <- true
-}
-
-func test2(rpcName string) {
-	// Esecuzione delle rpc
-	done := make(chan bool)
-	cycles := 2
-
-	fmt.Println("\nOrdinamento goroutine (senza ritardi di rete) ripetute", cycles, "volte"+
-		"\nClient1: \nPut-giorno:18 Put-mese:02 "+
-		"\nClient2: \nPut-giorno:16 Put-mese:02 "+
-		"\nClient3: \nGet-giorno Get-mese Put-giorno:20 Put-mese:07")
-
-	for i := 0; i < cycles; i++ {
-		go client1(rpcName, done)
-		go client2(rpcName, done)
-		go client3(rpcName, done)
-
-		time.Sleep(time.Millisecond * 100)
-	}
-
-	// Attendi il completamento di tutte le goroutine
-	for i := 0; i < cycles*3; i++ {
-		<-done
-	}
-}
-
-func client1(rpcName string, done chan bool) {
-	executeRandomCall(rpcName+put, "giorno", "18")
-	executeRandomCall(rpcName+put, "mese", "02")
-	done <- true
-}
-
-func client2(rpcName string, done chan bool) {
-	executeRandomCall(rpcName+put, "giorno", "16")
-	executeRandomCall(rpcName+put, "mese", "09")
-	done <- true
-}
-
-func client3(rpcName string, done chan bool) {
-	executeRandomCall(rpcName+get, "giorno")
-	executeRandomCall(rpcName+get, "mese")
-	executeRandomCall(rpcName+put, "giorno", "20")
-	executeRandomCall(rpcName+put, "mese", "07")
-	done <- true
-}
-
-// In questo basicTestCE vengono inviate in goroutine:
-//   - una richiesta di put al server1,
-//   - al server due le richieste di get e successivamente una put (così da essere in relazione di causa-effetto) sul singolo server
-func basicTestCE(rpcName string) {
-	go executeSpecificCall(0, rpcName+put, "prova1", "1")
-
-	time.Sleep(time.Millisecond * 100)
-
-	go func() {
-		executeSpecificCall(1, rpcName+get, "prova1")
-		executeSpecificCall(1, rpcName+put, "prova2", "2")
-	}()
-}
-
-// basicTestSeq contatta tutti i server in goroutine con operazioni di put
-// un corretto funzionamento della consistenza sequenziale prevede che a prescindere dall'ordinamento
-// tutti i server eseguiranno nello stesso ordine le richieste.
-func basicTestSeq(rpcName string) {
-	go executeSpecificCall(0, rpcName+put, "prova", "1")
-	go executeSpecificCall(1, rpcName+put, "prova", "2")
-	go executeSpecificCall(2, rpcName+put, "prova", "3")
-}
-
-func mediumTestSeq(rpcName string) {
-	go executeSpecificCall(0, rpcName+put, "prova", "1")
-	go executeSpecificCall(1, rpcName+put, "prova", "2")
-	go executeSpecificCall(2, rpcName+put, "prova", "3")
-
-	go executeSpecificCall(0, rpcName+put, "prova1", "1")
-	go executeSpecificCall(1, rpcName+put, "prova1", "2")
-	go executeSpecificCall(2, rpcName+put, "prova1", "3")
-
-	go executeSpecificCall(0, rpcName+put, "prova2", "1")
-	go executeSpecificCall(1, rpcName+put, "prova2", "2")
-	go executeSpecificCall(2, rpcName+put, "prova2", "3")
 }
