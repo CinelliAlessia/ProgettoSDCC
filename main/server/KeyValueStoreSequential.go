@@ -18,11 +18,11 @@ type KeyValueStoreSequential struct {
 	logicalClock int // Orologio logico scalare
 	mutexClock   sync.Mutex
 
-	queue      []Message
+	queue      []MessageS
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 }
 
-type Message struct {
+type MessageS struct {
 	Id            string
 	IdSender      int // IdSender rappresenta l'indice del server che invia il messaggio
 	TypeOfMessage string
@@ -40,7 +40,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	// solamente l'ordinamento del messaggio nella coda.
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
-	message := Message{common.GenerateUniqueID(), kvs.id, "Get", args, kvs.logicalClock, 3}
+	message := MessageS{common.GenerateUniqueID(), kvs.id, "Get", args, kvs.logicalClock, 3}
 	kvs.printDebugBlue("RICEVUTO da client", message)
 	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
@@ -67,13 +67,12 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
-	//fmt.Println("Richiesta PUT di", args.Key, args.Value)
 
 	kvs.mutexClock.Lock()
 	kvs.logicalClock++
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
-	message := Message{common.GenerateUniqueID(), kvs.id, "Put", args, kvs.logicalClock, 0}
+	message := MessageS{common.GenerateUniqueID(), kvs.id, "Put", args, kvs.logicalClock, 0}
 	kvs.printDebugBlue("RICEVUTO da client", message)
 	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
@@ -97,7 +96,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	id := common.GenerateUniqueID()
-	message := Message{id, kvs.id, "Delete", args, kvs.logicalClock, 0}
+	message := MessageS{id, kvs.id, "Delete", args, kvs.logicalClock, 0}
 	kvs.printDebugBlue("RICEVUTO da client", message)
 	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
 	kvs.mutexClock.Unlock()
@@ -114,18 +113,18 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // RealFunction esegue l'operazione di get, put e di delete realmente, inserendo la risposta adeguata nella struttura common.Response
-func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) RealFunction(message MessageS, response *common.Response) error {
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 
 		kvs.datastore[message.Args.Key] = message.Args.Value
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock", kvs.logicalClock)
-		printDatastore(kvs)
+		kvs.printGreen("ESEGUITO", message)
+
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
 
 		delete(kvs.datastore, message.Args.Key)
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
-		printDatastore(kvs)
+		kvs.printGreen("ESEGUITO", message)
+
 	} else if message.TypeOfMessage == "Get" { // Lettura
 
 		val, ok := kvs.datastore[message.Args.Key]
@@ -135,8 +134,9 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 			return nil
 		}
 		response.Value = val
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+val, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock)
-		printDatastore(kvs)
+
+		message.Args.Value = val //Fatto solo per DEBUG per la funzione sottostante
+		kvs.printGreen("ESEGUITO", message)
 	} else {
 		return fmt.Errorf("command not found")
 	}
@@ -146,7 +146,7 @@ func (kvs *KeyValueStoreSequential) RealFunction(message Message, response *comm
 }
 
 // sendToAllServer invia a tutti i server la richiesta rpcName
-func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Message, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message MessageS, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
 
@@ -165,7 +165,7 @@ func (kvs *KeyValueStoreSequential) sendToAllServer(rpcName string, message Mess
 }
 
 // callRPC è una funzione ausiliaria per effettuare la chiamata RPC a una replica specifica
-func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message Message, response *common.Response, resultChan chan<- error, replicaIndex int) {
+func (kvs *KeyValueStoreSequential) callRPC(rpcName string, message MessageS, response *common.Response, resultChan chan<- error, replicaIndex int) {
 
 	serverName := common.GetServerName(common.ReplicaPorts[replicaIndex], replicaIndex)
 

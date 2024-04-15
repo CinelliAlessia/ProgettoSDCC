@@ -36,7 +36,8 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 	kvc.vectorClock[kvc.id]++
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Get", args, kvc.vectorClock}
-	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	kvc.printDebugBlue("RICEVUTO da client", message)
 
 	kvc.mutexClock.Unlock()
 
@@ -50,14 +51,14 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response) error {
-	//fmt.Println("Richiesta PUT di", args.Key, args.Value)
 
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
 
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Put", args, kvc.vectorClock}
-	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	kvc.printDebugBlue("RICEVUTO da client", message)
 
 	kvc.mutexClock.Unlock()
 
@@ -74,9 +75,11 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 	kvc.mutexClock.Lock()
 	kvc.vectorClock[kvc.id]++
+
 	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
 	message := MessageC{common.GenerateUniqueID(), kvc.id, "Delete", args, kvc.vectorClock}
-	fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	//fmt.Println(color.BlueString("RICEVUTO da client"), message.TypeOfMessage, message.Args.Key, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+	kvc.printDebugBlue("RICEVUTO da client", message)
 	kvc.mutexClock.Unlock()
 
 	err := kvc.sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
@@ -92,11 +95,11 @@ func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 		kvc.datastore[message.Args.Key] = message.Args.Value
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock", kvc.vectorClock)
+		kvc.printGreen("ESEGUITO", message)
 
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
 		delete(kvc.datastore, message.Args.Key)
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+		kvc.printGreen("ESEGUITO", message)
 
 	} else if message.TypeOfMessage == "Get" { // Lettura
 
@@ -108,7 +111,8 @@ func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common
 		}
 
 		response.Value = val
-		fmt.Println(color.GreenString("ESEGUITO"), message.TypeOfMessage, message.Args.Key+":"+val, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+		message.Args.Value = val //Fatto solo per DEBUG per la funzione sottostante
+		kvc.printGreen("ESEGUITO", message)
 
 	} else {
 		return fmt.Errorf("command not found")
