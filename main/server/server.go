@@ -53,7 +53,7 @@ func main() {
 	kvSequential := &KeyValueStoreSequential{
 		datastore:    make(map[string]string),
 		logicalClock: 0, // Inizializzazione dell'orologio logico scalare
-		queue:        make([]Message, 0),
+		queue:        make([]MessageS, 0),
 		id:           id,
 	}
 
