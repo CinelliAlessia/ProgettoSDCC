@@ -16,6 +16,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 
 	kvc.addToQueue(message)
 
+	// Solo per DEBUG
 	if kvc.id != message.IdSender {
 		kvc.printDebugBlue("RICEVUTO da server", message)
 	}
@@ -32,8 +33,6 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 			if err != nil {
 				return err
 			}
-
-			kvc.removeMessageToQueue(message)
 			break
 		}
 		// La richiesta non può essere ancora eseguita, si attende un breve periodo prima di riprovare
@@ -55,6 +54,8 @@ func (kvc *KeyValueStoreCausale) addToQueue(message MessageC) {
 //   - `t(m)[i] = Vj[i] + 1` (il messaggio `m` è il successivo che `pj` si aspetta da `pi`).
 //   - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
 func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool {
+	result := false
+
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
 	if message.IdSender != kvc.id && message.VectorClock[message.IdSender] == kvc.vectorClock[message.IdSender]+1 {
 
@@ -62,25 +63,25 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 		for index := range message.VectorClock {
 			if index != message.IdSender && message.VectorClock[index] > kvc.vectorClock[index] {
 				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
-				return false
+				result = false
 			}
 		}
 		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
 		kvc.mutexClock.Lock()
 		kvc.vectorClock[message.IdSender] = message.VectorClock[message.IdSender]
 		kvc.mutexClock.Unlock()
-		//fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", message.VectorClock, "id", message.IdSender)
-		return true
-	} else if message.IdSender == kvc.id {
+		result = true
+
+	} else if message.IdSender == kvc.id { //Ho "ricevuto" una mia richiesta -> è possibile processarla
+		result = true
+	}
+
+	if result {
+		kvc.removeMessageToQueue(message)
 		//fmt.Println("La condizione è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", kvc.vectorClock, "id", message.IdSender)
 		return true
 	}
-
-	// Una delle condizioni non è soddisfatta, il messaggio non può essere consegnato al livello applicativo
-	/*newVector := kvc.vectorClock
-	newVector[message.IdSender]++
-	fmt.Println("La condizione NON è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", newVector, "id", message.IdSender) */
-
+	//fmt.Println("La condizione NON è soddisfatta", message.TypeOfMessage, message.Args.Key, message.Args.Value, message.VectorClock, "atteso:", newVector, "id", message.IdSender) */
 	return false
 }
 
@@ -98,6 +99,22 @@ func (kvc *KeyValueStoreCausale) removeMessageToQueue(message MessageC) {
 
 func (kvc *KeyValueStoreCausale) printDebugBlue(blueString string, message MessageC) {
 	if common.GetDebug() {
-		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock)
+		// Ottieni l'orario corrente
+		now := time.Now()
+
+		// Formatta l'orario corrente come stringa nel formato desiderato
+		formattedTime := now.Format("15:04:05.000")
+
+		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock, formattedTime)
 	}
+}
+
+func (kvc *KeyValueStoreCausale) printGreen(greenString string, message MessageC) {
+	// Ottieni l'orario corrente
+	now := time.Now()
+
+	// Formatta l'orario corrente come stringa nel formato desiderato
+	formattedTime := now.Format("15:04:05.000")
+
+	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock, formattedTime)
 }
