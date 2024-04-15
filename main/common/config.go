@@ -32,6 +32,7 @@ func Max(clock int, clock2 int) int {
 }
 
 // GetServerName restituisce il nome del server in base alla scelta di configurazione, tra locale e remota (docker)
+// indicizzazione richiesta a partire da 0
 func GetServerName(replicaPort string, id int) string {
 	if os.Getenv("CONFIG") == "1" {
 		return ":" + replicaPort // Locale
@@ -43,7 +44,9 @@ func GetServerName(replicaPort string, id int) string {
 	}
 }
 
-// GetDebug restituisce
+// GetDebug restituisce un booleano
+//   - true: Esegue più print di debug
+//   - false: Esegue solamente i print necessari
 func GetDebug() bool {
 	if os.Getenv("DEBUG") == "1" {
 		return true
@@ -57,7 +60,7 @@ func GetDebug() bool {
 
 // RandomDelay Genera un numero casuale compreso tra 0 e 999 (max un secondo)
 func RandomDelay() {
-	delay := rand.Intn(1000)
+	delay := rand.Intn(10000)
 
 	// Introduce un ritardo casuale
 	time.Sleep(time.Millisecond * time.Duration(delay))
