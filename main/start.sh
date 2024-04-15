@@ -12,10 +12,13 @@ if [ "$CONFIG" -eq 1 ]; then
   server_file="server/"
   client_file="client/"
 
-  # Esecuzione del server in un nuovo terminale gnome-terminal
-  gnome-terminal --geometry=100x24+0+0 -- bash -c "cd server/ && go run . 0; exec bash" &
-  gnome-terminal --geometry=100x24+0+0 -- bash -c "cd $server_file && go run . 1; exec bash" &
-  gnome-terminal --geometry=100x24+0+0 -- bash -c "cd $server_file && go run . 2; exec bash" &
+  # Numero di repliche
+  Replicas=3
+
+  # Esecuzione del server in nuovi terminali gnome-terminal
+  for ((i=0; i<Replicas; i++)); do
+    gnome-terminal --geometry=100x24+0+0 -- bash -c "cd $server_file && go run . $i; exec bash" &
+  done
 
   # Esecuzione del client in un nuovo terminale gnome-terminal
   gnome-terminal --geometry=100x24+0+0 -- bash -c "cd $client_file && go run .; exec bash" &
