@@ -12,11 +12,6 @@ type Response struct {
 	Result bool
 }
 
-// Datastore mantenuto da ciascun server
-type Datastore struct {
-	datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-}
-
 // KeyValueStoreService è un'interfaccia rappresentante che chiamate RPC esposte al client
 type KeyValueStoreService interface {
 	Get(args Args, reply *Response) error
