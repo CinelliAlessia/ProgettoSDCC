@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	put    = ".Put"
-	get    = ".Get"
-	delete = ".Delete"
+	put = ".Put"
+	get = ".Get"
+	del = ".Delete"
 )
 
 func main() {
@@ -47,10 +47,17 @@ func main() {
 		default:
 			fmt.Println("Scelta non valida. Riprova.")
 		}
+
+		/* --- Scegliere il tipo di test che si vuole eseguire --- */
 		//test1(rpcName)
-		test2(rpcName)
+		//test2(rpcName)
+		//basicTestCE(rpcName)
+		//basicTestSeq(rpcName)
+		mediumTestSeq(rpcName)
 	}
 }
+
+/* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
 
 // randomConnect restituisce una connessione random con un server definito in common/config.go
 func randomConnect() *rpc.Client {
@@ -71,8 +78,9 @@ func randomConnect() *rpc.Client {
 }
 
 // specificConnect restituisce una connessione specifica con un server definito in common/config.go, tramite index passato in argomento
+// Attenzione: Indicizzazione parte da 0!
 func specificConnect(index int) *rpc.Client {
-	if index >= common.Replicas {
+	if index > common.Replicas {
 		_ = fmt.Errorf("index out of range")
 		return nil
 	}
@@ -90,8 +98,38 @@ func specificConnect(index int) *rpc.Client {
 	return conn
 }
 
+func executeRandomCall(rpcName, key string, values ...string) {
+	conn := randomConnect()
+	if conn == nil {
+		fmt.Println("CLIENT: Errore durante la connessione")
+		return
+	}
+
+	if len(values) > 0 {
+		executeCall(conn, rpcName, key, values[0])
+	} else {
+		executeCall(conn, rpcName, key)
+	}
+}
+
+// executeSpecificCall:
+//   - index rappresenta l'indice relativo al server da contattare, da 0 a (common.Replicas-1)
+func executeSpecificCall(index int, rpcName, key string, values ...string) {
+	conn := specificConnect(index)
+	if conn == nil {
+		fmt.Println("executeSpecificCall: Errore durante la connessione")
+		return
+	}
+
+	if len(values) > 0 {
+		executeCall(conn, rpcName, key, values[0])
+	} else {
+		executeCall(conn, rpcName, key)
+	}
+}
+
 // executeCall esegue un comando ad un server random. Il comando da eseguire viene specificato tramite i parametri inseriti
-func executeCall(rpcName, key string, values ...string) {
+func executeCall(conn *rpc.Client, rpcName, key string, values ...string) {
 	var value string
 	if len(values) > 0 {
 		value = values[0]
@@ -100,14 +138,7 @@ func executeCall(rpcName, key string, values ...string) {
 	args := common.Args{Key: key, Value: value}
 	response := common.Response{}
 
-	conn := randomConnect()
-	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return
-	}
-
 	// TODO: Qui posso usare un id auto-incrementativo per un DEBUG accurato
-	//fmt.Println("Run", rpcName, key+":"+value)
 	err := delayedCall(conn, args, &response, rpcName)
 	if err != nil {
 		return
@@ -119,7 +150,7 @@ func executeCall(rpcName, key string, values ...string) {
 func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
 
 	// Applica un ritardo casuale
-	common.RandomDelay()
+	common.RandomDelay() // Vogliamo applicare o meno il ritardo? -> Scelto all'utilizzo e si imposta una variabile globale
 
 	debugPrintRun(rpcName, args)
 
@@ -138,6 +169,8 @@ func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, 
 	return nil
 }
 
+/* ----- FUNZIONI PER PRINT DI DEBUG ----- */
+
 func debugPrintRun(rpcName string, args common.Args) {
 	if common.GetDebug() {
 		debugName := strings.SplitAfter(rpcName, ".")
@@ -148,7 +181,7 @@ func debugPrintRun(rpcName string, args common.Args) {
 			fmt.Println(color.BlueString("RUN Put"), args.Key+":"+args.Value)
 		case get:
 			fmt.Println(color.BlueString("RUN Get"), args.Key)
-		case delete:
+		case del:
 			fmt.Println(color.BlueString("RUN Delete"), args.Key)
 		default:
 			fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
@@ -172,12 +205,14 @@ func debugPrintResponse(rpcName string, args common.Args, response common.Respon
 		} else {
 			fmt.Println(color.RedString("RISPOSTA Get fallita"), "key:"+args.Key)
 		}
-	case delete:
+	case del:
 		fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.Key, "result:", response.Result)
 	default:
 		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
 	}
 }
+
+/* ----- FUNZIONI DI TEST ----- */
 
 func test1(rpcName string) {
 
@@ -200,33 +235,33 @@ func test1(rpcName string) {
 
 func run1(rpcName string, done chan bool) {
 
-	executeCall(rpcName+put, "y", "0")
-	executeCall(rpcName+put, "x", "1")
-	executeCall(rpcName+get, "x")
-	executeCall(rpcName+get, "y")
+	executeRandomCall(rpcName+put, "y", "0")
+	executeRandomCall(rpcName+put, "x", "1")
+	executeRandomCall(rpcName+get, "x")
+	executeRandomCall(rpcName+get, "y")
 
 	done <- true
 }
 
 func run2(rpcName string, done chan bool) {
 
-	executeCall(rpcName+put, "y", "1")
-	executeCall(rpcName+get, "y")
-	executeCall(rpcName+get, "x")
+	executeRandomCall(rpcName+put, "y", "1")
+	executeRandomCall(rpcName+get, "y")
+	executeRandomCall(rpcName+get, "x")
 
 	done <- true
 }
 
 func run3(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "x", "9")
-	executeCall(rpcName+get, "y")
+	executeRandomCall(rpcName+put, "x", "9")
+	executeRandomCall(rpcName+get, "y")
 	done <- true
 }
 
 func run4(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "x", "0")
-	executeCall(rpcName+put, "y", "3")
-	executeCall(rpcName+get, "x")
+	executeRandomCall(rpcName+put, "x", "0")
+	executeRandomCall(rpcName+put, "y", "3")
+	executeRandomCall(rpcName+get, "x")
 
 	done <- true
 }
@@ -256,21 +291,58 @@ func test2(rpcName string) {
 }
 
 func client1(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "giorno", "18")
-	executeCall(rpcName+put, "mese", "02")
+	executeRandomCall(rpcName+put, "giorno", "18")
+	executeRandomCall(rpcName+put, "mese", "02")
 	done <- true
 }
 
 func client2(rpcName string, done chan bool) {
-	executeCall(rpcName+put, "giorno", "16")
-	executeCall(rpcName+put, "mese", "09")
+	executeRandomCall(rpcName+put, "giorno", "16")
+	executeRandomCall(rpcName+put, "mese", "09")
 	done <- true
 }
 
 func client3(rpcName string, done chan bool) {
-	executeCall(rpcName+get, "giorno")
-	executeCall(rpcName+get, "mese")
-	executeCall(rpcName+put, "giorno", "20")
-	executeCall(rpcName+put, "mese", "07")
+	executeRandomCall(rpcName+get, "giorno")
+	executeRandomCall(rpcName+get, "mese")
+	executeRandomCall(rpcName+put, "giorno", "20")
+	executeRandomCall(rpcName+put, "mese", "07")
 	done <- true
+}
+
+// In questo basicTestCE vengono inviate in goroutine:
+//   - una richiesta di put al server1,
+//   - al server due le richieste di get e successivamente una put (così da essere in relazione di causa-effetto) sul singolo server
+func basicTestCE(rpcName string) {
+	go executeSpecificCall(0, rpcName+put, "prova1", "1")
+
+	time.Sleep(time.Millisecond * 100)
+
+	go func() {
+		executeSpecificCall(1, rpcName+get, "prova1")
+		executeSpecificCall(1, rpcName+put, "prova2", "2")
+	}()
+}
+
+// basicTestSeq contatta tutti i server in goroutine con operazioni di put
+// un corretto funzionamento della consistenza sequenziale prevede che a prescindere dall'ordinamento
+// tutti i server eseguiranno nello stesso ordine le richieste.
+func basicTestSeq(rpcName string) {
+	go executeSpecificCall(0, rpcName+put, "prova", "1")
+	go executeSpecificCall(1, rpcName+put, "prova", "2")
+	go executeSpecificCall(2, rpcName+put, "prova", "3")
+}
+
+func mediumTestSeq(rpcName string) {
+	go executeSpecificCall(0, rpcName+put, "prova", "1")
+	go executeSpecificCall(1, rpcName+put, "prova", "2")
+	go executeSpecificCall(2, rpcName+put, "prova", "3")
+
+	go executeSpecificCall(0, rpcName+put, "prova1", "1")
+	go executeSpecificCall(1, rpcName+put, "prova1", "2")
+	go executeSpecificCall(2, rpcName+put, "prova1", "3")
+
+	go executeSpecificCall(0, rpcName+put, "prova2", "1")
+	go executeSpecificCall(1, rpcName+put, "prova2", "2")
+	go executeSpecificCall(2, rpcName+put, "prova2", "3")
 }
