@@ -20,13 +20,11 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 
 	// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 	kvs.mutexClock.Lock()
-
 	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
 	if kvs.id != message.IdSender {
 		//kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ? TODO: ???
 		kvs.printDebugBlue("RICEVUTO da server", message)
 	}
-
 	kvs.mutexClock.Unlock()
 
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
@@ -39,7 +37,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 		canSend := kvs.controlSendToApplication(message)
 		if canSend {
 			// Invio a livello applicativo
-			err := kvs.RealFunction(message, response)
+			err := kvs.realFunction(message, response)
 			if err != nil {
 				return err
 			}
