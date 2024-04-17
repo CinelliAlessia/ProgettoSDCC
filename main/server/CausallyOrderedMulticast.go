@@ -29,7 +29,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 		if canSend {
 
 			// Invio a livello applicativo
-			err := kvc.RealFunction(message, response)
+			err := kvc.realFunction(message, response)
 			if err != nil {
 				return err
 			}
@@ -117,4 +117,5 @@ func (kvc *KeyValueStoreCausale) printGreen(greenString string, message MessageC
 	formattedTime := now.Format("15:04:05.000")
 
 	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.vectorClock, formattedTime)
+	//printDatastore(kvc)
 }

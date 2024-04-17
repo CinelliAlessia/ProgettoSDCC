@@ -91,7 +91,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente
-func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common.Response) error {
+func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common.Response) error {
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 		kvc.datastore[message.Args.Key] = message.Args.Value
@@ -118,12 +118,11 @@ func (kvc *KeyValueStoreCausale) RealFunction(message MessageC, response *common
 		return fmt.Errorf("command not found")
 	}
 
-	printDatastore(kvc)
 	response.Result = true
 	return nil
 }
 
-// sendToAllServer invia a tutti i server la richiesta rpcName
+// sendToAllServer invia in multicast il messaggio, tramite goroutine di callRPC a cui viene passato come argomento un canale per conoscerne la terminazione.
 func (kvc *KeyValueStoreCausale) sendToAllServer(rpcName string, message MessageC, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
