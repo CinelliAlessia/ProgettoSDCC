@@ -43,18 +43,18 @@ func main() {
 
 	// ----- CONSISTENZA CAUSALE -----
 	kvCausale := &KeyValueStoreCausale{
-		datastore:   make(map[string]string),
-		vectorClock: [common.Replicas]int{}, // Array di lunghezza fissa inizializzato a zero
-		queue:       make([]MessageC, 0),
-		id:          id,
+		Datastore:   make(map[string]string),
+		VectorClock: [common.Replicas]int{}, // Array di lunghezza fissa inizializzato a zero
+		Queue:       make([]MessageC, 0),
+		Id:          id,
 	}
 
 	// ----- CONSISTENZA SEQUENZIALE -----
 	kvSequential := &KeyValueStoreSequential{
-		datastore:    make(map[string]string),
-		logicalClock: 0, // Inizializzazione dell'orologio logico scalare
-		queue:        make([]MessageS, 0),
-		id:           id,
+		Datastore:    make(map[string]string),
+		LogicalClock: 0, // Inizializzazione dell'orologio logico scalare
+		Queue:        make([]MessageS, 0),
+		Id:           id,
 	}
 
 	//go printDatastoreOnChange(kvSequential)
@@ -111,18 +111,18 @@ func printQueue(kv interface{}) {
 	switch kv := kv.(type) {
 	case *KeyValueStoreSequential:
 		// Controllo se il queue è vuoto
-		if len(kv.queue) == 0 {
+		if len(kv.Queue) == 0 {
 			fmt.Println("Queue vuota")
 			return
 		}
-		fmt.Println("Queue:", kv.queue)
+		fmt.Println("Queue:", kv.Queue)
 	case *KeyValueStoreCausale:
 		// Controllo se il questa è vuoto
-		if len(kv.queue) == 0 {
+		if len(kv.Queue) == 0 {
 			fmt.Println("Queue vuota")
 			return
 		}
-		fmt.Println("Queue:", kv.queue)
+		fmt.Println("Queue:", kv.Queue)
 	default:
 		fmt.Println("Tipo di KeyValueStore non supportato")
 	}
@@ -133,34 +133,34 @@ func printDatastore(kv interface{}) {
 	switch kv := kv.(type) {
 	case *KeyValueStoreSequential:
 		// Controllo se il datastore è vuoto
-		if len(kv.datastore) == 0 {
+		if len(kv.Datastore) == 0 {
 			fmt.Println("Datastore vuota")
 			return
 		}
-		fmt.Println("Datastore:", kv.datastore)
+		fmt.Println("Datastore:", kv.Datastore)
 	case *KeyValueStoreCausale:
 		// Controllo se il datastore è vuoto
-		if len(kv.datastore) == 0 {
+		if len(kv.Datastore) == 0 {
 			fmt.Println("Datastore vuota")
 			return
 		}
-		fmt.Println("Datastore:", kv.datastore)
+		fmt.Println("Datastore:", kv.Datastore)
 	default:
 		fmt.Println("Tipo di KeyValueStore non supportato")
 	}
 }
 
 func printDatastoreOnChange(kv *KeyValueStoreSequential) {
-	prevClock := kv.logicalClock
+	prevClock := kv.LogicalClock
 
 	for {
 		// Se il valore dell'orologio logico è cambiato, stampa il datastore
-		if kv.logicalClock != prevClock {
-			fmt.Printf("Datastore cambiato clock: %d, datastore:\n", kv.logicalClock)
-			for key, value := range kv.datastore {
+		if kv.LogicalClock != prevClock {
+			fmt.Printf("Datastore cambiato clock: %d, datastore:\n", kv.LogicalClock)
+			for key, value := range kv.Datastore {
 				fmt.Printf("%s: %s\n", key, value)
 			}
-			prevClock = kv.logicalClock
+			prevClock = kv.LogicalClock
 		}
 	}
 }

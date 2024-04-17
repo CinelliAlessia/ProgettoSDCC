@@ -207,6 +207,7 @@ func basicTestSeq(rpcName string) {
 	}
 }
 
+// mediumTestSeq contatta tutti i server in goroutine con operazioni di put
 func mediumTestSeq(rpcName string) {
 	done := make(chan bool)
 
@@ -238,5 +239,37 @@ func mediumTestSeq(rpcName string) {
 }
 
 func complexTestSeq(rpcName string) {
+	done := make(chan bool)
 
+	// Definisci le azioni da eseguire per ciascuna goroutine
+	actions := []func(){
+		func() {
+			executeSpecificCall(0, rpcName+put, "prova", "1")
+			executeSpecificCall(0, rpcName+put, "prova", "2")
+			executeSpecificCall(0, rpcName+get, "prova")
+		},
+		func() {
+			executeSpecificCall(1, rpcName+put, "prova", "3")
+			executeSpecificCall(1, rpcName+get, "prova")
+			executeSpecificCall(1, rpcName+put, "prova", "4")
+		},
+		func() {
+			executeSpecificCall(2, rpcName+get, "prova")
+			executeSpecificCall(2, rpcName+put, "prova", "5")
+			executeSpecificCall(2, rpcName+get, "prova")
+		},
+	}
+
+	// Avvia le goroutine per ciascuna azione
+	for _, action := range actions {
+		go func(act func()) {
+			act()
+			done <- true
+		}(action)
+	}
+
+	// Attendi il completamento di tutte le goroutine
+	for i := 0; i < len(actions); i++ {
+		<-done
+	}
 }

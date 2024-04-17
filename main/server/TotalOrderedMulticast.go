@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"main/common"
 	"net/rpc"
 	"sort"
@@ -14,21 +13,23 @@ import (
 func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, response *common.Response) error {
 
 	// Aggiunta della richiesta in coda, solo se sono un ricevente contattato dal server
-	if kvs.id != message.IdSender {
+	/*if kvs.id != message.IdSender {
 		kvs.addToSortQueue(message)
-	}
+	}*/
+
+	kvs.addToSortQueue(message)
 
 	// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 	kvs.mutexClock.Lock()
-	kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
-	if kvs.id != message.IdSender {
+	//kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
+	if kvs.Id != message.IdSender {
 		//kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ? TODO: ???
 		kvs.printDebugBlue("RICEVUTO da server", message)
 	}
 	kvs.mutexClock.Unlock()
 
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
-	kvs.sendAck(message)
+	sendAck(message)
 
 	// Ciclo finché controlSendToApplication non restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
@@ -69,16 +70,16 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message MessageS, reply *bool) er
 // La funzione è threadSafe per l'utilizzo della coda kvs.queue tramite kvs.mutexQueue
 func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 	kvs.mutexQueue.Lock()
-	kvs.queue = append(kvs.queue, message)
+	kvs.Queue = append(kvs.Queue, message)
 
 	// Ordina la coda in base al logicalClock
-	sort.Slice(kvs.queue, func(i, j int) bool {
-		if kvs.queue[i].LogicalClock == kvs.queue[j].LogicalClock {
-			return kvs.queue[i].Id < kvs.queue[j].Id
+	sort.Slice(kvs.Queue, func(i, j int) bool {
+		if kvs.Queue[i].LogicalClock == kvs.Queue[j].LogicalClock {
+			return kvs.Queue[i].Id < kvs.Queue[j].Id
 		}
-		return kvs.queue[i].LogicalClock < kvs.queue[j].LogicalClock
+		return kvs.Queue[i].LogicalClock < kvs.Queue[j].LogicalClock
 	})
-	//printQueue(kvs)
+
 	kvs.mutexQueue.Unlock()
 }
 
@@ -86,22 +87,22 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 func (kvs *KeyValueStoreSequential) removeMessageToQueue(message MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
-	if kvs.queue[0].LogicalClock == message.LogicalClock && kvs.queue[0].Id == message.Id {
+	if kvs.Queue[0].LogicalClock == message.LogicalClock && kvs.Queue[0].Id == message.Id {
 		// Rimuovi l'elemento dalla slice
-		kvs.queue = kvs.queue[1:]
+		kvs.Queue = kvs.Queue[1:]
 		return
 	}
-	//fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda")
+	fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda")
 }
 
 // updateMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
 func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
-	for i := range kvs.queue {
-		if kvs.queue[i].LogicalClock == message.LogicalClock && kvs.queue[i].Id == message.Id {
+	for i := range kvs.Queue {
+		if kvs.Queue[i].LogicalClock == message.LogicalClock && kvs.Queue[i].Id == message.Id {
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
-			kvs.queue[i].NumberAck++
+			kvs.Queue[i].NumberAck++
 			return true
 		}
 	}
@@ -114,7 +115,16 @@ func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 // (quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 // timestamp potenzialmente minore o uguale a quello di msg_i) TODO: >=
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) bool {
-	if kvs.queue[0].Id == message.Id && kvs.queue[0].NumberAck >= common.Replicas {
+	if kvs.Queue[0].Id == message.Id && kvs.Queue[0].NumberAck >= common.Replicas {
+
+		// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
+		kvs.mutexClock.Lock()
+		kvs.LogicalClock = common.Max(message.LogicalClock, kvs.LogicalClock)
+		if kvs.Id != message.IdSender {
+			kvs.LogicalClock++ // Devo incrementare il clock per gestire l'evento di receive ? TODO: ???
+		}
+		kvs.mutexClock.Unlock()
+
 		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
 		kvs.removeMessageToQueue(message)
 		return true
@@ -123,7 +133,7 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 }
 
 // sendAck invia a tutti i server un Ack
-func (kvs *KeyValueStoreSequential) sendAck(message MessageS) {
+func sendAck(message MessageS) {
 	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi stavo riferendo.
 	for i := 0; i < common.Replicas; i++ {
 		go func(replicaPort string, index int) {
@@ -168,37 +178,4 @@ func sendAckRPC(conn *rpc.Client, message MessageS, reply *bool) error {
 		return err
 	}
 	return nil
-}
-
-func (kvs *KeyValueStoreSequential) findMessage(message MessageS) *MessageS {
-	for i := range kvs.queue {
-		if kvs.queue[i].Id == message.Id && kvs.queue[i].LogicalClock == message.LogicalClock {
-			return &kvs.queue[i]
-		}
-	}
-	return &MessageS{}
-}
-
-func (kvs *KeyValueStoreSequential) printDebugBlue(blueString string, message MessageS) {
-	if common.GetDebug() {
-		// Ottieni l'orario corrente
-		now := time.Now()
-
-		// Formatta l'orario corrente come stringa nel formato desiderato
-		formattedTime := now.Format("15:04:05.000")
-
-		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock, formattedTime)
-	}
-}
-
-func (kvs *KeyValueStoreSequential) printGreen(greenString string, message MessageS) {
-
-	// Ottieni l'orario corrente
-	now := time.Now()
-
-	// Formatta l'orario corrente come stringa nel formato desiderato
-	formattedTime := now.Format("15:04:05.000")
-	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.logicalClock, formattedTime)
-
-	//printDatastore(kvs)
 }
