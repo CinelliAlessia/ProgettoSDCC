@@ -65,6 +65,7 @@ func sequential(rpcName string) {
 		fmt.Println("Client -> Errore durante la lettura dell'input:", err)
 		return
 	}
+	fmt.Println()
 
 	switch choice {
 	case 1:
@@ -74,9 +75,10 @@ func sequential(rpcName string) {
 		mediumTestSeq(rpcName)
 		break
 	case 3:
-		//complexTestSeq(rpcName)
+		complexTestSeq(rpcName)
 		break
 	}
+	fmt.Println()
 
 }
 
@@ -85,7 +87,7 @@ func causal(rpcName string) {
 	// Stampa il menu interattivo
 	fmt.Println("\nConsistenza causale, scegli il test da eseguire: ")
 	fmt.Println("1. Basic Test")
-	fmt.Println("2. Medium Test ---> ANCORA NO")
+	fmt.Println("2. Medium Test")
 	fmt.Println("3. Complex Test")
 
 	// Leggi l'input dell'utente per l'operazione
@@ -96,19 +98,20 @@ func causal(rpcName string) {
 		fmt.Println("Client -> Errore durante la lettura dell'input:", err)
 		return
 	}
+	fmt.Println()
 
 	switch choice {
 	case 1:
 		basicTestCE(rpcName)
 		break
 	case 2:
-		//mediumTestCE(rpcName)
+		mediumTestCE(rpcName)
 		break
 	case 3:
 		complexTestCE(rpcName)
 		break
 	}
-
+	fmt.Println()
 }
 
 /* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
