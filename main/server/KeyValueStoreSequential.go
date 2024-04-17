@@ -53,7 +53,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 		canSend := kvs.controlSendToApplication(message)
 		if canSend {
 			// Invio a livello applicativo
-			err := kvs.RealFunction(message, response)
+			err := kvs.realFunction(message, response)
 			if err != nil {
 				return err
 			}
@@ -113,7 +113,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // RealFunction esegue l'operazione di get, put e di delete realmente, inserendo la risposta adeguata nella struttura common.Response
-func (kvs *KeyValueStoreSequential) RealFunction(message MessageS, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *common.Response) error {
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 
