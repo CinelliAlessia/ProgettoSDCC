@@ -86,6 +86,8 @@ func test2(rpcName string) {
 	}
 }
 
+/* ----- CONSISTENZA CAUSALE ----- */
+
 // In questo basicTestCE vengono inviate in goroutine:
 //   - una richiesta di put al server1,
 //   - al server due le richieste di get e successivamente una put (così da essere in relazione di causa-effetto) sul singolo server
@@ -110,6 +112,75 @@ func basicTestCE(rpcName string) {
 		<-done
 	}
 }
+
+func mediumTestCE(rpcName string) {
+	done := make(chan bool)
+
+	// Invia richieste al primo server
+	go func() {
+		executeSpecificCall(0, rpcName+put, "x", "a")
+		executeSpecificCall(0, rpcName+put, "x", "b")
+		done <- true
+	}()
+
+	// Invia richieste al secondo server
+	go func() {
+		executeSpecificCall(1, rpcName+get, "x")
+		executeSpecificCall(1, rpcName+put, "x", "c")
+		done <- true
+	}()
+
+	// Invia richieste al terzo server
+	go func() {
+		executeSpecificCall(2, rpcName+get, "x")
+		executeSpecificCall(2, rpcName+put, "x", "d")
+		done <- true
+	}()
+
+	// Attendi il completamento di tutte le goroutine (3)
+	for i := 0; i < 3; i++ {
+		<-done
+	}
+}
+
+func complexTestCE(rpcName string) {
+	done := make(chan bool)
+
+	// Invio richieste al primo server
+	go func() {
+		executeSpecificCall(0, rpcName+put, "x", "a")
+		executeSpecificCall(0, rpcName+put, "x", "b")
+		response := executeSpecificCall(0, rpcName+get, "x")
+		if response.Value == "c" {
+			executeSpecificCall(0, rpcName+put, "x", "d")
+		}
+		done <- true // Segnala il completamento del test
+	}()
+
+	go func() {
+		response := executeSpecificCall(1, rpcName+get, "x")
+		if response.Value == "a" {
+			executeSpecificCall(1, rpcName+put, "x", "c")
+		}
+		executeSpecificCall(1, rpcName+put, "x", "d")
+		done <- true // Segnala il completamento del test
+	}()
+
+	// Invio di richieste al terzo server
+	go func() {
+		executeSpecificCall(2, rpcName+put, "x", "a")
+		executeSpecificCall(2, rpcName+get, "x")
+		executeSpecificCall(2, rpcName+get, "x")
+		done <- true // Segnala il completamento del test
+	}()
+
+	// Attendi il completamento di tutte le goroutine (3)
+	for i := 0; i < 3; i++ {
+		<-done
+	}
+}
+
+/* ----- CONSISTENZA SEQUENZIALE ----- */
 
 // basicTestSeq contatta tutti i server in goroutine con operazioni di put
 // un corretto funzionamento della consistenza sequenziale prevede che a prescindere dall'ordinamento
@@ -166,39 +237,6 @@ func mediumTestSeq(rpcName string) {
 	}
 }
 
-func complexTestCE(rpcName string) {
-	done := make(chan bool)
+func complexTestSeq(rpcName string) {
 
-	// Invio richieste al primo server
-	go func() {
-		executeSpecificCall(0, rpcName+put, "x", "a")
-		executeSpecificCall(0, rpcName+put, "x", "b")
-		response := executeSpecificCall(0, rpcName+get, "x")
-		if response.Value == "c" {
-			executeSpecificCall(0, rpcName+put, "x", "d")
-		}
-		done <- true // Segnala il completamento del test
-	}()
-
-	go func() {
-		response := executeSpecificCall(1, rpcName+get, "x")
-		if response.Value == "a" {
-			executeSpecificCall(1, rpcName+put, "x", "c")
-		}
-		executeSpecificCall(1, rpcName+put, "x", "d")
-		done <- true // Segnala il completamento del test
-	}()
-
-	// Invio di richieste al terzo server
-	go func() {
-		executeSpecificCall(2, rpcName+put, "x", "a")
-		executeSpecificCall(2, rpcName+get, "x")
-		executeSpecificCall(2, rpcName+get, "x")
-		done <- true // Segnala il completamento del test
-	}()
-
-	// Attendi il completamento di tutte le goroutine (3)
-	for i := 0; i < 3; i++ {
-		<-done
-	}
 }
