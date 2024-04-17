@@ -16,13 +16,16 @@ const Replicas = 3
 // ReplicaPorts Lista delle porte su cui le repliche possono essere contattate
 var ReplicaPorts = [Replicas]string{"8085", "8086", "8087"}
 
+const TIMER = 1000 // Ritardo di rete max espresso in Millisecondi
+
 // GenerateUniqueID Genera un ID univoco utilizzando UUID
 func GenerateUniqueID() string {
 	id := uuid.New()
 	return id.String()
 }
 
-// Max TODO: Controllare perché la funzione max non funziona
+// Max Restituisce il massimo tra due numeri interi
+// TODO: Controllare perché la funzione max non funziona
 func Max(clock int, clock2 int) int {
 	if clock > clock2 {
 		return clock
@@ -31,8 +34,8 @@ func Max(clock int, clock2 int) int {
 	}
 }
 
-// GetServerName restituisce il nome del server in base alla scelta di configurazione, tra locale e remota (docker)
-// indicizzazione richiesta a partire da 0
+// GetServerName Restituisce il nome del server in base alla configurazione scelta, tra locale e remota (docker)
+// L'indice id parte da 0 fino a (Replicas-1)
 func GetServerName(replicaPort string, id int) string {
 	if os.Getenv("CONFIG") == "1" {
 		return ":" + replicaPort // Locale
@@ -44,9 +47,9 @@ func GetServerName(replicaPort string, id int) string {
 	}
 }
 
-// GetDebug restituisce un booleano
-//   - true: Esegue più print di debug
-//   - false: Esegue solamente i print necessari
+// GetDebug Restituisce un booleano in base alla variabile di ambiente DEBUG impostata:
+//   - true: Esegue più print di debug.
+//   - false: Esegue solamente i print necessari.
 func GetDebug() bool {
 	if os.Getenv("DEBUG") == "1" {
 		return true
@@ -58,9 +61,9 @@ func GetDebug() bool {
 	}
 }
 
-// RandomDelay Genera un numero casuale compreso tra 0 e 999 (max un secondo)
+// RandomDelay Genera un ritardo casuale tra 0 e 999 millisecondi
 func RandomDelay() {
-	delay := rand.Intn(10000)
+	delay := rand.Intn(TIMER)
 
 	// Introduce un ritardo casuale
 	time.Sleep(time.Millisecond * time.Duration(delay))
