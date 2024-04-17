@@ -39,19 +39,45 @@ Questo progetto consiste nel realizzare un server che dia garanzia, a scelta del
 
 - L'invio dell'ack a tutti i server avviene in maniera asincrona.
 
-***CAUSALE:***
-
 **Multicast Causalmente Ordinato**
 
-1. Un client effettua una chiamata RPC con la propria richiesta ad un singolo server (scelto random).
-2. Il server che riceve la richiesta incrementa il suo valore del clock logico vettoriale e lo allega alla richiesta.
-3. Il server invia in multicast il messaggio creato.
-4. Ciascun server ricevente:
-   1. Aggiunge la richiesta nella coda.
-   2. Controlla attivamente se la richiesta ricevuta può essere inviata a livello applicativo, se si, verrà rimossa dalla coda.
+Il client effettua le richieste RPC chiamando le `KeyValueStoreCausale.Put`, `KeyValueStoreCausale.Get`, `KeyValueStoreCausale.Delete`.
 
-Il controllo della richiesta avviene controllando due parametri, se pj è il server che riceve la richiesta fatta da pi:
-1) t(m)[i] = Vj[i]+1 (m è il messaggio successivo che pj si aspetta da pi).
-2) t(m)[k] <= Vj[k] per ogni k != i (per ogni processo pk, pj ha visto almeno gli stessi messaggi di pk visti da pi).
-Se entrambe queste condizioni sono rispettate, il messaggio verrà inviato a livello applicativo.
+Ciascuna di queste funzioni RPC, lato server, una volta ricevuta la richiesta incrementano il clock vettoriale associato al server (protetto da un mutex),
+lo associa alla richiesta ricevuta e genera un messaggio da inviare in multicast, tramite `sendToAllServer()`.
 
+Ciascun server che riceve un messaggio di multicast, in `CausallyOrderedMulticast()`, aggiunge la richiesta alla coda e
+controlla (ogni 100 Millisecondi) se può essere eseguita a livello applicativo.
+
+Il controllo avviene in `controlSendToApplication()`, quando il processo `pj` riceve il messaggio `m` da `pi`, dove per `t(m)` si intende
+il clock vettoriale associato al messaggio inviato:
+- `t(m)[i] = Vj[i] + 1` (il messaggio `m` è il successivo che `pj` si aspetta da `pi`).
+- `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
+- Viene ulteriormente controllato se il messaggio ricevuto è stato inviato da se stesso, in quel caso è sicuramente un "messaggio che si aspetta di ricevere".
+
+In caso il controllo vada a buon fine è possibile inviare il messaggio a livello applicativo, viene rimosso il messaggio dalla coda ed eseguita `realFunction()`
+che esegue l'operazione richiesta nel datastore del server. 
+
+**Multicast Totalmente Ordinato**
+
+Il client effettua le richieste RPC chiamando le `KeyValueStoreSequential.Put`, `KeyValueStoreSequential.Get`, `KeyValueStoreSequential.Delete`.
+
+Ciascuna di queste funzioni RPC, lato server, una volta ricevuta la richiesta incrementano il suo clock logico scalare (protetto da un mutex):
+- Per le richieste di tipo `GET` viene eseguita direttamente la richiesta e restituito il risultato al client.
+- Per le richieste di tipo `PUT` e `DELETE` viene generato un messaggio da inviare in multicast, tramite `sendToAllServer()`.
+
+Ciascun server che riceve un messaggio di multicast (da una richiesta di `PUT` o `DELETE`), in `TotalOrderedMulticast()`:
+- Aggiunge la richiesta alla coda, ordinata in base al timestamp locale. 
+- Calcola il max tra il suo clock scalare e il clock scalare del messaggio ricevuto.
+- Incrementa di uno il clock scalare, per l'evento di `receive(m)`. ???
+- Invia un ack a tutti i server per indicare che lui ha letto quel messaggio, tramite `sendAck()`.
+- Controlla (ogni 100 Millisecondi) se può essere eseguita a livello applicativo.
+
+Il controllo avviene in `controlSendToApplication()`: verificando se il messaggio è in testa alla coda e ha ricevuto tutti gli ack relativi a quella richiesta. 
+In caso il controllo vada a buon fine è possibile inviare il messaggio a livello applicativo, viene rimosso il messaggio dalla coda ed eseguita `realFunction()`
+che esegue l'operazione richiesta nel datastore del server. 
+
+`sendAck()` invia un messaggio di ack a tutti i server, in modo asincrono.
+Viene effettuata una chiamata RPC `ReceiveAck()`, che gestisce la ricezione dell'ack, se fa riferimento ad un messaggio che il server ha già ricevuto, viene incrementato il contatore degli ack ricevuti, 
+se non è un messaggio che il server ha già ricevuto, viene impostata la risposta a false.
+In sendAck() viene controllato il valore della risposta, se è false, viene inviato nuovamente l'ack.
