@@ -95,7 +95,7 @@ func causal(rpcName string) {
 	var choice int
 	_, err := fmt.Scan(&choice)
 	if err != nil {
-		fmt.Println("Client -> Errore durante la lettura dell'input:", err)
+		fmt.Println("Errore durante la lettura dell'input:", err)
 		return
 	}
 	fmt.Println()
@@ -111,6 +111,7 @@ func causal(rpcName string) {
 		complexTestCE(rpcName)
 		break
 	}
+
 	fmt.Println()
 }
 
