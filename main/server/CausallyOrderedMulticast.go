@@ -22,6 +22,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 	// Ciclo finché controlSendToApplication restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
 	response.Result = false
+	// TODO: vale la pena aggiungere un mutex?
 	for {
 		canSend := kvc.controlSendToApplication(message)
 		if canSend {
@@ -55,7 +56,7 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 	result := false
 
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
-	if message.IdSender != kvc.Id && message.VectorClock[message.IdSender] == kvc.VectorClock[message.IdSender]+1 {
+	if (message.IdSender != kvc.Id) && (message.VectorClock[message.IdSender] == kvc.VectorClock[message.IdSender]+1) {
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
 		for index := range message.VectorClock {
@@ -64,6 +65,7 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 				result = false
 			}
 		}
+
 		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
 		kvc.mutexClock.Lock()
 		kvc.VectorClock[message.IdSender] = message.VectorClock[message.IdSender]
@@ -85,10 +87,12 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 func (kvc *KeyValueStoreCausale) removeMessageToQueue(message MessageC) {
 	kvc.mutexQueue.Lock()
 	defer kvc.mutexQueue.Unlock()
-	if kvc.Queue[0].Id == message.Id {
-		// Rimuovi l'elemento dalla slice
-		kvc.Queue = kvc.Queue[1:]
-		return
+
+	for i, m := range kvc.Queue {
+		if m.Id == message.Id {
+			kvc.Queue = append(kvc.Queue[:i], kvc.Queue[i+1:]...)
+			return
+		}
 	}
-	//fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda.")
+	fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda")
 }
