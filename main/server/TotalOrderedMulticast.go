@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"main/common"
 	"net/rpc"
 	"sort"
-	"time"
 )
 
 // TotalOrderedMulticast gestione dell'evento esterno ricevuto da un server
@@ -46,7 +46,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 		}
 
 		// Altrimenti, attendi un breve periodo prima di riprovare
-		time.Sleep(time.Millisecond * 100)
+		//time.Sleep(time.Millisecond * 100)
 		//printQueue(kvs)
 		//printDatastore(kvs)
 	}
@@ -60,8 +60,11 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
 // Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
 func (kvs *KeyValueStoreSequential) ReceiveAck(message MessageS, reply *bool) error {
-	//fmt.Println("ReceiveAck: Ho ricevuto un ack", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 	*reply = kvs.updateMessage(message)
+	if !(*reply) {
+		fmt.Println("Ricevuto ack di un messaggio non presente", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+		kvs.addToSortQueue(message)
+	}
 	return nil
 }
 
@@ -70,17 +73,31 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message MessageS, reply *bool) er
 // La funzione è threadSafe per l'utilizzo della coda kvs.queue tramite kvs.mutexQueue
 func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 	kvs.mutexQueue.Lock()
-	kvs.Queue = append(kvs.Queue, message)
+	defer kvs.mutexQueue.Unlock()
 
-	// Ordina la coda in base al logicalClock
-	sort.Slice(kvs.Queue, func(i, j int) bool {
-		if kvs.Queue[i].LogicalClock == kvs.Queue[j].LogicalClock {
-			return kvs.Queue[i].Id < kvs.Queue[j].Id
+	// Verifica se il messaggio è già presente nella coda
+	isPresent := false
+	for _, msg := range kvs.Queue {
+		if msg.Id == message.Id {
+			isPresent = true
+			break
 		}
-		return kvs.Queue[i].LogicalClock < kvs.Queue[j].LogicalClock
-	})
+	}
 
-	kvs.mutexQueue.Unlock()
+	// Se il messaggio non è presente, aggiungilo alla coda
+	if !isPresent {
+		kvs.Queue = append(kvs.Queue, message)
+
+		// Ordina la coda in base al logicalClock
+		sort.Slice(kvs.Queue, func(i, j int) bool {
+			if kvs.Queue[i].LogicalClock == kvs.Queue[j].LogicalClock {
+				return kvs.Queue[i].Id < kvs.Queue[j].Id
+			}
+			return kvs.Queue[i].LogicalClock < kvs.Queue[j].LogicalClock
+		})
+
+		printQueue(kvs)
+	}
 }
 
 // removeMessageToQueue Rimuove un messaggio dalla coda basato sull'ID
@@ -102,6 +119,7 @@ func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 	for i := range kvs.Queue {
 		if kvs.Queue[i].LogicalClock == message.LogicalClock && kvs.Queue[i].Id == message.Id {
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
+			fmt.Println("Ricevuto ack di: ", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			kvs.Queue[i].NumberAck++
 			return true
 		}
@@ -113,9 +131,9 @@ func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 // 4. pj consegna msg_i all’applicazione se msg_i è in testa a queue_j, tutti gli ack relativi a msg_i sono stati ricevuti
 // da pj e, per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
 // (quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
-// timestamp potenzialmente minore o uguale a quello di msg_i) TODO: >=
+// timestamp potenzialmente minore o uguale a quello di msg_i)
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) bool {
-	if kvs.Queue[0].Id == message.Id && kvs.Queue[0].NumberAck >= common.Replicas {
+	if kvs.Queue[0].Id == message.Id && kvs.Queue[0].NumberAck == common.Replicas {
 
 		// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 		kvs.mutexClock.Lock()
@@ -128,6 +146,8 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
 		kvs.removeMessageToQueue(message)
 		return true
+	} else if kvs.Queue[0].NumberAck > common.Replicas {
+		fmt.Println(color.RedString("controlSendToApplication: Il messaggio in testa alla coda ha ricevuto più ack del previsto"))
 	}
 	return false
 }
