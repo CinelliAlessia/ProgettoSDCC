@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"main/common"
 	"sync"
 	"time"
@@ -19,6 +18,8 @@ type KeyValueStoreSequential struct {
 
 	Queue      []MessageS
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
+
+	executeFunctionMutex sync.Mutex
 }
 
 type MessageS struct {
@@ -112,6 +113,8 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 
 // RealFunction esegue l'operazione di get, put e di delete realmente, inserendo la risposta adeguata nella struttura common.Response
 func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *common.Response) error {
+	kvs.executeFunctionMutex.Lock()
+	defer kvs.executeFunctionMutex.Unlock()
 
 	if message.TypeOfMessage == "Put" { // Scrittura
 
@@ -127,7 +130,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *com
 
 		val, ok := kvs.Datastore[message.Args.Key]
 		if !ok {
-			fmt.Println(color.RedString("NON ESEGUITO"), message.TypeOfMessage, message.Args.Key, "datastore:", kvs.Datastore, "msg clock:", message.LogicalClock, "my clock:", kvs.LogicalClock)
+			kvs.printRed("NON ESEGUITO", message)
 			response.Result = false
 			return nil
 		}
