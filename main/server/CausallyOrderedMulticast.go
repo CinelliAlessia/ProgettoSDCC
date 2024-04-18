@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"main/common"
 	"time"
 )
@@ -26,13 +27,21 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 	for {
 		canSend := kvc.controlSendToApplication(message)
 		if canSend {
-
 			// Invio a livello applicativo
 			err := kvc.realFunction(message, response)
 			if err != nil {
 				return err
 			}
 			break
+			/*if message.TypeOfMessage == "Get" && !(response.Result) {
+				// Se un client chiede di leggere una chiave che non esiste,
+				// aspetto che la chiave verrà inserita.
+				time.Sleep(time.Millisecond * 100)
+				continue
+			} else {
+				kvc.removeMessageToQueue(message)
+				break
+			}*/
 		}
 		// La richiesta non può essere ancora eseguita, si attende un breve periodo prima di riprovare
 		time.Sleep(time.Millisecond * 1000)
@@ -75,6 +84,9 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 	} else if message.IdSender == kvc.Id { //Ho "ricevuto" una mia richiesta -> è possibile processarla
 		result = true
 	}
+
+	fmt.Println("Messaggio", message.TypeOfMessage, message.Args.Key+":"+message.Args.Key, "non può essere ancora eseguito da", kvc.Id)
+	fmt.Println("VectorClock messaggio", message.VectorClock, "VectorClock mio", kvc.VectorClock)
 
 	if result {
 		kvc.removeMessageToQueue(message)
