@@ -12,45 +12,40 @@ import (
 // Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
 func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, response *common.Response) error {
 
-	// Aggiunta della richiesta in coda, solo se sono un ricevente contattato dal server
-	/*if kvs.id != message.IdSender {
-		kvs.addToSortQueue(message)
-	}*/
-
+	// Aggiunta della richiesta in coda
 	kvs.addToSortQueue(message)
 
-	// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 	kvs.mutexClock.Lock()
-	//kvs.logicalClock = common.Max(message.LogicalClock, kvs.logicalClock)
 	if kvs.Id != message.IdSender {
-		//kvs.logicalClock++ // Devo incrementare il clock per gestire l'evento di receive ? TODO: ???
 		kvs.printDebugBlue("RICEVUTO da server", message)
 	}
 	kvs.mutexClock.Unlock()
 
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
-	sendAck(message)
+	go sendAck(message)
+
+	response.Result = false // Inizializzo la risposta a false, corrisponde alla risposta che leggerà il client
 
 	// Ciclo finché controlSendToApplication non restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
-	response.Result = false
 	for {
+		kvs.executeFunctionMutex.Lock()
+
 		canSend := kvs.controlSendToApplication(message)
 		if canSend {
 			// Invio a livello applicativo
 			err := kvs.realFunction(message, response)
+
+			kvs.executeFunctionMutex.Unlock()
+
 			if err != nil {
 				return err
 			}
 			break
+
 		}
-
-		// Altrimenti, attendi un breve periodo prima di riprovare
-		//time.Sleep(time.Millisecond * 100)
-		//printQueue(kvs)
-		//printDatastore(kvs)
+		kvs.executeFunctionMutex.Unlock()
 	}
-
 	if response.Result {
 		return nil
 	}
@@ -58,19 +53,22 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 }
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
-// Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti restituisce false
+// Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti lo inserisce in coda e incrementa il numero di ack ricevuti.
 func (kvs *KeyValueStoreSequential) ReceiveAck(message MessageS, reply *bool) error {
 	*reply = kvs.updateMessage(message)
 	if !(*reply) {
-		fmt.Println("Ricevuto ack di un messaggio non presente", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
+		//fmt.Println("Ricevuto ack di un messaggio non presente", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value)
 		kvs.addToSortQueue(message)
+		*reply = kvs.updateMessage(message)
 	}
+	//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 	return nil
 }
 
 // addToSortQueue aggiunge un messaggio alla coda locale, ordinandola in base al timeStamp, a parità di timestamp
 // l'ordinamento è deterministico: per garantire l'ordinamento totale verranno usati gli ID associati al messaggio.
 // La funzione è threadSafe per l'utilizzo della coda kvs.queue tramite kvs.mutexQueue
+// Prima di aggiungere il messaggio alla coda, verifica che non sia già presente.
 func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
@@ -88,7 +86,7 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 	if !isPresent {
 		kvs.Queue = append(kvs.Queue, message)
 
-		// Ordina la coda in base al logicalClock
+		// Ordina la coda in base al logicalClock, a parità di timestamp l'ordinamento è deterministico in base all'ID
 		sort.Slice(kvs.Queue, func(i, j int) bool {
 			if kvs.Queue[i].LogicalClock == kvs.Queue[j].LogicalClock {
 				return kvs.Queue[i].Id < kvs.Queue[j].Id
@@ -96,11 +94,11 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 			return kvs.Queue[i].LogicalClock < kvs.Queue[j].LogicalClock
 		})
 
-		printQueue(kvs)
+		//printQueue(kvs)
 	}
 }
 
-// removeMessageToQueue Rimuove un messaggio dalla coda basato sull'ID
+// removeMessageToQueue Rimuove il messaggio passato come argomento dalla coda solamente se è l'elemento in testa, l'eliminazione si basa sull'ID
 func (kvs *KeyValueStoreSequential) removeMessageToQueue(message MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
@@ -119,7 +117,7 @@ func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 	for i := range kvs.Queue {
 		if kvs.Queue[i].LogicalClock == message.LogicalClock && kvs.Queue[i].Id == message.Id {
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
-			fmt.Println("Ricevuto ack di: ", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+			//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			kvs.Queue[i].NumberAck++
 			return true
 		}
@@ -139,20 +137,21 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 		kvs.mutexClock.Lock()
 		kvs.LogicalClock = common.Max(message.LogicalClock, kvs.LogicalClock)
 		if kvs.Id != message.IdSender {
-			kvs.LogicalClock++ // Devo incrementare il clock per gestire l'evento di receive ? TODO: ???
+			kvs.LogicalClock++ // Devo incrementare il clock per gestire l'evento di receive
 		}
 		kvs.mutexClock.Unlock()
 
 		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
-		kvs.removeMessageToQueue(message)
+		go kvs.removeMessageToQueue(message)
 		return true
+
 	} else if kvs.Queue[0].NumberAck > common.Replicas {
 		fmt.Println(color.RedString("controlSendToApplication: Il messaggio in testa alla coda ha ricevuto più ack del previsto"))
 	}
 	return false
 }
 
-// sendAck invia a tutti i server un Ack
+// sendAck invia con una goroutine a ciascun server un ack del messaggio ricevuto
 func sendAck(message MessageS) {
 	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi stavo riferendo.
 	for i := 0; i < common.Replicas; i++ {
@@ -173,11 +172,10 @@ func sendAck(message MessageS) {
 					fmt.Printf("sendAck: Errore durante la chiamata RPC receiveAck %v\n", err)
 					return
 				}
-
+				// Controllo del valore di ritorno della chiamata RPC, se è false riprovo a inviare l'ack
 				if reply {
 					break
 				}
-				//fmt.Printf("sendAck: il server %s non è riuscito ad incrementare il numero di ack!\n", replicaPort)
 			}
 
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato

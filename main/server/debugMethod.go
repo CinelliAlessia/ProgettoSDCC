@@ -13,7 +13,7 @@ func (kvc *KeyValueStoreCausale) printDebugBlue(blueString string, message Messa
 		now := time.Now()
 
 		// Formatta l'orario corrente come stringa nel formato desiderato
-		formattedTime := now.Format("15:04:05.000")
+		formattedTime := now.Format("15:04:05.00000")
 
 		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.VectorClock, formattedTime)
 	}
@@ -25,7 +25,7 @@ func (kvs *KeyValueStoreSequential) printDebugBlue(blueString string, message Me
 		now := time.Now()
 
 		// Formatta l'orario corrente come stringa nel formato desiderato
-		formattedTime := now.Format("15:04:05.000")
+		formattedTime := now.Format("15:04:05.00000")
 
 		fmt.Println(color.BlueString(blueString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.LogicalClock, formattedTime)
 	}
@@ -35,7 +35,7 @@ func (kvc *KeyValueStoreCausale) printGreen(greenString string, message MessageC
 	now := time.Now()
 
 	// Formatta l'orario corrente come stringa nel formato desiderato
-	formattedTime := now.Format("15:04:05.000")
+	formattedTime := now.Format("15:04:05.00000")
 
 	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.VectorClock, formattedTime)
 	//printDatastore(kvc)
@@ -47,7 +47,7 @@ func (kvs *KeyValueStoreSequential) printGreen(greenString string, message Messa
 	now := time.Now()
 
 	// Formatta l'orario corrente come stringa nel formato desiderato
-	formattedTime := now.Format("15:04:05.000")
+	formattedTime := now.Format("15:04:05.00000")
 	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.LogicalClock, "my clock:", kvs.LogicalClock, formattedTime)
 
 	//printDatastore(kvs)
@@ -59,7 +59,7 @@ func (kvs *KeyValueStoreSequential) printRed(redString string, message MessageS)
 	now := time.Now()
 
 	// Formatta l'orario corrente come stringa nel formato desiderato
-	formattedTime := now.Format("15:04:05.000")
+	formattedTime := now.Format("15:04:05.00000")
 
 	fmt.Println(color.RedString(redString), message.TypeOfMessage, message.Args.Key, "datastore:", kvs.Datastore, "msg clock:", message.LogicalClock, "my clock:", kvs.LogicalClock, formattedTime)
 	//printDatastore(kvs)
