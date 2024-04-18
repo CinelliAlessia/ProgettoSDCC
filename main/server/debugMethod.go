@@ -52,6 +52,17 @@ func (kvs *KeyValueStoreSequential) printGreen(greenString string, message Messa
 
 	//printDatastore(kvs)
 }
+func (kvc *KeyValueStoreCausale) printRed(redString string, message MessageC) {
+
+	// Ottieni l'orario corrente
+	now := time.Now()
+
+	// Formatta l'orario corrente come stringa nel formato desiderato
+	formattedTime := now.Format("15:04:05.00000")
+
+	fmt.Println(color.RedString(redString), message.TypeOfMessage, message.Args.Key, "datastore:", kvc.Datastore, "msg clock:", message.VectorClock, "my clock:", kvc.VectorClock, formattedTime)
+	//printDatastore(kvs)
+}
 
 func (kvs *KeyValueStoreSequential) printRed(redString string, message MessageS) {
 

@@ -89,21 +89,24 @@ func test2(rpcName string) {
 /* ----- CONSISTENZA CAUSALE ----- */
 
 // In questo basicTestCE vengono inviate in goroutine:
-//   - una richiesta di put al server1,
-//   - al server due le richieste di get e successivamente una put (così da essere in relazione di causa-effetto) sul singolo server
+//   - una richiesta di put x:1 al server1,
+//   - una richiesta di get x put y:2 al server2 (così da essere in relazione di causa-effetto)
 func basicTestCE(rpcName string) {
+
+	fmt.Println("In questo basicTestCE vengono inviate in goroutine:\n" +
+		"- una richiesta di put al server1\n" +
+		"- una richiesta di get x put y:2 al server2 (causa-effetto)")
+
 	done := make(chan bool)
 
 	go func() {
-		executeSpecificCall(0, rpcName+put, "prova1", "1")
+		executeSpecificCall(0, rpcName+put, "x", "1")
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
-
 	go func() {
-		executeSpecificCall(1, rpcName+get, "prova1")
-		executeSpecificCall(1, rpcName+put, "prova2", "2")
+		executeSpecificCall(1, rpcName+get, "x")
+		executeSpecificCall(1, rpcName+put, "y", "2")
 		done <- true
 	}()
 
@@ -113,27 +116,37 @@ func basicTestCE(rpcName string) {
 	}
 }
 
+// In questo mediumTestCE vengono inviate in goroutine:
+//   - una richiesta di put x:a e put y:b al server1,
+//   - una richiesta di get x e put x:b al server2,
+//   - una richiesta di get y e put y:a al server3,
 func mediumTestCE(rpcName string) {
+
+	fmt.Println("In mediumTestCE vengono inviate in goroutine:\n" +
+		"- una richiesta di put x:a e put y:b al server1\n" +
+		"- una richiesta di get x e put x:b al server2\n" +
+		"- una richiesta di get y e put y:a al server3")
+
 	done := make(chan bool)
 
 	// Invia richieste al primo server
 	go func() {
 		executeSpecificCall(0, rpcName+put, "x", "a")
-		executeSpecificCall(0, rpcName+put, "x", "b")
+		executeSpecificCall(0, rpcName+put, "y", "b")
 		done <- true
 	}()
 
 	// Invia richieste al secondo server
 	go func() {
 		executeSpecificCall(1, rpcName+get, "x")
-		executeSpecificCall(1, rpcName+put, "x", "c")
+		executeSpecificCall(1, rpcName+put, "x", "b")
 		done <- true
 	}()
 
 	// Invia richieste al terzo server
 	go func() {
-		executeSpecificCall(2, rpcName+get, "x")
-		executeSpecificCall(2, rpcName+put, "x", "d")
+		executeSpecificCall(2, rpcName+get, "y")
+		executeSpecificCall(2, rpcName+put, "y", "a")
 		done <- true
 	}()
 
