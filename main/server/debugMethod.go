@@ -37,7 +37,7 @@ func (kvc *KeyValueStoreCausale) printGreen(greenString string, message MessageC
 	// Formatta l'orario corrente come stringa nel formato desiderato
 	formattedTime := now.Format("15:04:05.00000")
 
-	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.VectorClock, formattedTime)
+	fmt.Println(color.GreenString(greenString), message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "msg clock:", message.VectorClock, "my clock:", kvc.VectorClock, formattedTime, "idMex", message.IdSender)
 	//printDatastore(kvc)
 }
 

@@ -156,33 +156,47 @@ func mediumTestCE(rpcName string) {
 	}
 }
 
+// In questo complexTestCE vengono inviate in goroutine:
+//   - una richiesta di get y, get y, se leggo y:c -> put x:b e get y al server1,
+//   - una richiesta di put y:b, get x, get y, get x al server2,
+//   - una richiesta di get x, se leggo x:b -> put x:c, put y:c e get x al server3,
 func complexTestCE(rpcName string) {
+	fmt.Println("In questo complexTestCE vengono inviate in goroutine:\n" +
+		"- una richiesta di get y, get y se leggo y:c -> put x:b e get y al server1\n" +
+		"- una richiesta di put y:b, get x, get y, get x al server2\n" +
+		"- una richiesta di get x se leggo x:b -> put x:c, put y:c e get x al server3")
+
 	done := make(chan bool)
 
 	// Invio richieste al primo server
 	go func() {
-		executeSpecificCall(0, rpcName+put, "x", "a")
-		executeSpecificCall(0, rpcName+put, "x", "b")
-		response := executeSpecificCall(0, rpcName+get, "x")
+		executeSpecificCall(0, rpcName+get, "y")
+
+		response := executeSpecificCall(0, rpcName+get, "y")
 		if response.Value == "c" {
-			executeSpecificCall(0, rpcName+put, "x", "d")
+			executeSpecificCall(0, rpcName+put, "x", "b")
 		}
+
+		executeSpecificCall(0, rpcName+put, "x", "b")
+
+		executeSpecificCall(0, rpcName+get, "x")
 		done <- true // Segnala il completamento del test
 	}()
 
 	go func() {
-		response := executeSpecificCall(1, rpcName+get, "x")
-		if response.Value == "a" {
-			executeSpecificCall(1, rpcName+put, "x", "c")
-		}
-		executeSpecificCall(1, rpcName+put, "x", "d")
+		executeSpecificCall(1, rpcName+put, "y", "b")
+		executeSpecificCall(1, rpcName+get, "x")
+		executeSpecificCall(1, rpcName+get, "x")
+		executeSpecificCall(1, rpcName+get, "x")
+
 		done <- true // Segnala il completamento del test
 	}()
 
 	// Invio di richieste al terzo server
 	go func() {
-		executeSpecificCall(2, rpcName+put, "x", "a")
 		executeSpecificCall(2, rpcName+get, "x")
+		executeSpecificCall(2, rpcName+put, "x", "c")
+		executeSpecificCall(2, rpcName+put, "y", "c")
 		executeSpecificCall(2, rpcName+get, "x")
 		done <- true // Segnala il completamento del test
 	}()
