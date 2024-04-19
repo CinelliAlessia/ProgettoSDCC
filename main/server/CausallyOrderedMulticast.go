@@ -65,33 +65,44 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 	result := false
 
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
-	if (message.IdSender != kvc.Id) && (message.VectorClock[message.IdSender] == kvc.VectorClock[message.IdSender]+1) {
+	if (message.IdSender != kvc.Id) && (message.VectorClock[message.IdSender] == (kvc.VectorClock[message.IdSender] + 1)) {
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
 		for index := range message.VectorClock {
-			if index != message.IdSender && message.VectorClock[index] > kvc.VectorClock[index] {
+			if (index != message.IdSender) && (index != kvc.Id) && (message.VectorClock[index] > kvc.VectorClock[index]) {
 				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
+				//fmt.Println("non ho ancora visto dei messaggi", "msg", message.VectorClock, "mio", kvc.VectorClock)
 				result = false
 			}
 		}
-
-		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
-		kvc.mutexClock.Lock()
-		kvc.VectorClock[message.IdSender] = message.VectorClock[message.IdSender]
-		kvc.mutexClock.Unlock()
 		result = true
-
 	} else if message.IdSender == kvc.Id { //Ho "ricevuto" una mia richiesta -> è possibile processarla
 		result = true
 	}
 
-	fmt.Println("Messaggio", message.TypeOfMessage, message.Args.Key+":"+message.Args.Key, "non può essere ancora eseguito da", kvc.Id)
-	fmt.Println("VectorClock messaggio", message.VectorClock, "VectorClock mio", kvc.VectorClock)
+	if result {
+		// Se è un evento di lettura, controllo se la chiave è presente nel mio datastore
+		// Se non c'è aspetterò fin quando non verrà inserita
+		if message.TypeOfMessage == "Get" { // Lettura
+			_, result = kvc.Datastore[message.Args.Key]
+		}
+	}
 
 	if result {
+		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
+		// Aggiorno il mio orologio vettoriale
+		if message.IdSender != kvc.Id {
+			kvc.mutexClock.Lock()
+			kvc.VectorClock[message.IdSender] += 1
+			kvc.mutexClock.Unlock()
+		}
+
 		kvc.removeMessageToQueue(message)
 		return true
 	}
+
+	//fmt.Println("Messaggio", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "non può essere ancora eseguito da", kvc.Id)
+	//fmt.Println("VectorClock messaggio", message.VectorClock, "VectorClock mio", kvc.VectorClock)
 	return false
 }
 
