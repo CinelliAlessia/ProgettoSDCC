@@ -1,14 +1,18 @@
 version: '3.7'
 
 services:
+
   server1:
     build:
       context: .
       dockerfile: DockerfileServer
+    hostname: server1
     stdin_open: true
     tty: true
     environment:
       SERVER_ID: "0"
+    env_file:
+      - .env
     ports:
       - "8085:8085"
     networks:
@@ -18,10 +22,13 @@ services:
     build:
       context: .
       dockerfile: DockerfileServer
+    hostname: server2
     stdin_open: true
     tty: true
     environment:
       SERVER_ID: "1"
+    env_file:
+      - .env
     ports:
       - "8086:8086"
     networks:
@@ -31,10 +38,13 @@ services:
     build:
       context: .
       dockerfile: DockerfileServer
+    hostname: server3
     stdin_open: true
     tty: true
     environment:
       SERVER_ID: "2"
+    env_file:
+      - .env
     ports:
       - "8087:8087"
     networks:
@@ -45,8 +55,11 @@ services:
     build:
       context: .
       dockerfile: DockerfileClient
-    stdin_open: true
+    hostname: client
     tty: true
+    stdin_open: true
+    env_file:
+      - .env
     depends_on:
       - server1
       - server2

@@ -29,7 +29,7 @@ func main() {
 		var choice int
 		_, err := fmt.Scan(&choice)
 		if err != nil {
-			fmt.Println("Client -> Errore durante la lettura dell'input:", err)
+			fmt.Println("Errore durante la lettura dell'input:", err)
 			break
 		}
 
@@ -62,7 +62,7 @@ func sequential(rpcName string) {
 	var choice int
 	_, err := fmt.Scan(&choice)
 	if err != nil {
-		fmt.Println("Client -> Errore durante la lettura dell'input:", err)
+		fmt.Println("Errore durante la lettura dell'input:", err)
 		return
 	}
 	fmt.Println()

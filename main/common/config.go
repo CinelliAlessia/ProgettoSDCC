@@ -42,7 +42,7 @@ func GetServerName(replicaPort string, id int) string {
 	} else if os.Getenv("CONFIG") == "2" {
 		return "server" + strconv.Itoa(id+1) + ":" + replicaPort // Docker
 	} else {
-		fmt.Println("VARIABILE DI AMBIENTE ERRATA")
+		fmt.Println("VARIABILE DI AMBIENTE ERRATA, CONFIG:", os.Getenv("CONFIG"))
 		return ""
 	}
 }
@@ -56,7 +56,7 @@ func GetDebug() bool {
 	} else if os.Getenv("DEBUG") == "0" {
 		return false
 	} else {
-		fmt.Println("VARIABILE DI AMBIENTE ERRATA")
+		fmt.Println("VARIABILE DI AMBIENTE ERRATA DEBUG:", os.Getenv("DEBUG"))
 		return true
 	}
 }

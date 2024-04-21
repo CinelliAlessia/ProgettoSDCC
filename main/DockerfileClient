@@ -5,14 +5,17 @@ WORKDIR /main
 # Copio e scarico le dipendenze del modulo Go
 COPY go.mod .
 COPY go.sum .
+
 RUN go mod download
+RUN go get -u github.com/fatih/color
 
 # Copio il resto del codice sorgente
 COPY go.work .
 COPY common common
 COPY client client
 
-EXPOSE ${CLIENT_PORT}
+#EXPOSE ${CLIENT_PORT}
 
 # Avvia il tuo client Go
 CMD ["bash", "-c", "cd client && go run ."]
+#CMD ["bash", "-c", "cd client"]

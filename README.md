@@ -45,15 +45,16 @@ Ciascuna di queste funzioni RPC, lato server, una volta ricevuta la richiesta in
 - Per le richieste di tipo `PUT` e `DELETE` viene generato un messaggio da inviare in multicast, tramite `sendToAllServer()`.
 
 Ciascun server che riceve un messaggio di multicast (da una richiesta di `PUT` o `DELETE`), in `TotalOrderedMulticast()`:
-- Aggiunge la richiesta alla coda, ordinata in base al timestamp locale. 
-- Calcola il max tra il suo clock scalare e il clock scalare del messaggio ricevuto.
-- Incrementa di uno il clock scalare, per l'evento di `receive(m)`. ???
+- Aggiunge la richiesta alla coda, ordinata in base al timestamp locale.
 - Invia un ack a tutti i server per indicare che lui ha letto quel messaggio, tramite `sendAck()`.
-- Controlla (ogni 100 Millisecondi) se può essere eseguita a livello applicativo.
+- Controlla se può essere eseguita a livello applicativo.
 
 Il controllo avviene in `controlSendToApplication()`: verificando se il messaggio è in testa alla coda e ha ricevuto tutti gli ack relativi a quella richiesta. 
-In caso il controllo vada a buon fine è possibile inviare il messaggio a livello applicativo, viene rimosso il messaggio dalla coda ed eseguita `realFunction()`
-che esegue l'operazione richiesta nel datastore del server. 
+In caso il controllo vada a buon fine è possibile inviare il messaggio a livello applicativo:
+- Viene rimosso il messaggio dalla coda 
+- Calcola il max tra il suo clock scalare e il clock scalare del messaggio ricevuto.
+- Incrementa di uno il clock scalare, per conteggiare l'evento 
+- Viene eseguita `realFunction()` che esegue l'operazione richiesta nel datastore del server. 
 
 `sendAck()` invia un messaggio di ack a tutti i server, in modo asincrono.
 Viene effettuata una chiamata RPC `ReceiveAck()`, che gestisce la ricezione dell'ack, se fa riferimento ad un messaggio che il server ha già ricevuto, viene incrementato il contatore degli ack ricevuti, 

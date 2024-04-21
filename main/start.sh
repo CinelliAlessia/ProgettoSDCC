@@ -1,8 +1,11 @@
 #!/bin/bash
 
 # Imposta la variabile di ambiente
-export CONFIG=1 # 1 locale, 2 docker
-export DEBUG=1 # 1=true 0=false
+
+# 1 locale, 2 docker
+export CONFIG=1
+# 1=true 0=false
+export DEBUG=0
 
 pkill gnome-terminal
 
