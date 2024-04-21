@@ -61,7 +61,7 @@ func GetDebug() bool {
 	}
 }
 
-// RandomDelay Genera un ritardo casuale tra 0 e 999 millisecondi
+// RandomDelay Genera un ritardo casuale tra 0 e TIMER-1 millisecondi
 func RandomDelay() {
 	delay := rand.Intn(TIMER)
 
