@@ -210,9 +210,15 @@ func complexTestCE(rpcName string) {
 /* ----- CONSISTENZA SEQUENZIALE ----- */
 
 // basicTestSeq contatta tutti i server in goroutine con operazioni di put
-// un corretto funzionamento della consistenza sequenziale prevede che a prescindere dall'ordinamento
-// tutti i server eseguiranno nello stesso ordine le richieste.
+// - put prova:1 al server1,
+// - put prova:2 al server2,
+// - put prova:3 al server3.
 func basicTestSeq(rpcName string) {
+	fmt.Println("In questo basicTestSeq vengono inviate in goroutine:\n" +
+		"- put prova:1 al server1\n" +
+		"- put prova:2 al server2\n" +
+		"- put prova:3 al server3")
+
 	done := make(chan bool)
 
 	go func() {
@@ -235,20 +241,36 @@ func basicTestSeq(rpcName string) {
 }
 
 // mediumTestSeq contatta tutti i server in goroutine con operazioni di put
+// - put x:1, put y:1, put z:1 al server1,
+// - put x:2, put y:2, put z:2 al server2,
+// - put x:3, put y:3, put z:3 al server3.
 func mediumTestSeq(rpcName string) {
+	fmt.Println("In questo mediumTestSeq vengono inviate in goroutine:\n" +
+		"- put x:1, put y:1, put z:1 al server1\n" +
+		"- put x:2, put y:2, put z:2 al server2\n" +
+		"- put x:3, put y:3, put z:3 al server3")
+
 	done := make(chan bool)
 
 	// Definisci le azioni da eseguire per ciascuna goroutine
 	actions := []func(){
-		func() { executeSpecificCall(0, rpcName+put, "prova", "1") },
-		func() { executeSpecificCall(1, rpcName+put, "prova", "2") },
-		func() { executeSpecificCall(2, rpcName+put, "prova", "3") },
-		func() { executeSpecificCall(0, rpcName+put, "prova1", "1") },
-		func() { executeSpecificCall(1, rpcName+put, "prova1", "2") },
-		func() { executeSpecificCall(2, rpcName+put, "prova1", "3") },
-		func() { executeSpecificCall(0, rpcName+put, "prova2", "1") },
-		func() { executeSpecificCall(1, rpcName+put, "prova2", "2") },
-		func() { executeSpecificCall(2, rpcName+put, "prova2", "3") },
+		func() {
+			executeSpecificCall(0, rpcName+put, "x", "1")
+			executeSpecificCall(0, rpcName+put, "y", "1")
+			executeSpecificCall(0, rpcName+put, "z", "1")
+		},
+
+		func() {
+			executeSpecificCall(1, rpcName+put, "x", "2")
+			executeSpecificCall(1, rpcName+put, "y", "2")
+			executeSpecificCall(1, rpcName+put, "z", "2")
+		},
+
+		func() {
+			executeSpecificCall(2, rpcName+put, "x", "3")
+			executeSpecificCall(2, rpcName+put, "y", "3")
+			executeSpecificCall(2, rpcName+put, "z", "3")
+		},
 	}
 
 	// Avvia le goroutine per ciascuna azione
@@ -265,25 +287,34 @@ func mediumTestSeq(rpcName string) {
 	}
 }
 
+// In questo complexTestSeq vengono inviate in goroutine:
+//   - put x:1, put x:2, get x al server1,
+//   - put x:3, get x, put x:4 al server2,
+//   - put x:5, get x, put x:6 al server3.
 func complexTestSeq(rpcName string) {
+	fmt.Println("In questo complexTestSeq vengono inviate in goroutine:\n" +
+		"- put x:1, put x:2, get x al server1\n" +
+		"- put x:3, get x, put x:4 al server2\n" +
+		"- put x:5, get x, put x:6 al server3")
+
 	done := make(chan bool)
 
 	// Definisci le azioni da eseguire per ciascuna goroutine
 	actions := []func(){
 		func() {
-			executeSpecificCall(0, rpcName+put, "prova", "1")
-			executeSpecificCall(0, rpcName+put, "prova", "2")
-			executeSpecificCall(0, rpcName+get, "prova")
+			executeSpecificCall(0, rpcName+put, "x", "1")
+			executeSpecificCall(0, rpcName+put, "x", "2")
+			executeSpecificCall(0, rpcName+get, "x")
 		},
 		func() {
-			executeSpecificCall(1, rpcName+put, "prova", "3")
-			executeSpecificCall(1, rpcName+get, "prova")
-			executeSpecificCall(1, rpcName+put, "prova", "4")
+			executeSpecificCall(1, rpcName+put, "x", "3")
+			executeSpecificCall(1, rpcName+get, "x")
+			executeSpecificCall(1, rpcName+put, "x", "4")
 		},
 		func() {
-			executeSpecificCall(2, rpcName+get, "prova")
-			executeSpecificCall(2, rpcName+put, "prova", "5")
-			executeSpecificCall(2, rpcName+get, "prova")
+			executeSpecificCall(2, rpcName+get, "x")
+			executeSpecificCall(2, rpcName+put, "x", "5")
+			executeSpecificCall(2, rpcName+get, "x")
 		},
 	}
 

@@ -61,7 +61,7 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message MessageS, reply *bool) er
 		kvs.addToSortQueue(message)
 		*reply = kvs.updateMessage(message)
 	}
-	fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+	//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 	return nil
 }
 
@@ -167,7 +167,7 @@ func sendAck(message MessageS) {
 				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
 				return
 			}
-			fmt.Println("Inviato ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+			//fmt.Println("Inviato ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			err = sendAckRPC(conn, message, &reply)
 			if err != nil {
 				fmt.Printf("sendAck: Errore durante la chiamata RPC receiveAck %v\n", err)

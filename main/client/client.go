@@ -202,7 +202,6 @@ func executeCall(conn *rpc.Client, rpcName, key string, values ...string) common
 	args := common.Args{Key: key, Value: value}
 	response := common.Response{}
 
-	// TODO: Qui posso usare un id auto-incrementativo per un DEBUG accurato
 	err := delayedCall(conn, args, &response, rpcName)
 	if err != nil {
 		return common.Response{}
@@ -215,7 +214,7 @@ func executeCall(conn *rpc.Client, rpcName, key string, values ...string) common
 func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
 
 	// Applica un ritardo casuale
-	common.RandomDelay() // Vogliamo applicare o meno il ritardo? -> Scelto all'utilizzo e si imposta una variabile globale
+	//common.RandomDelay() // Vogliamo applicare o meno il ritardo? -> Scelto all'utilizzo e si imposta una variabile globale
 
 	debugPrintRun(rpcName, args)
 

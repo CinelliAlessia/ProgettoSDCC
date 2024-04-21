@@ -5,7 +5,7 @@
 # 1 locale, 2 docker
 export CONFIG=1
 # 1=true 0=false
-export DEBUG=0
+export DEBUG=1
 
 pkill gnome-terminal
 
