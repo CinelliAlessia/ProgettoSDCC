@@ -22,7 +22,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 	kvs.mutexClock.Unlock()
 
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
-	go sendAck(message)
+	sendAck(message)
 
 	response.Result = false // Inizializzo la risposta a false, corrisponde alla risposta che leggerà il client
 
@@ -61,7 +61,7 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message MessageS, reply *bool) er
 		kvs.addToSortQueue(message)
 		*reply = kvs.updateMessage(message)
 	}
-	//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+	fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 	return nil
 }
 
@@ -148,11 +148,14 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 	} else if kvs.Queue[0].NumberAck > common.Replicas {
 		fmt.Println(color.RedString("controlSendToApplication: Il messaggio in testa alla coda ha ricevuto più ack del previsto"))
 	}
+
 	return false
 }
 
 // sendAck invia con una goroutine a ciascun server un ack del messaggio ricevuto
 func sendAck(message MessageS) {
+	canSend := 0
+
 	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi stavo riferendo.
 	for i := 0; i < common.Replicas; i++ {
 		go func(replicaPort string, index int) {
@@ -164,19 +167,14 @@ func sendAck(message MessageS) {
 				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
 				return
 			}
-
-			// Invio controllando il valore, se il server mi risponde false provo a ricontattarlo. (Immediatamente)
-			for {
-				err = sendAckRPC(conn, message, &reply)
-				if err != nil {
-					fmt.Printf("sendAck: Errore durante la chiamata RPC receiveAck %v\n", err)
-					return
-				}
-				// Controllo del valore di ritorno della chiamata RPC, se è false riprovo a inviare l'ack
-				if reply {
-					break
-				}
+			fmt.Println("Inviato ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
+			err = sendAckRPC(conn, message, &reply)
+			if err != nil {
+				fmt.Printf("sendAck: Errore durante la chiamata RPC receiveAck %v\n", err)
+				return
 			}
+
+			canSend++
 
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
 			err = conn.Close()
@@ -184,16 +182,35 @@ func sendAck(message MessageS) {
 				fmt.Println("Errore durante la chiusura della connessione in TotalOrderedMulticast.sendAckRPC:", err)
 				return
 			}
+
 		}(common.ReplicaPorts[i], i)
+	}
+
+	for {
+		// In questo modo controllo che tutti i miei ack siano arrivati a destinazione
+		// sendAck non va chiamata in una goroutine quindi aspetteremo fin quando tutti avranno letto l'ack
+		if canSend == common.Replicas {
+			break
+		}
 	}
 }
 
 // sendAckRPC invia l'ack tramite RPC, applicando un ritardo random
 func sendAckRPC(conn *rpc.Client, message MessageS, reply *bool) error {
 	common.RandomDelay()
+
 	err := conn.Call("KeyValueStoreSequential.ReceiveAck", message, reply)
 	if err != nil {
 		return err
 	}
+
+	if !*reply {
+		return fmt.Errorf("sendAckRPC: Errore ReceiveAck ha risposto false")
+	}
+	// Problema: Se un messaggio ha un ritardo eccessivo, ...
+	// La soluzione al ritardo eccessivo è non inviare a livello applicativo il messaggio se il server che contatto non mi risponde true
+	// mi aspetto una risposta ad un ack
+	// Posso creare un lucchetto per messaggio o un canale, se è lockato non ho ricevuto almeno una risposta all'ack che ho inviato.
+	// Questo dovrebbe rientrare nelle assunzioni di comunicazione affidabile
 	return nil
 }
