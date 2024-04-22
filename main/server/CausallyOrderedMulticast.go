@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"main/common"
-	"time"
 )
 
 // CausallyOrderedMulticast esegue l'algoritmo multicast causalmente ordinato sul messaggio ricevuto.
@@ -25,6 +24,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 	response.Result = false
 	// TODO: vale la pena aggiungere un mutex?
 	for {
+		kvc.executeFunctionMutex.Lock()
 		canSend := kvc.controlSendToApplication(message)
 		if canSend {
 			// Invio a livello applicativo
@@ -32,19 +32,12 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 			if err != nil {
 				return err
 			}
+			kvc.executeFunctionMutex.Unlock()
 			break
-			/*if message.TypeOfMessage == "Get" && !(response.Result) {
-				// Se un client chiede di leggere una chiave che non esiste,
-				// aspetto che la chiave verrà inserita.
-				time.Sleep(time.Millisecond * 100)
-				continue
-			} else {
-				kvc.removeMessageToQueue(message)
-				break
-			}*/
 		}
+		kvc.executeFunctionMutex.Unlock()
 		// La richiesta non può essere ancora eseguita, si attende un breve periodo prima di riprovare
-		time.Sleep(time.Millisecond * 1000)
+		// time.Sleep(time.Millisecond * 1000)
 	}
 	return nil
 }
@@ -80,12 +73,10 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 		result = true
 	}
 
-	if result {
+	if message.TypeOfMessage == "Get" && result {
 		// Se è un evento di lettura, controllo se la chiave è presente nel mio datastore
 		// Se non c'è aspetterò fin quando non verrà inserita
-		if message.TypeOfMessage == "Get" { // Lettura
-			_, result = kvc.Datastore[message.Args.Key]
-		}
+		_, result = kvc.Datastore[message.Args.Key]
 	}
 
 	if result {

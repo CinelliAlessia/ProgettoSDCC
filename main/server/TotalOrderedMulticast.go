@@ -9,7 +9,8 @@ import (
 )
 
 // TotalOrderedMulticast gestione dell'evento esterno ricevuto da un server
-// Implementazione del multicast totalmente ordinato -> Il server ha inviato in multicast il messaggio di update
+// Implementazione del multicast totalmente ordinato
+// Il server ha inviato in multicast il messaggio di update per msg
 func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, response *common.Response) error {
 
 	// Aggiunta della richiesta in coda
@@ -24,7 +25,8 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message MessageS, resp
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
 	sendAck(message)
 
-	response.Result = false // Inizializzo la risposta a false, corrisponde alla risposta che leggerà il client
+	// Inizializzo la risposta a false, corrisponde alla risposta che leggerà il client
+	response.Result = false
 
 	// Ciclo finché controlSendToApplication non restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
@@ -102,8 +104,9 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 func (kvs *KeyValueStoreSequential) removeMessageToQueue(message MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
+
 	if kvs.Queue[0].LogicalClock == message.LogicalClock && kvs.Queue[0].Id == message.Id {
-		// Rimuovi l'elemento dalla slice
+		// Rimuovi il primo elemento dalla slice
 		kvs.Queue = kvs.Queue[1:]
 		return
 	}
@@ -114,6 +117,7 @@ func (kvs *KeyValueStoreSequential) removeMessageToQueue(message MessageS) {
 func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
+
 	for i := range kvs.Queue {
 		if kvs.Queue[i].LogicalClock == message.LogicalClock && kvs.Queue[i].Id == message.Id {
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
@@ -133,6 +137,9 @@ func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) bool {
 	if kvs.Queue[0].Id == message.Id && kvs.Queue[0].NumberAck == common.Replicas {
 
+		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
+		go kvs.removeMessageToQueue(message)
+
 		// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 		kvs.mutexClock.Lock()
 		kvs.LogicalClock = common.Max(message.LogicalClock, kvs.LogicalClock)
@@ -140,9 +147,6 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 			kvs.LogicalClock++ // Devo incrementare il clock per gestire l'evento di receive
 		}
 		kvs.mutexClock.Unlock()
-
-		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
-		go kvs.removeMessageToQueue(message)
 		return true
 
 	} else if kvs.Queue[0].NumberAck > common.Replicas {
@@ -154,19 +158,22 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 
 // sendAck invia con una goroutine a ciascun server un ack del messaggio ricevuto
 func sendAck(message MessageS) {
-	canSend := 0
+	canSend := 0 // Contatore del numero di ack inviati che sono stati ricevuti (ho avuto una risposta alla chiamata RPC)
 
 	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi stavo riferendo.
 	for i := 0; i < common.Replicas; i++ {
+		// Invio ack in una goroutine
 		go func(replicaPort string, index int) {
 
 			reply := false
+
 			serverName := common.GetServerName(replicaPort, index)
 			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
 				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
 				return
 			}
+
 			//fmt.Println("Inviato ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			err = sendAckRPC(conn, message, &reply)
 			if err != nil {
@@ -174,7 +181,7 @@ func sendAck(message MessageS) {
 				return
 			}
 
-			canSend++
+			canSend++ // Incremento il numero di ack inviati che sono stati ricevuti
 
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
 			err = conn.Close()
@@ -186,9 +193,8 @@ func sendAck(message MessageS) {
 		}(common.ReplicaPorts[i], i)
 	}
 
+	// Controllo e attendo che tutti i miei ack siano arrivati a destinazione
 	for {
-		// In questo modo controllo che tutti i miei ack siano arrivati a destinazione
-		// sendAck non va chiamata in una goroutine quindi aspetteremo fin quando tutti avranno letto l'ack
 		if canSend == common.Replicas {
 			break
 		}

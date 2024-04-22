@@ -94,7 +94,7 @@ func test2(rpcName string) {
 func basicTestCE(rpcName string) {
 
 	fmt.Println("In questo basicTestCE vengono inviate in goroutine:\n" +
-		"- una richiesta di put al server1\n" +
+		"- una richiesta di put x:1 al server1\n" +
 		"- una richiesta di get x put y:2 al server2 (causa-effetto)")
 
 	done := make(chan bool)
@@ -288,14 +288,14 @@ func mediumTestSeq(rpcName string) {
 }
 
 // In questo complexTestSeq vengono inviate in goroutine:
-//   - put x:1, put x:2, get x al server1,
-//   - put x:3, get x, put x:4 al server2,
-//   - put x:5, get x, put x:6 al server3.
+//   - put x:1, put y:2, get x, put y:1 al server1,
+//   - put x:2, get x, get y, put x:3 al server2,
+//   - put x:4, get x, get y al server3.
 func complexTestSeq(rpcName string) {
 	fmt.Println("In questo complexTestSeq vengono inviate in goroutine:\n" +
-		"- put x:1, put x:2, get x al server1\n" +
-		"- put x:3, get x, put x:4 al server2\n" +
-		"- put x:5, get x, put x:6 al server3")
+		"- put x:1, put y:2, get x, put y:1 al server1\n" +
+		"- put x:2, get x, get y, put x:3 al server2\n" +
+		"- put x:4, get x, get y al server3")
 
 	done := make(chan bool)
 
@@ -303,18 +303,21 @@ func complexTestSeq(rpcName string) {
 	actions := []func(){
 		func() {
 			executeSpecificCall(0, rpcName+put, "x", "1")
-			executeSpecificCall(0, rpcName+put, "x", "2")
+			executeSpecificCall(0, rpcName+put, "y", "2")
 			executeSpecificCall(0, rpcName+get, "x")
+			executeSpecificCall(0, rpcName+put, "y", "1")
+
 		},
 		func() {
-			executeSpecificCall(1, rpcName+put, "x", "3")
+			executeSpecificCall(1, rpcName+put, "x", "2")
 			executeSpecificCall(1, rpcName+get, "x")
-			executeSpecificCall(1, rpcName+put, "x", "4")
+			executeSpecificCall(1, rpcName+get, "y")
+			executeSpecificCall(1, rpcName+put, "x", "3")
 		},
 		func() {
+			executeSpecificCall(2, rpcName+put, "x", "4")
 			executeSpecificCall(2, rpcName+get, "x")
-			executeSpecificCall(2, rpcName+put, "x", "5")
-			executeSpecificCall(2, rpcName+get, "x")
+			executeSpecificCall(2, rpcName+get, "y")
 		},
 	}
 

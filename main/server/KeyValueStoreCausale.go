@@ -17,14 +17,17 @@ type KeyValueStoreCausale struct {
 	Queue      []MessageC
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
+	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
 }
 
 type MessageC struct {
-	Id            string // Id del messaggio stesso
-	IdSender      int    // IdSender rappresenta l'indice del server che invia il messaggio
+	Id       string // Id del messaggio stesso
+	IdSender int    // IdSender rappresenta l'indice del server che invia il messaggio
+
 	TypeOfMessage string
 	Args          common.Args
-	VectorClock   [common.Replicas]int // Orologio vettoriale
+
+	VectorClock [common.Replicas]int // Orologio vettoriale
 }
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
@@ -87,14 +90,10 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 // RealFunction esegue l'operazione di put e di delete realmente
 func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common.Response) error {
 	if message.TypeOfMessage == "Put" { // Scrittura
-
 		kvc.Datastore[message.Args.Key] = message.Args.Value
-		kvc.printGreen("ESEGUITO", message)
 
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
-
 		delete(kvc.Datastore, message.Args.Key)
-		kvc.printGreen("ESEGUITO", message)
 
 	} else if message.TypeOfMessage == "Get" { // Lettura
 
@@ -105,13 +104,12 @@ func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common
 			return nil
 		}
 		response.Value = val
-
-		message.Args.Value = val //Fatto solo per DEBUG per la funzione sottostante
-		kvc.printGreen("ESEGUITO", message)
+		message.Args.Value = val //Fatto solo per DEBUG per il print
 	} else {
 		return fmt.Errorf("command not found")
 	}
 
+	kvc.printGreen("ESEGUITO", message)
 	response.Result = true
 	return nil
 }

@@ -18,16 +18,18 @@ type KeyValueStoreSequential struct {
 	Queue      []MessageS
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
-	executeFunctionMutex sync.Mutex
+	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
 }
 
 type MessageS struct {
-	Id            string
-	IdSender      int // IdSender rappresenta l'indice del server che invia il messaggio
+	Id       string
+	IdSender int // IdSender rappresenta l'indice del server che invia il messaggio
+
 	TypeOfMessage string
 	Args          common.Args
-	LogicalClock  int
-	NumberAck     int
+
+	LogicalClock int
+	NumberAck    int
 }
 
 // Get gestisce una chiamata RPC di un evento interno, genera un messaggio e allega il suo clock scalare.
@@ -62,7 +64,6 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 				return err
 			}
 			break
-
 		}
 		kvs.executeFunctionMutex.Unlock()
 	}
@@ -73,11 +74,11 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
 
 	kvs.mutexClock.Lock()
-	kvs.LogicalClock++
 
-	// CREO IL MESSAGGIO E DEVO FAR SI CHE TUTTI LO SCRIVONO NEL DATASTORE
+	kvs.LogicalClock++
 	message := MessageS{common.GenerateUniqueID(), kvs.Id, "Put", args, kvs.LogicalClock, 0}
 	kvs.printDebugBlue("RICEVUTO da client", message)
+
 	kvs.mutexClock.Unlock()
 
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp
@@ -95,9 +96,11 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Response) error {
 
 	kvs.mutexClock.Lock()
+
 	kvs.LogicalClock++
 	message := MessageS{common.GenerateUniqueID(), kvs.Id, "Delete", args, kvs.LogicalClock, 0}
 	kvs.printDebugBlue("RICEVUTO da client", message)
+
 	kvs.mutexClock.Unlock()
 
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
@@ -111,35 +114,32 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	return nil
 }
 
-// RealFunction esegue l'operazione di get, put e di delete realmente, inserendo la risposta adeguata nella struttura common.Response
-// Se l'operazione è andata a buon fine, restituisce true, altrimenti restituisce false, sarà la risposta che leggerà il client
+// realFunction esegue l'operazione di get, put e di delete realmente,
+// inserendo la risposta adeguata nella struttura common.Response
+// Se l'operazione è andata a buon fine, restituisce true, altrimenti restituisce false,
+// sarà la risposta che leggerà il client
 func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *common.Response) error {
 	if message.TypeOfMessage == "Put" { // Scrittura
-
 		kvs.Datastore[message.Args.Key] = message.Args.Value
-		kvs.printGreen("ESEGUITO", message)
 
 	} else if message.TypeOfMessage == "Delete" { // Scrittura
-
 		delete(kvs.Datastore, message.Args.Key)
-		kvs.printGreen("ESEGUITO", message)
 
 	} else if message.TypeOfMessage == "Get" { // Lettura
-
 		val, ok := kvs.Datastore[message.Args.Key]
 		if !ok {
 			kvs.printRed("NON ESEGUITO", message)
 			response.Result = false
 			return nil
 		}
-		response.Value = val
 
-		message.Args.Value = val //Fatto solo per DEBUG per la funzione sottostante
-		kvs.printGreen("ESEGUITO", message)
+		response.Value = val
+		message.Args.Value = val //Fatto solo per DEBUG per il print
 	} else {
 		return fmt.Errorf("command not found")
 	}
 
+	kvs.printGreen("ESEGUITO", message)
 	response.Result = true
 	return nil
 }
