@@ -16,6 +16,13 @@ const (
 	del = ".Delete"
 )
 
+type OperationType int
+
+const (
+	Sync OperationType = iota
+	Async
+)
+
 func main() {
 
 	for {
@@ -25,7 +32,7 @@ func main() {
 		fmt.Println("2. Consistenza Sequenziale")
 
 		// Leggi l'input dell'utente per l'operazione
-		fmt.Print("\nInserisci il numero dell'operazione desiderata: ")
+		fmt.Print("Inserisci il numero dell'operazione desiderata: ")
 		var choice int
 		_, err := fmt.Scan(&choice)
 		if err != nil {
@@ -79,7 +86,6 @@ func sequential(rpcName string) {
 		break
 	}
 	fmt.Println()
-
 }
 
 // causal() Scegliere il tipo di test che si vuole eseguire per verificare le garanzie di consistenza causale
@@ -156,65 +162,64 @@ func specificConnect(index int) *rpc.Client {
 	return conn
 }
 
-func executeRandomCall(rpcName, key string, values ...string) common.Response {
-	var response common.Response
-
+func executeRandomCall(rpcName string, args common.Args, response *common.Response, opType OperationType) error {
 	conn := randomConnect()
 	if conn == nil {
-		fmt.Println("CLIENT: Errore durante la connessione")
-		return common.Response{}
+		return fmt.Errorf("executeSpecificCall: Errore durante la connessione con un server random\n")
 	}
 
-	if len(values) > 0 {
-		response = executeCall(conn, rpcName, key, values[0])
-	} else {
-		response = executeCall(conn, rpcName, key)
+	switch opType {
+	case Sync:
+		// Esegui l'operazione in modo sincrono
+		err := syncCall(conn, args, response, rpcName)
+		if err != nil {
+			return err
+		}
+	case Async:
+		// Esegui l'operazione in modo asincrono
+		err := asyncCall(conn, args, response, rpcName)
+		if err != nil {
+			return err
+		}
+	default:
+		// Gestisci i casi non previsti
 	}
-	return response
+
+	return nil
 }
 
 // executeSpecificCall:
 //   - index rappresenta l'indice relativo al server da contattare, da 0 a (common.Replicas-1)
-func executeSpecificCall(index int, rpcName, key string, values ...string) common.Response {
-	var response common.Response
+//   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+func executeSpecificCall(index int, rpcName string, args common.Args, response *common.Response, opType OperationType) error {
 
 	conn := specificConnect(index)
 	if conn == nil {
-		fmt.Println("executeSpecificCall: Errore durante la connessione")
-		return common.Response{}
+		return fmt.Errorf("executeSpecificCall: Errore durante la connessione con il server specifico %d\n", index)
 	}
 
-	if len(values) > 0 {
-		response = executeCall(conn, rpcName, key, values[0])
-	} else {
-		response = executeCall(conn, rpcName, key)
+	switch opType {
+	case Sync:
+		// Esegui l'operazione in modo sincrono
+		err := syncCall(conn, args, response, rpcName)
+		if err != nil {
+			return err
+		}
+	case Async:
+		// Esegui l'operazione in modo asincrono
+		err := asyncCall(conn, args, response, rpcName)
+		if err != nil {
+			return err
+		}
+	default:
+		// Gestisci i casi non previsti
 	}
-	return response
-}
-
-// executeCall esegue un comando ad un server random. Il comando da eseguire viene specificato tramite i parametri inseriti
-func executeCall(conn *rpc.Client, rpcName, key string, values ...string) common.Response {
-	var value string
-	if len(values) > 0 {
-		value = values[0]
-	}
-
-	args := common.Args{Key: key, Value: value}
-	response := common.Response{}
-
-	err := delayedCall(conn, args, &response, rpcName)
-	if err != nil {
-		return common.Response{}
-	}
-	return response
+	return nil
 }
 
 // delayedCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
 // Prima di effettuare la chiamata, applica un ritardo casuale per simulare condizioni reali di rete.
-func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
-
-	// Applica un ritardo casuale
-	//common.RandomDelay() // Vogliamo applicare o meno il ritardo? -> Scelto all'utilizzo e si imposta una variabile globale
+func syncCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
 
 	debugPrintRun(rpcName, args)
 
@@ -231,6 +236,54 @@ func delayedCall(conn *rpc.Client, args common.Args, response *common.Response, 
 		return fmt.Errorf("errore durante la chiusura della connessione in client.call: %s", err)
 	}
 	return nil
+}
+
+func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
+
+	debugPrintRun(rpcName, args)
+
+	// Effettua la chiamata RPC
+	call := conn.Go(rpcName, args, response, nil)
+
+	go func() {
+		<-call.Done // Aspetta che la chiamata RPC sia completata
+		if call.Error != nil {
+			fmt.Printf("errore durante la chiamata RPC in client.call: %s", call.Error)
+			response.Done <- false
+		} else {
+			debugPrintResponse(rpcName, args, *response)
+			response.Done <- true
+		}
+
+		err := conn.Close()
+		if err != nil {
+			fmt.Printf("errore durante la chiusura della connessione in client.call: %s", err)
+		}
+	}()
+
+	return nil
+}
+
+// executeCall esegue un comando ad un server specifico. Il comando da eseguire viene specificato tramite i parametri inseriti
+// si occupa di eseguire le operazioni di put, get e del, in maniera sync o async e incrementa il timestamp dello specifico client
+func executeCall(index int, rpcName string, operationType string, key string, value string, timestamps map[int]int, opType OperationType) (common.Response, error) {
+	response := common.Response{}
+
+	var err error
+
+	if operationType == put || operationType == del {
+		err = executeSpecificCall(index, rpcName+put, common.Args{Key: key, Value: value, Timestamp: timestamps[index]}, &response, opType)
+
+	} else if operationType == get {
+		err = executeSpecificCall(index, rpcName+get, common.Args{Key: key, Timestamp: timestamps[index]}, &response, opType)
+	}
+
+	if err != nil {
+		return response, err
+	}
+
+	timestamps[index]++
+	return response, nil
 }
 
 /* ----- FUNZIONI PER PRINT DI DEBUG ----- */

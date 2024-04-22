@@ -86,6 +86,8 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 
 	// Se il messaggio non è presente, aggiungilo alla coda
 	if !isPresent {
+		fmt.Println(message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "aggiunto alla coda")
+
 		kvs.Queue = append(kvs.Queue, message)
 
 		// Ordina la coda in base al logicalClock, a parità di timestamp l'ordinamento è deterministico in base all'ID
@@ -95,9 +97,9 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message MessageS) {
 			}
 			return kvs.Queue[i].LogicalClock < kvs.Queue[j].LogicalClock
 		})
-
-		//printQueue(kvs)
 	}
+
+	//printQueue(kvs)
 }
 
 // removeMessageToQueue Rimuove il messaggio passato come argomento dalla coda solamente se è l'elemento in testa, l'eliminazione si basa sull'ID
@@ -135,7 +137,8 @@ func (kvs *KeyValueStoreSequential) updateMessage(message MessageS) bool {
 // (quest’ultima condizione sta a indicare che nessun altro processo può inviare in multicast un messaggio con
 // timestamp potenzialmente minore o uguale a quello di msg_i)
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) bool {
-	if kvs.Queue[0].Id == message.Id && kvs.Queue[0].NumberAck == common.Replicas {
+
+	if kvs.secondCondition(message) && kvs.Queue[0].Id == message.Id && kvs.Queue[0].NumberAck == common.Replicas {
 
 		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
 		go kvs.removeMessageToQueue(message)
@@ -152,6 +155,9 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message MessageS) b
 	} else if kvs.Queue[0].NumberAck > common.Replicas {
 		fmt.Println(color.RedString("controlSendToApplication: Il messaggio in testa alla coda ha ricevuto più ack del previsto"))
 	}
+
+	// Non è stato eseguito il messaggio a livello applicativo
+	// TODO: controllo ogni tot secondi se rimangono appese solo tre richieste e sono tre richieste di end non far girare i server amazon a buffo
 
 	return false
 }
@@ -219,4 +225,28 @@ func sendAckRPC(conn *rpc.Client, message MessageS, reply *bool) error {
 	// Posso creare un lucchetto per messaggio o un canale, se è lockato non ho ricevuto almeno una risposta all'ack che ho inviato.
 	// Questo dovrebbe rientrare nelle assunzioni di comunicazione affidabile
 	return nil
+}
+
+// secondCondition ritorna true se:
+// Per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
+// Dato il messaggio in argomento:
+// - Ci devono essere almeno un messaggio per ciascun server con timestamp maggiore (msg.IdSender)
+func (kvs *KeyValueStoreSequential) secondCondition(message MessageS) bool {
+
+	// Controllo che ci sia almeno un messaggio per ciascun server con timestamp maggiore
+	for i := 0; i < common.Replicas; i++ {
+		found := false
+		for _, msg := range kvs.Queue {
+			if msg.IdSender == i && msg.LogicalClock > message.LogicalClock {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	//fmt.Println(message, "rispetta le condizioni")
+	return true
 }
