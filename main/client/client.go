@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/rpc"
 	"strings"
+	"time"
 )
 
 const (
@@ -16,11 +17,16 @@ const (
 	del = ".Delete"
 )
 
-type OperationType int
+type CallType int
 
 const (
-	Sync OperationType = iota
+	Sync CallType = iota
 	Async
+)
+
+const (
+	random   = "random"
+	specific = "specific"
 )
 
 func main() {
@@ -58,67 +64,80 @@ func main() {
 
 // sequential() Scegliere il tipo di test che si vuole eseguire per verificare le garanzie di consistenza sequenziale
 func sequential(rpcName string) {
-	// Stampa il menu interattivo
-	fmt.Println("\nConsistenza sequenziale, scegli il test da eseguire: ")
-	fmt.Println("1. Basic Test")
-	fmt.Println("2. Medium Test")
-	fmt.Println("3. Complex Test")
+	for {
+		// Stampa il menu interattivo
+		fmt.Println("Consistenza sequenziale, scegli il test da eseguire: ")
+		fmt.Println("1. Basic Test")
+		fmt.Println("2. Medium Test")
+		fmt.Println("3. Complex Test")
+		fmt.Println("4. Esci")
 
-	// Leggi l'input dell'utente per l'operazione
-	fmt.Print("Inserisci il numero dell'operazione desiderata: ")
-	var choice int
-	_, err := fmt.Scan(&choice)
-	if err != nil {
-		fmt.Println("Errore durante la lettura dell'input:", err)
-		return
-	}
-	fmt.Println()
+		// Leggi l'input dell'utente per l'operazione
+		fmt.Print("Inserisci il numero dell'operazione desiderata: ")
+		var choice int
+		_, err := fmt.Scan(&choice)
+		if err != nil {
+			fmt.Println("Errore durante la lettura dell'input:", err)
+			return
+		}
+		fmt.Println()
 
-	switch choice {
-	case 1:
-		basicTestSeq(rpcName)
-		break
-	case 2:
-		mediumTestSeq(rpcName)
-		break
-	case 3:
-		complexTestSeq(rpcName)
-		break
+		switch choice {
+		case 1:
+			basicTestSeq(rpcName)
+			break
+		case 2:
+			mediumTestSeq(rpcName)
+			break
+		case 3:
+			complexTestSeq(rpcName)
+			break
+		case 4:
+			fmt.Println()
+			return
+		}
+		//endCall(rpcName)
+		time.Sleep(5000 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
 	}
-	fmt.Println()
 }
 
 // causal() Scegliere il tipo di test che si vuole eseguire per verificare le garanzie di consistenza causale
 func causal(rpcName string) {
-	// Stampa il menu interattivo
-	fmt.Println("\nConsistenza causale, scegli il test da eseguire: ")
-	fmt.Println("1. Basic Test")
-	fmt.Println("2. Medium Test")
-	fmt.Println("3. Complex Test")
+	for { // Stampa il menu interattivo
+		fmt.Println("Consistenza causale, scegli il test da eseguire: ")
+		fmt.Println("1. Basic Test")
+		fmt.Println("2. Medium Test")
+		fmt.Println("3. Complex Test")
+		fmt.Println("4. Esci")
 
-	// Leggi l'input dell'utente per l'operazione
-	fmt.Print("\nInserisci il numero dell'operazione desiderata: ")
-	var choice int
-	_, err := fmt.Scan(&choice)
-	if err != nil {
-		fmt.Println("Errore durante la lettura dell'input:", err)
-		return
+		// Leggi l'input dell'utente per l'operazione
+		fmt.Print("Inserisci il numero dell'operazione desiderata: ")
+		var choice int
+		_, err := fmt.Scan(&choice)
+		if err != nil {
+			fmt.Println("Errore durante la lettura dell'input:", err)
+			return
+		}
+		fmt.Println()
+
+		switch choice {
+		case 1:
+			basicTestCE(rpcName)
+			break
+		case 2:
+			mediumTestCE(rpcName)
+			break
+		case 3:
+			complexTestCE(rpcName)
+			break
+		case 4:
+			//endCall(rpcName)
+			fmt.Println()
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
 	}
-	fmt.Println()
-
-	switch choice {
-	case 1:
-		basicTestCE(rpcName)
-		break
-	case 2:
-		mediumTestCE(rpcName)
-		break
-	case 3:
-		complexTestCE(rpcName)
-		break
-	}
-
-	fmt.Println()
 }
 
 /* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
@@ -162,7 +181,9 @@ func specificConnect(index int) *rpc.Client {
 	return conn
 }
 
-func executeRandomCall(rpcName string, args common.Args, response *common.Response, opType OperationType) error {
+// executeRandomCall:
+//   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+func executeRandomCall(rpcName string, args common.Args, response *common.Response, opType CallType) error {
 	conn := randomConnect()
 	if conn == nil {
 		return fmt.Errorf("executeSpecificCall: Errore durante la connessione con un server random\n")
@@ -191,7 +212,7 @@ func executeRandomCall(rpcName string, args common.Args, response *common.Respon
 // executeSpecificCall:
 //   - index rappresenta l'indice relativo al server da contattare, da 0 a (common.Replicas-1)
 //   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
-func executeSpecificCall(index int, rpcName string, args common.Args, response *common.Response, opType OperationType) error {
+func executeSpecificCall(index int, rpcName string, args common.Args, response *common.Response, opType CallType) error {
 
 	conn := specificConnect(index)
 	if conn == nil {
@@ -217,7 +238,7 @@ func executeSpecificCall(index int, rpcName string, args common.Args, response *
 	return nil
 }
 
-// delayedCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
+// syncCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
 // Prima di effettuare la chiamata, applica un ritardo casuale per simulare condizioni reali di rete.
 func syncCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
 
@@ -226,29 +247,29 @@ func syncCall(conn *rpc.Client, args common.Args, response *common.Response, rpc
 	// Effettua la chiamata RPC
 	err := conn.Call(rpcName, args, response)
 	if err != nil {
-		return fmt.Errorf("errore durante la chiamata RPC in client.call: %s", err)
+		return fmt.Errorf("errore durante la chiamata RPC in client.call: %s\n", err)
 	}
 
 	debugPrintResponse(rpcName, args, *response)
 
 	err = conn.Close()
 	if err != nil {
-		return fmt.Errorf("errore durante la chiusura della connessione in client.call: %s", err)
+		return fmt.Errorf("errore durante la chiusura della connessione in client.call: %s\n", err)
 	}
 	return nil
 }
 
+// asyncCall: utilizzato per lsa consistenza sequenziale
 func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rpcName string) error {
-
-	debugPrintRun(rpcName, args)
 
 	// Effettua la chiamata RPC
 	call := conn.Go(rpcName, args, response, nil)
+	debugPrintRun(rpcName, args)
 
 	go func() {
 		<-call.Done // Aspetta che la chiamata RPC sia completata
 		if call.Error != nil {
-			fmt.Printf("errore durante la chiamata RPC in client.call: %s", call.Error)
+			fmt.Printf("errore durante la chiamata RPC in client.call: %s\n", call.Error)
 			response.Done <- false
 		} else {
 			debugPrintResponse(rpcName, args, *response)
@@ -257,7 +278,7 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 
 		err := conn.Close()
 		if err != nil {
-			fmt.Printf("errore durante la chiusura della connessione in client.call: %s", err)
+			fmt.Printf("errore durante la chiusura della connessione in client.call: %s\n", err)
 		}
 	}()
 
@@ -266,23 +287,37 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 
 // executeCall esegue un comando ad un server specifico. Il comando da eseguire viene specificato tramite i parametri inseriti
 // si occupa di eseguire le operazioni di put, get e del, in maniera sync o async e incrementa il timestamp dello specifico client
-func executeCall(index int, rpcName string, operationType string, key string, value string, timestamps map[int]int, opType OperationType) (common.Response, error) {
+func executeCall(index int, rpcName string, operationType string, args common.Args, opType CallType, specOrRandom string) (common.Response, error) {
 	response := common.Response{}
-
 	var err error
 
-	if operationType == put || operationType == del {
-		err = executeSpecificCall(index, rpcName+put, common.Args{Key: key, Value: value, Timestamp: timestamps[index]}, &response, opType)
-
-	} else if operationType == get {
-		err = executeSpecificCall(index, rpcName+get, common.Args{Key: key, Timestamp: timestamps[index]}, &response, opType)
+	switch operationType {
+	case put:
+		if specOrRandom == specific {
+			err = executeSpecificCall(index, rpcName+put, args, &response, opType)
+		} else if specOrRandom == random {
+			err = executeRandomCall(rpcName+put, args, &response, opType)
+		}
+	case get:
+		if specOrRandom == specific {
+			err = executeSpecificCall(index, rpcName+get, args, &response, opType)
+		} else if specOrRandom == random {
+			err = executeRandomCall(rpcName+get, args, &response, opType)
+		}
+	case del:
+		if specOrRandom == specific {
+			err = executeSpecificCall(index, rpcName+del, args, &response, opType)
+		} else if specOrRandom == random {
+			err = executeRandomCall(rpcName+del, args, &response, opType)
+		}
+	default:
+		// gestisci i casi non previsti
 	}
 
 	if err != nil {
 		return response, err
 	}
 
-	timestamps[index]++
 	return response, nil
 }
 
