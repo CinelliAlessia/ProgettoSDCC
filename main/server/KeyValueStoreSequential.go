@@ -1,36 +1,8 @@
-// Package sequential KeyValueStoreSequential.go
 package main
 
 import (
-	"fmt"
 	"main/common"
-	"sync"
 )
-
-// KeyValueStoreSequential rappresenta il servizio di memorizzazione chiave-valore specializzato nel sequenziale
-type KeyValueStoreSequential struct {
-	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-	Id        int               // Id che identifica il server stesso
-
-	LogicalClock int // Orologio logico scalare
-	mutexClock   sync.Mutex
-
-	Queue      []MessageS
-	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
-
-	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
-}
-
-type MessageS struct {
-	Id       string
-	IdSender int // IdSender rappresenta l'indice del server che invia il messaggio
-
-	TypeOfMessage string
-	Args          common.Args
-
-	LogicalClock int
-	NumberAck    int
-}
 
 // Get gestisce una chiamata RPC di un evento interno, genera un messaggio e allega il suo clock scalare.
 // Restituisce il valore associato alla chiave specificata, non notifica ad altri server replica l'evento,
@@ -39,33 +11,19 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	// Incrementa il clock logico e genera il messaggio da inviare a livello applicativo
 	// Si crea un messaggio con 3 ack "ricevuti" così che per inviarlo a livello applicativo si controllerà
 	// solamente l'ordinamento del messaggio nella coda.
-	kvs.mutexClock.Lock()
 
-	kvs.LogicalClock++
-	message := MessageS{common.GenerateUniqueID(), kvs.Id, "Get", args, kvs.LogicalClock, 3}
-	kvs.printDebugBlue("RICEVUTO da client", message)
-
-	kvs.mutexClock.Unlock()
-
+	message := kvs.createMessage(args, "Get")
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Controllo in while se il messaggio può essere inviato a livello applicativo
 	for {
-		kvs.executeFunctionMutex.Lock()
-
-		canSend := kvs.controlSendToApplication(message)
-		if canSend {
-			// Invio a livello applicativo
-			err := kvs.realFunction(message, response)
-
-			kvs.executeFunctionMutex.Unlock()
-
-			if err != nil {
-				return err
-			}
+		stop, err := kvs.canExecute(message, response)
+		if stop {
 			break
 		}
-		kvs.executeFunctionMutex.Unlock()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -73,15 +31,8 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
 
-	kvs.mutexClock.Lock()
-
-	kvs.LogicalClock++
-	message := MessageS{common.GenerateUniqueID(), kvs.Id, "Put", args, kvs.LogicalClock, 0}
-	kvs.printDebugBlue("RICEVUTO da client", message)
-
-	kvs.mutexClock.Unlock()
-
-	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp
+	message := kvs.createMessage(args, "Put")
+	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
@@ -95,15 +46,8 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Response) error {
 
-	kvs.mutexClock.Lock()
-
-	kvs.LogicalClock++
-	message := MessageS{common.GenerateUniqueID(), kvs.Id, "Delete", args, kvs.LogicalClock, 0}
-	kvs.printDebugBlue("RICEVUTO da client", message)
-
-	kvs.mutexClock.Unlock()
-
-	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
+	message := kvs.createMessage(args, "Delete")
+	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
@@ -120,26 +64,52 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 // sarà la risposta che leggerà il client
 func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *common.Response) error {
 	if message.TypeOfMessage == "Put" { // Scrittura
-		kvs.Datastore[message.Args.Key] = message.Args.Value
-
-	} else if message.TypeOfMessage == "Delete" { // Scrittura
-		delete(kvs.Datastore, message.Args.Key)
-
-	} else if message.TypeOfMessage == "Get" { // Lettura
-		val, ok := kvs.Datastore[message.Args.Key]
-		if !ok {
-			kvs.printRed("NON ESEGUITO", message)
-			response.Result = false
+		if kvs.isEndKeyMessage(message) {
+			kvs.isAllEndKey()
 			return nil
 		}
 
-		response.Value = val
-		message.Args.Value = val //Fatto solo per DEBUG per il print
-	} else {
-		return fmt.Errorf("command not found")
+		kvs.Datastore[message.Args.Key] = message.GetValue()
+
+	} else if message.TypeOfMessage == "Delete" { // Scrittura
+		delete(kvs.Datastore, message.GetValue())
+
+	} else if message.TypeOfMessage == "Get" { // Lettura
+		val, ok := kvs.Datastore[message.GetValue()]
+		if !ok {
+			printRed("NON ESEGUITO", message, kvs)
+			if message.GetIdSender() == kvs.Id {
+				response.Result = false
+			}
+			return nil
+		}
+		if message.IdSender == kvs.Id { // Solo se io sono il sender imposto la risposta per il client
+			response.Value = val
+			message.Args.Value = val //Fatto solo per DEBUG per il print
+		}
 	}
 
-	kvs.printGreen("ESEGUITO", message)
-	response.Result = true
+	printGreen("ESEGUITO", message, kvs)
+
+	if message.IdSender == kvs.Id {
+		response.Result = true
+	}
+
 	return nil
+}
+
+func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc string) MessageS {
+	kvs.mutexClock.Lock()
+	defer kvs.mutexClock.Unlock()
+
+	kvs.LogicalClock++
+	numberAck := 0
+	if typeFunc == "Get" { // se è una get non serve aspettare ack
+		numberAck = common.Replicas
+	}
+
+	message := MessageS{common.GenerateUniqueID(), kvs.Id, typeFunc, args, kvs.LogicalClock, numberAck}
+
+	printDebugBlue("RICEVUTO da client", message, kvs)
+	return message
 }
