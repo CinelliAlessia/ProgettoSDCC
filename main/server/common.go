@@ -12,16 +12,7 @@ func sendToAllServer(rpcName string, message interface{}, response *common.Respo
 
 	// Itera su tutte le repliche e avvia le chiamate RPC
 	for i := 0; i < common.Replicas; i++ {
-		go func(i int) {
-			switch msg := message.(type) {
-			case MessageC:
-				callRPC(rpcName, msg, response, resultChan, i)
-			case MessageS:
-				callRPC(rpcName, msg, response, resultChan, i)
-			default:
-				resultChan <- fmt.Errorf("unsupported message type: %T", msg)
-			}
-		}(i)
+		go callRPC(rpcName, message, response, resultChan, i)
 	}
 
 	// Raccoglie i risultati dalle chiamate RPC
