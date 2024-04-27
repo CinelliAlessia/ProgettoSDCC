@@ -12,39 +12,63 @@ type Operation struct {
 	Value         string
 }
 
-// TODO: decidere quando fare endCall
 func testSequential(rpcName string, operations []Operation) {
 
-	endOps := []Operation{
-		{0, put, "endKey", "end"},
-		{1, put, "endKey", "end"},
-		{2, put, "endKey", "end"},
+	// serverTimestamps è una mappa che associa a ogni server un timestamp
+	serverTimestamps := make(map[int]int)
+	for i := 0; i < common.Replicas; i++ {
+		serverTimestamps[i] = 0
 	}
 
-	operations = append(operations, endOps...)
-
-	for _, operation := range operations {
-		fmt.Println(operation)
-	}
-
-	serverTimestamps := map[int]int{
-		0: 0,
-		1: 0,
-		2: 0,
-	}
-
-	responses := make([]common.Response, 3)
+	responses := make([]common.Response, common.Replicas)
 	var err error
 
+	// executeCall esegue una chiamata RPC al server specificato e restituisce la risposta
+	// in questo for vengono eseguite tutte le operazioni passate come argomento
+	// Async e specific sono due variabili booleane che indicano rispettivamente se la chiamata è sincrona o asincrona
+	// e se è indirizzata ad un server specifico o random
 	for _, operation := range operations {
 
-		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName, operation.OperationType,
-			operation.Key, operation.Value, serverTimestamps, Async)
+		args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: serverTimestamps[operation.ServerIndex]}
+		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, Async, specific)
+		serverTimestamps[operation.ServerIndex]++
+
 		if err != nil {
 			fmt.Println("Errore durante l'esecuzione di executeCall")
 			return
 		}
 	}
+
+	// ----- Da qui inseriamo le operazioni di fine ----- //
+
+	// timestamp è il massimo tra i timestamp dei server + 1
+	timestamp := 0
+	for i, _ := range serverTimestamps {
+		timestamp = common.Max(serverTimestamps[i], timestamp)
+	}
+	timestamp += 1
+
+	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
+	endOps := getEndOps()
+	for _, operation := range endOps {
+		args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: timestamp}
+		_, err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, Async, specific)
+		serverTimestamps[operation.ServerIndex] = timestamp + 1
+
+		if err != nil {
+			fmt.Println("Errore durante l'esecuzione di executeCall")
+			return
+		}
+	}
+}
+
+// getEndOps restituisce un array di operazioni di tipo put che vengono eseguite su tutti i server
+func getEndOps() []Operation {
+	var endOps []Operation
+	for i := 0; i < common.Replicas; i++ {
+		endOps = append(endOps, Operation{i, put, common.EndKey, common.EndValue})
+	}
+	return endOps
 }
 
 // basicTestSeq contatta tutti i server in goroutine con operazioni di put
@@ -93,17 +117,17 @@ func mediumTestSeq(rpcName string) {
 // In questo complexTestSeqNew vengono inviate in goroutine:
 //   - put x:1, put y:2, get x, put y:1 al server1,
 //   - put x:2, get x, get y, put x:3 al server2,
-//   - put x:4, get x, get y al server3.
+//   - put x:3, get x, get y al server3.
 func complexTestSeq(rpcName string) {
 	fmt.Println("In questo complexTestSeq vengono inviate in sequenza:\n" +
 		"- put x:1, put y:2, get x, put y:1 al server1\n" +
 		"- put x:2, get x, get y, put x:3 al server2\n" +
-		"- put x:4, get x, get y al server3")
+		"- put x:3, get x, get y al server3")
 
 	operations := []Operation{
 		{0, put, "x", "1"},
 		{1, put, "x", "2"},
-		{2, put, "x", "4"},
+		{2, put, "x", "3"},
 		{0, put, "y", "2"},
 		{ServerIndex: 1, OperationType: get, Key: "x"},
 		{ServerIndex: 2, OperationType: get, Key: "x"},
@@ -112,15 +136,7 @@ func complexTestSeq(rpcName string) {
 		{ServerIndex: 2, OperationType: get, Key: "y"},
 		{0, put, "y", "1"},
 		{1, put, "x", "3"},
-	}
-	testSequential(rpcName, operations)
-}
-
-func endCall(rpcName string, serverTimestamps map[int]int) {
-	operations := []Operation{
-		{0, put, "endKey", "end"},
-		{1, put, "endKey", "end"},
-		{2, put, "endKey", "end"},
+		{2, put, "x", "4"},
 	}
 	testSequential(rpcName, operations)
 }

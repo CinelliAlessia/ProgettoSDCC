@@ -14,38 +14,30 @@ type CausalOperation struct {
 }
 
 func testCausal(rpcName string, operations []CausalOperation) {
-	fmt.Println("In questo test vengono inviate in sequenza rispettando le dipendenze causali:")
-	//var operationChannels map[int]chan bool
 
-	serverTimestamps := map[int]int{
-		0: 0,
-		1: 0,
-		2: 0,
+	// serverTimestamps è una mappa che associa a ogni server un timestamp
+	serverTimestamps := make(map[int]int)
+	for i := 0; i < common.Replicas; i++ {
+		serverTimestamps[i] = 0
 	}
 
-	responses := make([]common.Response, 3)
+	responses := make([]common.Response, common.Replicas)
 	var err error
 
 	// Assume operations are sorted in the order they should be executed
-	for _ /*i*/, operation := range operations {
-		// Wait for all operations this operation depends on to complete
-		/*for _, dependency := range operation.DependsOn {
-			// Wait for operation with ID 'dependency' to complete
-			// This could be implemented with channels or other synchronization primitives
-			<-operationChannels[dependency]
-		}*/
+	for _, operation := range operations {
 
-		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName, operation.OperationType, operation.Key, operation.Value, serverTimestamps, Sync)
+		args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: serverTimestamps[operation.ServerIndex]}
+		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, Sync, specific)
+		serverTimestamps[operation.ServerIndex]++ // In caso sincrono? qui?
+
 		if err != nil {
 			fmt.Println("Errore durante l'esecuzione di executeCall")
 			return
 		}
-		// Signal that this operation has completed
-		// This could be implemented with channels or other synchronization primitives
-		//operationChannels[i] <- true
 	}
 
-	endCall(rpcName, serverTimestamps)
+	// ----- Da qui inseriamo le operazioni di fine ??? ----- //
 }
 
 // In questo basicTestCE vengono inviate in goroutine:
@@ -56,12 +48,6 @@ func basicTestCE(rpcName string) {
 	fmt.Println("In questo basicTestCE vengono inviate in goroutine:\n" +
 		"- una richiesta di put x:1 al server1\n" +
 		"- una richiesta di get x put y:2 al server2 (causa-effetto)")
-
-	/*operations := []CausalOperation{
-		{0, "put", "x", "1", nil},
-		{ServerIndex: 1, OperationType: "get", Key: "x", DependsOn: []int{0}},
-		{2, "put", "x", "2", []int{1}},
-	}*/
 
 	operations := []CausalOperation{
 		{0, put, "x", "1"},
@@ -82,12 +68,6 @@ func mediumTestCE(rpcName string) {
 		"- una richiesta di get x e put x:b al server2\n" +
 		"- una richiesta di get y e put y:a al server3")
 
-	/*{0, "put", "x", "1", nil},
-	{1, "get", "x", "", []int{0}},
-	{2, "put", "x", "2", []int{1}},
-	{0, "get", "x", "", []int{2}},
-	{1, "put", "x", "3", []int{3}},*/
-
 	operations := []CausalOperation{
 		{0, put, "x", "1"},
 		{ServerIndex: 1, OperationType: get, Key: "x"},
@@ -107,17 +87,6 @@ func complexTestCE(rpcName string) {
 		"- una richiesta di get y, se leggo y:c -> put x:b e get y al server1\n" +
 		"- una richiesta di put y:b, get x, get y, get x al server2\n" +
 		"- una richiesta di get x se leggo x:b -> put x:c, put y:c e get x al server3")
-
-	/*operations := []CausalOperation{
-		{0, put, "x", "1", nil},
-		{1, get, "x", "", []int{0}},
-		{2, put, "x", "2", []int{1}},
-		{0, get, "x", "", []int{2}},
-		{1, put, "x", "3", []int{3}},
-		{2, get, "x", "", []int{4}},
-		{0, put, "x", "4", []int{5}},
-		{1, get, "x", "", []int{6}},
-	}*/
 
 	operations := []CausalOperation{
 		{0, put, "x", "1"},
