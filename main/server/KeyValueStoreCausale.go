@@ -3,43 +3,12 @@ package main
 import (
 	"fmt"
 	"main/common"
-	"sync"
 )
-
-// KeyValueStoreCausale rappresenta la struttura di memorizzazione chiave-valore per garantire consistenza causale
-type KeyValueStoreCausale struct {
-	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-	Id        int               // Id che identifica il server stesso
-
-	VectorClock [common.Replicas]int // Orologio vettoriale
-	mutexClock  sync.Mutex
-
-	Queue      []MessageC
-	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
-
-	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
-}
-
-type MessageC struct {
-	Id       string // Id del messaggio stesso
-	IdSender int    // IdSender rappresenta l'indice del server che invia il messaggio
-
-	TypeOfMessage string
-	Args          common.Args
-
-	VectorClock [common.Replicas]int // Orologio vettoriale
-}
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
 
-	kvc.mutexClock.Lock()
-
-	kvc.VectorClock[kvc.Id]++
-	message := MessageC{common.GenerateUniqueID(), kvc.Id, "Get", args, kvc.VectorClock}
-	kvc.printDebugBlue("RICEVUTO da client", message)
-
-	kvc.mutexClock.Unlock()
+	message := kvc.createMessage(args, "Get")
 
 	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
 	if err != nil {
@@ -52,13 +21,7 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response) error {
 
-	kvc.mutexClock.Lock()
-
-	kvc.VectorClock[kvc.Id]++
-	message := MessageC{common.GenerateUniqueID(), kvc.Id, "Put", args, kvc.VectorClock}
-	kvc.printDebugBlue("RICEVUTO da client", message)
-
-	kvc.mutexClock.Unlock()
+	message := kvc.createMessage(args, "Put")
 
 	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
 	if err != nil {
@@ -71,13 +34,7 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Response) error {
 
-	kvc.mutexClock.Lock()
-
-	kvc.VectorClock[kvc.Id]++
-	message := MessageC{common.GenerateUniqueID(), kvc.Id, "Delete", args, kvc.VectorClock}
-	kvc.printDebugBlue("RICEVUTO da client", message)
-
-	kvc.mutexClock.Unlock()
+	message := kvc.createMessage(args, "Delete")
 
 	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
 	if err != nil {
@@ -99,7 +56,7 @@ func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common
 
 		val, ok := kvc.Datastore[message.Args.Key]
 		if !ok {
-			kvc.printRed("NON ESEGUITO", message)
+			printRed("NON ESEGUITO", message, kvc)
 			response.Result = false
 			return nil
 		}
@@ -109,7 +66,18 @@ func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common
 		return fmt.Errorf("command not found")
 	}
 
-	kvc.printGreen("ESEGUITO", message)
+	printGreen("ESEGUITO", message, kvc)
 	response.Result = true
 	return nil
+}
+
+func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string) MessageC {
+	kvc.mutexClock.Lock()
+	defer kvc.mutexClock.Unlock()
+
+	kvc.VectorClock[kvc.Id]++
+	message := MessageC{common.GenerateUniqueID(), kvc.Id, typeFunc, args, kvc.VectorClock}
+
+	printDebugBlue("RICEVUTO da client", message, kvc)
+	return message
 }
