@@ -16,7 +16,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 
 	// Solo per DEBUG
 	if kvc.Id != message.IdSender {
-		kvc.printDebugBlue("RICEVUTO da server", message)
+		printDebugBlue("RICEVUTO da server", message, kvc)
 	}
 
 	// Ciclo finché controlSendToApplication restituisce true
