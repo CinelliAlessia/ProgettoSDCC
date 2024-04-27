@@ -96,7 +96,6 @@ func sequential(rpcName string) {
 			fmt.Println()
 			return
 		}
-		//endCall(rpcName)
 		time.Sleep(5000 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
 	}
 }
@@ -131,12 +130,11 @@ func causal(rpcName string) {
 			complexTestCE(rpcName)
 			break
 		case 4:
-			//endCall(rpcName)
 			fmt.Println()
 			return
 		}
 
-		time.Sleep(100 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
+		time.Sleep(5000 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
 	}
 }
 
@@ -179,6 +177,26 @@ func specificConnect(index int) *rpc.Client {
 		return nil
 	}
 	return conn
+}
+
+// executeCall esegue un comando ad un server specifico. Il comando da eseguire viene specificato tramite i parametri inseriti
+// si occupa di eseguire le operazioni di put, get e del, in maniera sync o async e incrementa il timestamp dello specifico client
+func executeCall(index int, rpcName string, args common.Args, opType CallType, specOrRandom string) (common.Response, error) {
+	response := common.Response{}
+	var err error
+
+	switch specOrRandom {
+	case specific:
+		err = executeSpecificCall(index, rpcName, args, &response, opType)
+	case random:
+		err = executeRandomCall(rpcName, args, &response, opType)
+	}
+
+	if err != nil {
+		return response, err
+	}
+
+	return response, nil
 }
 
 // executeRandomCall:
@@ -268,11 +286,13 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 
 	go func() {
 		<-call.Done // Aspetta che la chiamata RPC sia completata
+		debugPrintResponse(rpcName, args, *response)
+
 		if call.Error != nil {
 			fmt.Printf("errore durante la chiamata RPC in client.call: %s\n", call.Error)
 			response.Done <- false
 		} else {
-			debugPrintResponse(rpcName, args, *response)
+			//debugPrintResponse(rpcName, args, *response)
 			response.Done <- true
 		}
 
@@ -283,42 +303,6 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 	}()
 
 	return nil
-}
-
-// executeCall esegue un comando ad un server specifico. Il comando da eseguire viene specificato tramite i parametri inseriti
-// si occupa di eseguire le operazioni di put, get e del, in maniera sync o async e incrementa il timestamp dello specifico client
-func executeCall(index int, rpcName string, operationType string, args common.Args, opType CallType, specOrRandom string) (common.Response, error) {
-	response := common.Response{}
-	var err error
-
-	switch operationType {
-	case put:
-		if specOrRandom == specific {
-			err = executeSpecificCall(index, rpcName+put, args, &response, opType)
-		} else if specOrRandom == random {
-			err = executeRandomCall(rpcName+put, args, &response, opType)
-		}
-	case get:
-		if specOrRandom == specific {
-			err = executeSpecificCall(index, rpcName+get, args, &response, opType)
-		} else if specOrRandom == random {
-			err = executeRandomCall(rpcName+get, args, &response, opType)
-		}
-	case del:
-		if specOrRandom == specific {
-			err = executeSpecificCall(index, rpcName+del, args, &response, opType)
-		} else if specOrRandom == random {
-			err = executeRandomCall(rpcName+del, args, &response, opType)
-		}
-	default:
-		// gestisci i casi non previsti
-	}
-
-	if err != nil {
-		return response, err
-	}
-
-	return response, nil
 }
 
 /* ----- FUNZIONI PER PRINT DI DEBUG ----- */
@@ -350,7 +334,7 @@ func debugPrintResponse(rpcName string, args common.Args, response common.Respon
 
 	switch name {
 	case put:
-		fmt.Println(color.GreenString("RISPOSTA Put"), "key:"+args.Key, "value:"+args.Value, "result:", response.Result)
+		fmt.Println(color.GreenString("RISPOSTA Put"), "key:"+args.Key, "value:"+args.Value)
 	case get:
 		if response.Result {
 			fmt.Println(color.GreenString("RISPOSTA Get"), "key:"+args.Key, "response:"+response.Value)
@@ -358,7 +342,11 @@ func debugPrintResponse(rpcName string, args common.Args, response common.Respon
 			fmt.Println(color.RedString("RISPOSTA Get fallita"), "key:"+args.Key)
 		}
 	case del:
-		fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.Key, "result:", response.Result)
+		if response.Result {
+			fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.Key)
+		} else {
+			fmt.Println(color.RedString("RISPOSTA Delete fallita"), "key:"+args.Key)
+		}
 	default:
 		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
 	}
