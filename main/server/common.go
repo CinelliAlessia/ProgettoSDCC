@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"main/common"
+	message2 "main/server/message"
 	"net/rpc"
 )
 
@@ -41,9 +42,9 @@ func callRPC(rpcName string, message interface{}, response *common.Response, res
 
 	common.RandomDelay()
 	switch msg := message.(type) {
-	case MessageC:
+	case message2.MessageC:
 		err = conn.Call(rpcName, msg, response)
-	case MessageS:
+	case message2.MessageS:
 		err = conn.Call(rpcName, msg, response)
 	default:
 		resultChan <- fmt.Errorf("unsupported message type: %T", msg)

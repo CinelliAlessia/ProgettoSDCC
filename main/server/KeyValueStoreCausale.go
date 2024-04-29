@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"main/common"
+	"main/server/message"
 )
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
@@ -10,7 +11,7 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 	message := kvc.createMessage(args, get)
 
-	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
+	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.Result = false
 		return err
@@ -23,7 +24,7 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 	message := kvc.createMessage(args, put)
 
-	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
+	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.Result = false
 		return err
@@ -36,7 +37,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 	message := kvc.createMessage(args, del)
 
-	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", message, response)
+	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.Result = false
 		return err
@@ -45,7 +46,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente
-func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common.Response) error {
+func (kvc *KeyValueStoreCausale) realFunction(message *msg.MessageC, response *common.Response) error {
 	if message.GetTypeOfMessage() == put { // Scrittura
 		kvc.GetDatastore()[message.GetKey()] = message.GetValue()
 
@@ -56,31 +57,31 @@ func (kvc *KeyValueStoreCausale) realFunction(message MessageC, response *common
 
 		val, ok := kvc.GetDatastore()[message.GetKey()]
 		if !ok {
-			printRed("NON ESEGUITO", message, kvc)
+			printRed("NON ESEGUITO", *message, kvc, nil)
 			response.Result = false
 			return nil
 		}
 		response.Value = val
-		//SetValue(message, val)
-		message.Common.Args.Value = val //Fatto solo per DEBUG per il print
+		message.SetValue(val) //Fatto solo per DEBUG per il print
+		//message.Common.Args.Value = val
 	} else {
 		return fmt.Errorf("command not found")
 	}
 
-	printGreen("ESEGUITO", message, kvc)
+	printGreen("ESEGUITO", *message, kvc, nil)
 	response.Result = true
 	return nil
 }
 
-func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string) MessageC {
+func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string) *msg.MessageC {
 	kvc.mutexClock.Lock()
 	defer kvc.mutexClock.Unlock()
 
 	//kvc.VectorClock[kvc.GetIdServer()]++
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
 
-	message := newMessageCau(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
+	message := msg.NewMessageCau(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
 
-	printDebugBlue("RICEVUTO da client", message, kvc)
+	printDebugBlue("RICEVUTO da client", *message, kvc, nil)
 	return message
 }

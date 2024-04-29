@@ -26,7 +26,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 				serverTimestamps[op.ServerIndex]++ // In caso sincrono? qui?
 
 				if err != nil {
-					fmt.Println("Errore durante l'esecuzione di executeCall")
+					fmt.Println("testCausal: Errore durante l'esecuzione di executeCall:", err)
 					return
 				}
 			}

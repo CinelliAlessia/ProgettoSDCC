@@ -2,6 +2,7 @@ package main
 
 import (
 	"main/common"
+	"main/server/message"
 )
 
 // Get gestisce una chiamata RPC di un evento interno, genera un messaggio e allega il suo clock scalare.
@@ -35,7 +36,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
+	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", *message, response)
 	if err != nil {
 		response.Result = false
 		return err
@@ -50,7 +51,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", message, response)
+	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", *message, response)
 	if err != nil {
 		response.Result = false
 		return err
@@ -62,7 +63,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 // inserendo la risposta adeguata nella struttura common.Response
 // Se l'operazione è andata a buon fine, restituisce true, altrimenti restituisce false,
 // sarà la risposta che leggerà il client
-func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) realFunction(message *msg.MessageS, response *common.Response) error {
 	if message.GetTypeOfMessage() == put { // Scrittura
 		if kvs.isEndKeyMessage(message) {
 			kvs.isAllEndKey()
@@ -78,7 +79,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *com
 	} else if message.GetTypeOfMessage() == get { // Lettura
 		val, ok := kvs.GetDatastore()[message.GetValue()]
 		if !ok {
-			printRed("NON ESEGUITO", &message, kvs)
+			printRed("NON ESEGUITO", *message, nil, kvs)
 			if message.GetIdSender() == kvs.GetIdServer() {
 				response.Result = false
 			}
@@ -86,11 +87,11 @@ func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *com
 		}
 		if message.GetIdSender() == kvs.GetIdServer() { // Solo se io sono il sender imposto la risposta per il client
 			response.Value = val
-			SetValue(&message, val) //Fatto solo per DEBUG per il print
+			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
 	}
 
-	printGreen("ESEGUITO", message, kvs)
+	printGreen("ESEGUITO", *message, nil, kvs)
 
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.Result = true
@@ -99,7 +100,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *com
 	return nil
 }
 
-func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc string) MessageS {
+func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc string) *msg.MessageS {
 	kvs.mutexClock.Lock()
 	defer kvs.mutexClock.Unlock()
 
@@ -111,8 +112,8 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 		numberAck = common.Replicas
 	}
 
-	message := newMessageSeq(kvs.GetIdServer(), typeFunc, args, kvs.GetClock(), numberAck)
+	message := msg.NewMessageSeq(kvs.GetIdServer(), typeFunc, args, kvs.GetClock(), numberAck)
 
-	printDebugBlue("RICEVUTO da client", message, kvs)
+	printDebugBlue("RICEVUTO da client", *message, nil, kvs)
 	return message
 }

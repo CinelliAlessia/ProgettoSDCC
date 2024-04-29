@@ -269,7 +269,7 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 		debugPrintResponse(rpcName, args, *response)
 
 		if call.Error != nil {
-			fmt.Printf("asyncCall: errore durante la chiamata RPC in client.call: %s\n", call.Error)
+			fmt.Printf("asyncCall: errore durante la chiamata RPC in client: %s\n", call.Error)
 			response.Done <- false
 		} else {
 			//debugPrintResponse(rpcName, args, *response)
@@ -278,7 +278,7 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 
 		err := conn.Close()
 		if err != nil {
-			fmt.Printf("asyncCall: errore durante la chiusura della connessione in client.call: %s\n", err)
+			fmt.Printf("asyncCall: errore durante la chiusura della connessione in client: %s\n", err)
 		}
 	}()
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"main/common"
+	"main/server/message"
 	"sync"
 )
 
@@ -20,50 +21,70 @@ type ClientMap struct {
 
 // KeyValueStoreCausale rappresenta la struttura di memorizzazione chiave-valore per garantire consistenza causale
 type KeyValueStoreCausale struct {
-	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-	Id        int               // Id che identifica il server stesso
+	Common KeyValueStore
 
 	VectorClock [common.Replicas]int // Orologio vettoriale
 	mutexClock  sync.Mutex
 
-	Queue      []MessageC
+	Queue      []msg.MessageC
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
 	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
-	//clientMap map[string]ClientMap // Mappa -> struttura dati che associa chiavi a valori
 }
 
 // KeyValueStoreSequential rappresenta il servizio di memorizzazione chiave-valore specializzato nel sequenziale
 type KeyValueStoreSequential struct {
-	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-	Id        int               // Id che identifica il server stesso
+	Common KeyValueStore
 
 	LogicalClock int // Orologio logico scalare
 	mutexClock   sync.Mutex
 
-	Queue      []MessageS
+	Queue      []msg.MessageS
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
 	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
+}
+
+type KeyValueStore struct {
+	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
+	Id        int               // Id che identifica il server stesso
+
 	//clientMap map[string]ClientMap // Mappa -> struttura dati che associa chiavi a valori
 }
 
 // ----- Consistenza Causale ----- //
 
+func NewKeyValueStoreCausal(idServer int) *KeyValueStoreCausale {
+	kvc := &KeyValueStoreCausale{
+		Common: KeyValueStore{
+			Datastore: make(map[string]string),
+		},
+	}
+
+	for i := 0; i < common.Replicas; i++ {
+		kvc.SetVectorClock(0, 0) // Inizializzazione dell'orologio logico vettoriale
+	}
+
+	kvc.SetQueue(make([]msg.MessageC, 0)) // Inizializzazione della coda
+	kvc.SetIdServer(idServer)
+
+	return kvc
+}
+
 func (kvc *KeyValueStoreCausale) SetDatastore(key string, value string) {
-	kvc.Datastore[key] = value
+	kvc.Common.Datastore[key] = value
 }
 
 func (kvc *KeyValueStoreCausale) SetVectorClock(index int, value int) {
 	kvc.VectorClock[index] = value
 }
 
-func (kvc *KeyValueStoreCausale) SetQueue(queue []MessageC) {
+func (kvc *KeyValueStoreCausale) SetQueue(queue []msg.MessageC) {
 	kvc.Queue = queue
 }
 
 func (kvc *KeyValueStoreCausale) SetIdServer(id int) {
-	kvc.Id = id
+	kvc.Common.Id = id
 }
 
 func (kvc *KeyValueStoreCausale) GetClock() [common.Replicas]int {
@@ -71,33 +92,46 @@ func (kvc *KeyValueStoreCausale) GetClock() [common.Replicas]int {
 }
 
 func (kvc *KeyValueStoreCausale) GetDatastore() map[string]string {
-	return kvc.Datastore
+	return kvc.Common.Datastore
 }
 
-func (kvc *KeyValueStoreCausale) GetQueue() []MessageC {
+func (kvc *KeyValueStoreCausale) GetQueue() []msg.MessageC {
 	return kvc.Queue
 }
 
 func (kvc *KeyValueStoreCausale) GetIdServer() int {
-	return kvc.Id
+	return kvc.Common.Id
 }
 
 // ----- Consistenza Sequenziale ----- //
 
+func NewKeyValueStoreSequential(idServer int) *KeyValueStoreSequential {
+	kvSequential := &KeyValueStoreSequential{
+		Common: KeyValueStore{
+			Datastore: make(map[string]string),
+		},
+	}
+	kvSequential.SetLogicalClock(0)                // Inizializzazione dell'orologio logico scalare
+	kvSequential.SetQueue(make([]msg.MessageS, 0)) // Inizializzazione della coda
+	kvSequential.SetIdServer(idServer)
+
+	return kvSequential
+}
+
 func (kvs *KeyValueStoreSequential) SetDatastore(key string, value string) {
-	kvs.Datastore[key] = value
+	kvs.Common.Datastore[key] = value
 }
 
 func (kvs *KeyValueStoreSequential) SetLogicalClock(logicalClock int) {
 	kvs.LogicalClock = logicalClock
 }
 
-func (kvs *KeyValueStoreSequential) SetQueue(queue []MessageS) {
+func (kvs *KeyValueStoreSequential) SetQueue(queue []msg.MessageS) {
 	kvs.Queue = queue
 }
 
 func (kvs *KeyValueStoreSequential) SetIdServer(id int) {
-	kvs.Id = id
+	kvs.Common.Id = id
 }
 
 func (kvs *KeyValueStoreSequential) GetClock() int {
@@ -105,15 +139,15 @@ func (kvs *KeyValueStoreSequential) GetClock() int {
 }
 
 func (kvs *KeyValueStoreSequential) GetDatastore() map[string]string {
-	return kvs.Datastore
+	return kvs.Common.Datastore
 }
 
-func (kvs *KeyValueStoreSequential) GetQueue() []MessageS {
+func (kvs *KeyValueStoreSequential) GetQueue() []msg.MessageS {
 	return kvs.Queue
 }
 
 func (kvs *KeyValueStoreSequential) GetIdServer() int {
-	return kvs.Id
+	return kvs.Common.Id
 }
 
 /*

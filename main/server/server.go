@@ -42,25 +42,10 @@ func main() {
 	// Inizializzazione delle strutture
 
 	// ----- CONSISTENZA CAUSALE -----
-	kvCausale := &KeyValueStoreCausale{
-		Datastore:   make(map[string]string),
-		VectorClock: [common.Replicas]int{}, // Array di lunghezza fissa inizializzato a zero
-		Queue:       make([]MessageC, 0),
-		Id:          id,
-	}
+	kvCausale := NewKeyValueStoreCausal(id)
 
 	// ----- CONSISTENZA SEQUENZIALE -----
-	kvSequential := &KeyValueStoreSequential{
-		Datastore:    make(map[string]string),
-		LogicalClock: 0, // Inizializzazione dell'orologio logico scalare
-		Queue:        make([]MessageS, 0),
-		Id:           id,
-
-		/*fifo: orderingFIFO{
-			receiveAssumeFIFO:      0,
-			sendAssumeFIFO:         [Common.Replicas]int{},
-		},*/
-	}
+	kvSequential := NewKeyValueStoreSequential(id)
 
 	// Registrazione dei servizi RPC
 	err = rpc.RegisterName("KeyValueStoreCausale", kvCausale)
