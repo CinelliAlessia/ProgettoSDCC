@@ -20,3 +20,59 @@ type KeyValueStoreService interface {
 	Put(args Args, reply *Response) error
 	Delete(args Args, reply *Response) error
 }
+
+/* ARGS STRUCT */
+
+func newArgs() Args {
+	return Args{}
+}
+
+func (args *Args) SetKey(key string) {
+	args.Key = key
+}
+
+func (args *Args) SetValue(value string) {
+	args.Value = value
+}
+
+func (args *Args) SetTimestamp(timestamp int) {
+	args.Timestamp = timestamp
+}
+
+func (args *Args) GetKey() string {
+	return args.Key
+}
+
+func (args *Args) GetValue() string {
+	return args.Value
+}
+
+func (args *Args) GetTimestamp() int {
+	return args.Timestamp
+}
+
+/* RESPONDE STRUCT */
+
+func (response *Response) SetValue(value string) {
+	response.Value = value
+}
+
+func (response *Response) SetResult(result bool) {
+	response.Result = result
+}
+
+func (response *Response) SetDone(done chan bool) {
+	response.Done = done
+}
+
+func (response *Response) GetValue() string {
+	return response.Value
+}
+
+func (response *Response) GetResult() bool {
+	return response.Result
+}
+
+func (response *Response) GetDone() chan bool {
+	return response.Done
+}

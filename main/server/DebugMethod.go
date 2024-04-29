@@ -20,7 +20,7 @@ func printDebugBlue(blueString string, message Message, clockServer ClockServer)
 		formattedTime := now.Format(layoutTime)
 
 		fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "clockClient", message.GetOrderClient(),
-			"clockMsg:", message.GetClock(), "clockServer:", clockServer.GetClock(), formattedTime)
+			/*"clockMsg:", message.GetClock(), "clockServer:", clockServer.GetClock(), */ formattedTime)
 	}
 }
 
@@ -31,13 +31,7 @@ func printGreen(greenString string, message Message, clockServer ClockServer) {
 	formattedTime := now.Format(layoutTime)
 
 	fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "clockClient", message.GetOrderClient(),
-		"clockMsg:", message.GetClock(), "clockServer:", clockServer.GetClock(), "idSender", message.GetIdSender(), formattedTime)
-}
-
-func printDebugBlueArgs(blueString string, args common.Args) {
-	if common.GetDebug() {
-		fmt.Println(color.BlueString(blueString), args.Key+":"+args.Value, "msg clock:", args.Timestamp)
-	}
+		/*"clockMsg:", message.GetClock(), "clockServer:", clockServer.GetClock(),*/ "idSender", message.GetIdSender(), formattedTime)
 }
 
 func printRed(redString string, message Message, clockServer ClockServer) {
@@ -48,5 +42,5 @@ func printRed(redString string, message Message, clockServer ClockServer) {
 	formattedTime := now.Format(layoutTime)
 
 	fmt.Println(color.GreenString(redString), message.GetTypeOfMessage(), message.GetKey(), "datastore:", clockServer.GetDatastore(),
-		"clockMsg:", message.GetClock(), "clockServer:", clockServer.GetClock(), formattedTime)
+		/*"clockMsg:", message.GetClock(), "clockServer:", clockServer.GetClock(),*/ formattedTime)
 }

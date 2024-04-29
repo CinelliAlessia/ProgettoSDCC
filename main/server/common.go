@@ -6,6 +6,12 @@ import (
 	"net/rpc"
 )
 
+const (
+	put = "Put"
+	get = "Get"
+	del = "Delete"
+)
+
 func sendToAllServer(rpcName string, message interface{}, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)

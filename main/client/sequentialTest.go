@@ -5,13 +5,6 @@ import (
 	"main/common"
 )
 
-type Operation struct {
-	ServerIndex   int
-	OperationType string
-	Key           string
-	Value         string
-}
-
 func testSequential(rpcName string, operations []Operation) {
 
 	// serverTimestamps è una mappa che associa a ogni server un timestamp
@@ -19,22 +12,21 @@ func testSequential(rpcName string, operations []Operation) {
 	for i := 0; i < common.Replicas; i++ {
 		serverTimestamps[i] = 0
 	}
-
-	responses := make([]common.Response, common.Replicas)
+	responses := [common.Replicas]common.Response{}
 	var err error
 
 	// executeCall esegue una chiamata RPC al server specificato e restituisce la risposta
 	// in questo for vengono eseguite tutte le operazioni passate come argomento
-	// Async e specific sono due variabili booleane che indicano rispettivamente se la chiamata è sincrona o asincrona
+	// async e specific sono due variabili booleane che indicano rispettivamente se la chiamata è sincrona o asincrona
 	// e se è indirizzata ad un server specifico o random
 	for _, operation := range operations {
 
 		args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: serverTimestamps[operation.ServerIndex]}
-		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, Async, specific)
+		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
 		serverTimestamps[operation.ServerIndex]++
 
 		if err != nil {
-			fmt.Println("Errore durante l'esecuzione di executeCall")
+			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
 			return
 		}
 	}
@@ -52,11 +44,11 @@ func testSequential(rpcName string, operations []Operation) {
 	endOps := getEndOps()
 	for _, operation := range endOps {
 		args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: timestamp}
-		_, err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, Async, specific)
+		_, err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
 		serverTimestamps[operation.ServerIndex] = timestamp + 1
 
 		if err != nil {
-			fmt.Println("Errore durante l'esecuzione di executeCall")
+			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
 			return
 		}
 	}

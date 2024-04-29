@@ -55,9 +55,12 @@ func main() {
 		LogicalClock: 0, // Inizializzazione dell'orologio logico scalare
 		Queue:        make([]MessageS, 0),
 		Id:           id,
-	}
 
-	//go printDatastoreOnChange(kvSequential)
+		/*fifo: orderingFIFO{
+			receiveAssumeFIFO:      0,
+			sendAssumeFIFO:         [Common.Replicas]int{},
+		},*/
+	}
 
 	// Registrazione dei servizi RPC
 	err = rpc.RegisterName("KeyValueStoreCausale", kvCausale)
@@ -79,10 +82,6 @@ func main() {
 		return
 	}
 
-	// Avvio della goroutine per stampare la coda e il datastore
-	//go printQueue(kvSequential)
-	//go printDatastore(kvSequential)
-
 	// Ciclo per accettare e gestire le connessioni in arrivo in maniera asincrona
 	for {
 		conn, err := listener.Accept()
@@ -103,64 +102,5 @@ func main() {
 				}
 			}()
 		}(conn)
-	}
-}
-
-// Funzione debug: Stampa la queue del server replica
-func printQueue(kv interface{}) {
-	switch kv := kv.(type) {
-	case *KeyValueStoreSequential:
-		// Controllo se il queue è vuoto
-		if len(kv.Queue) == 0 {
-			fmt.Println("Queue vuota")
-			return
-		}
-		fmt.Println("Queue:", kv.Queue)
-	case *KeyValueStoreCausale:
-		// Controllo se il questa è vuoto
-		if len(kv.Queue) == 0 {
-			fmt.Println("Queue vuota")
-			return
-		}
-		fmt.Println("Queue:", kv.Queue)
-	default:
-		fmt.Println("Tipo di KeyValueStore non supportato")
-	}
-}
-
-// Funzione debug: Stampa il datastore del server replica
-func printDatastore(kv interface{}) {
-	switch kv := kv.(type) {
-	case *KeyValueStoreSequential:
-		// Controllo se il datastore è vuoto
-		if len(kv.Datastore) == 0 {
-			fmt.Println("Datastore vuota")
-			return
-		}
-		fmt.Println("Datastore:", kv.Datastore)
-	case *KeyValueStoreCausale:
-		// Controllo se il datastore è vuoto
-		if len(kv.Datastore) == 0 {
-			fmt.Println("Datastore vuota")
-			return
-		}
-		fmt.Println("Datastore:", kv.Datastore)
-	default:
-		fmt.Println("Tipo di KeyValueStore non supportato")
-	}
-}
-
-func printDatastoreOnChange(kv *KeyValueStoreSequential) {
-	prevClock := kv.LogicalClock
-
-	for {
-		// Se il valore dell'orologio logico è cambiato, stampa il datastore
-		if kv.LogicalClock != prevClock {
-			fmt.Printf("Datastore cambiato clock: %d, datastore:\n", kv.LogicalClock)
-			for key, value := range kv.Datastore {
-				fmt.Printf("%s: %s\n", key, value)
-			}
-			prevClock = kv.LogicalClock
-		}
 	}
 }

@@ -3,30 +3,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"main/common"
 	"math/rand"
 	"net/rpc"
-	"strings"
 	"time"
-)
-
-const (
-	put = ".Put"
-	get = ".Get"
-	del = ".Delete"
-)
-
-type CallType int
-
-const (
-	Sync CallType = iota
-	Async
-)
-
-const (
-	random   = "random"
-	specific = "specific"
 )
 
 func main() {
@@ -152,7 +132,7 @@ func randomConnect() *rpc.Client {
 	conn, err := rpc.Dial("tcp", serverName)
 
 	if err != nil {
-		fmt.Println("CLIENT: Errore durante la connessione al server:", err)
+		fmt.Println("randomConnect: Errore durante la connessione al server:", err)
 		return nil
 	}
 	return conn
@@ -173,7 +153,7 @@ func specificConnect(index int) *rpc.Client {
 	conn, err := rpc.Dial("tcp", serverName)
 
 	if err != nil {
-		fmt.Println("CLIENT: Errore durante la connessione al server:", err)
+		fmt.Println("specificConnect: Errore durante la connessione al server:", err)
 		return nil
 	}
 	return conn
@@ -181,7 +161,7 @@ func specificConnect(index int) *rpc.Client {
 
 // executeCall esegue un comando ad un server specifico. Il comando da eseguire viene specificato tramite i parametri inseriti
 // si occupa di eseguire le operazioni di put, get e del, in maniera sync o async e incrementa il timestamp dello specifico client
-func executeCall(index int, rpcName string, args common.Args, opType CallType, specOrRandom string) (common.Response, error) {
+func executeCall(index int, rpcName string, args common.Args, opType string, specOrRandom string) (common.Response, error) {
 	response := common.Response{}
 	var err error
 
@@ -201,20 +181,20 @@ func executeCall(index int, rpcName string, args common.Args, opType CallType, s
 
 // executeRandomCall:
 //   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
-func executeRandomCall(rpcName string, args common.Args, response *common.Response, opType CallType) error {
+func executeRandomCall(rpcName string, args common.Args, response *common.Response, opType string) error {
 	conn := randomConnect()
 	if conn == nil {
-		return fmt.Errorf("executeSpecificCall: Errore durante la connessione con un server random\n")
+		return fmt.Errorf("executeRandomCall: Errore durante la connessione con un server random\n")
 	}
 
 	switch opType {
-	case Sync:
+	case sync:
 		// Esegui l'operazione in modo sincrono
 		err := syncCall(conn, args, response, rpcName)
 		if err != nil {
 			return err
 		}
-	case Async:
+	case async:
 		// Esegui l'operazione in modo asincrono
 		err := asyncCall(conn, args, response, rpcName)
 		if err != nil {
@@ -230,7 +210,7 @@ func executeRandomCall(rpcName string, args common.Args, response *common.Respon
 // executeSpecificCall:
 //   - index rappresenta l'indice relativo al server da contattare, da 0 a (common.Replicas-1)
 //   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
-func executeSpecificCall(index int, rpcName string, args common.Args, response *common.Response, opType CallType) error {
+func executeSpecificCall(index int, rpcName string, args common.Args, response *common.Response, opType string) error {
 
 	conn := specificConnect(index)
 	if conn == nil {
@@ -238,13 +218,13 @@ func executeSpecificCall(index int, rpcName string, args common.Args, response *
 	}
 
 	switch opType {
-	case Sync:
+	case sync:
 		// Esegui l'operazione in modo sincrono
 		err := syncCall(conn, args, response, rpcName)
 		if err != nil {
 			return err
 		}
-	case Async:
+	case async:
 		// Esegui l'operazione in modo asincrono
 		err := asyncCall(conn, args, response, rpcName)
 		if err != nil {
@@ -265,14 +245,14 @@ func syncCall(conn *rpc.Client, args common.Args, response *common.Response, rpc
 	// Effettua la chiamata RPC
 	err := conn.Call(rpcName, args, response)
 	if err != nil {
-		return fmt.Errorf("errore durante la chiamata RPC in client.call: %s\n", err)
+		return fmt.Errorf("syncCall: errore durante la chiamata RPC in client.call: %s\n", err)
 	}
 
 	debugPrintResponse(rpcName, args, *response)
 
 	err = conn.Close()
 	if err != nil {
-		return fmt.Errorf("errore durante la chiusura della connessione in client.call: %s\n", err)
+		return fmt.Errorf("syncCall: errore durante la chiusura della connessione in client.call: %s\n", err)
 	}
 	return nil
 }
@@ -289,7 +269,7 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 		debugPrintResponse(rpcName, args, *response)
 
 		if call.Error != nil {
-			fmt.Printf("errore durante la chiamata RPC in client.call: %s\n", call.Error)
+			fmt.Printf("asyncCall: errore durante la chiamata RPC in client.call: %s\n", call.Error)
 			response.Done <- false
 		} else {
 			//debugPrintResponse(rpcName, args, *response)
@@ -298,56 +278,9 @@ func asyncCall(conn *rpc.Client, args common.Args, response *common.Response, rp
 
 		err := conn.Close()
 		if err != nil {
-			fmt.Printf("errore durante la chiusura della connessione in client.call: %s\n", err)
+			fmt.Printf("asyncCall: errore durante la chiusura della connessione in client.call: %s\n", err)
 		}
 	}()
 
 	return nil
-}
-
-/* ----- FUNZIONI PER PRINT DI DEBUG ----- */
-
-func debugPrintRun(rpcName string, args common.Args) {
-	if common.GetDebug() {
-		debugName := strings.SplitAfter(rpcName, ".")
-		name := "." + debugName[1]
-
-		switch name {
-		case put:
-			fmt.Println(color.BlueString("RUN Put"), args.Key+":"+args.Value)
-		case get:
-			fmt.Println(color.BlueString("RUN Get"), args.Key)
-		case del:
-			fmt.Println(color.BlueString("RUN Delete"), args.Key)
-		default:
-			fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
-		}
-	} else {
-		return
-	}
-}
-
-func debugPrintResponse(rpcName string, args common.Args, response common.Response) {
-
-	debugName := strings.SplitAfter(rpcName, ".")
-	name := "." + debugName[1]
-
-	switch name {
-	case put:
-		fmt.Println(color.GreenString("RISPOSTA Put"), "key:"+args.Key, "value:"+args.Value)
-	case get:
-		if response.Result {
-			fmt.Println(color.GreenString("RISPOSTA Get"), "key:"+args.Key, "response:"+response.Value)
-		} else {
-			fmt.Println(color.RedString("RISPOSTA Get fallita"), "key:"+args.Key)
-		}
-	case del:
-		if response.Result {
-			fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.Key)
-		} else {
-			fmt.Println(color.RedString("RISPOSTA Delete fallita"), "key:"+args.Key)
-		}
-	default:
-		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
-	}
 }

@@ -15,7 +15,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 	kvc.addToQueue(message)
 
 	// Solo per DEBUG
-	if kvc.Id != message.IdSender {
+	if kvc.GetIdServer() != message.GetIdSender() {
 		printDebugBlue("RICEVUTO da server", message, kvc)
 	}
 
@@ -46,7 +46,9 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message MessageC, resp
 func (kvc *KeyValueStoreCausale) addToQueue(message MessageC) {
 	kvc.mutexQueue.Lock()
 	defer kvc.mutexQueue.Unlock()
-	kvc.Queue = append(kvc.Queue, message)
+
+	kvc.SetQueue(append(kvc.GetQueue(), message))
+	//kvc.Queue = append(kvc.Queue, message)
 }
 
 // controlSendToApplication realizza questo controllo:
@@ -58,33 +60,36 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message MessageC) bool
 	result := false
 
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
-	if (message.IdSender != kvc.Id) && (message.VectorClock[message.IdSender] == (kvc.VectorClock[message.IdSender] + 1)) {
+	if (message.GetIdSender() != kvc.GetIdServer()) && (message.GetClock()[message.GetIdSender()] == (kvc.GetClock()[message.GetIdSender()] + 1)) {
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
-		for index := range message.VectorClock {
-			if (index != message.IdSender) && (index != kvc.Id) && (message.VectorClock[index] > kvc.VectorClock[index]) {
+		for index := range message.GetClock() {
+			if (index != message.GetIdSender()) && (index != kvc.GetIdServer()) && (message.GetClock()[index] > kvc.GetClock()[index]) {
 				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
 				//fmt.Println("non ho ancora visto dei messaggi", "msg", message.VectorClock, "mio", kvc.VectorClock)
 				result = false
 			}
 		}
 		result = true
-	} else if message.IdSender == kvc.Id { //Ho "ricevuto" una mia richiesta -> è possibile processarla
+	} else if message.GetIdSender() == kvc.GetIdServer() { //Ho "ricevuto" una mia richiesta -> è possibile processarla
 		result = true
 	}
 
-	if message.TypeOfMessage == "Get" && result {
+	if message.GetTypeOfMessage() == get && result {
 		// Se è un evento di lettura, controllo se la chiave è presente nel mio datastore
 		// Se non c'è aspetterò fin quando non verrà inserita
-		_, result = kvc.Datastore[message.Args.Key]
+		_, result = kvc.GetDatastore()[message.GetKey()]
 	}
 
 	if result {
 		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
 		// Aggiorno il mio orologio vettoriale
-		if message.IdSender != kvc.Id {
+		if message.GetIdSender() != kvc.Id {
 			kvc.mutexClock.Lock()
-			kvc.VectorClock[message.IdSender] += 1
+
+			kvc.SetVectorClock(message.GetIdSender(), kvc.GetClock()[message.GetIdSender()]+1)
+
+			//kvc.VectorClock[message.GetIdSender()] += 1
 			kvc.mutexClock.Unlock()
 		}
 
@@ -102,11 +107,12 @@ func (kvc *KeyValueStoreCausale) removeMessageToQueue(message MessageC) {
 	kvc.mutexQueue.Lock()
 	defer kvc.mutexQueue.Unlock()
 
-	for i, m := range kvc.Queue {
-		if m.Id == message.Id {
-			kvc.Queue = append(kvc.Queue[:i], kvc.Queue[i+1:]...)
+	for i, m := range kvc.GetQueue() {
+		if m.GetIdMessage() == message.GetIdMessage() {
+			kvc.SetQueue(append(kvc.GetQueue()[:i], kvc.GetQueue()[i+1:]...))
+			//kvc.Queue = append(kvc.Queue[:i], kvc.Queue[i+1:]...)
 			return
 		}
 	}
-	fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda")
+	fmt.Println("removeMessageToQueue: Messaggio con ID", message.GetIdMessage(), "non trovato nella coda")
 }

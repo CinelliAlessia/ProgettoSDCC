@@ -12,7 +12,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 	// Si crea un messaggio con 3 ack "ricevuti" così che per inviarlo a livello applicativo si controllerà
 	// solamente l'ordinamento del messaggio nella coda.
 
-	message := kvs.createMessage(args, "Get")
+	message := kvs.createMessage(args, get)
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Controllo in while se il messaggio può essere inviato a livello applicativo
@@ -31,7 +31,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
 
-	message := kvs.createMessage(args, "Put")
+	message := kvs.createMessage(args, put)
 	kvs.addToSortQueue(message) //Aggiunge alla coda ordinandolo per timestamp, cosi verrà letto esclusivamente se
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
@@ -46,7 +46,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Response) error {
 
-	message := kvs.createMessage(args, "Delete")
+	message := kvs.createMessage(args, del)
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
@@ -63,35 +63,36 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 // Se l'operazione è andata a buon fine, restituisce true, altrimenti restituisce false,
 // sarà la risposta che leggerà il client
 func (kvs *KeyValueStoreSequential) realFunction(message MessageS, response *common.Response) error {
-	if message.TypeOfMessage == "Put" { // Scrittura
+	if message.GetTypeOfMessage() == put { // Scrittura
 		if kvs.isEndKeyMessage(message) {
 			kvs.isAllEndKey()
 			return nil
 		}
 
-		kvs.Datastore[message.Args.Key] = message.GetValue()
+		kvs.SetDatastore(message.GetKey(), message.GetValue())
+		//kvs.Datastore[message.GetKey()] = message.GetValue()
 
-	} else if message.TypeOfMessage == "Delete" { // Scrittura
-		delete(kvs.Datastore, message.GetValue())
+	} else if message.GetTypeOfMessage() == del { // Scrittura
+		delete(kvs.GetDatastore(), message.GetValue())
 
-	} else if message.TypeOfMessage == "Get" { // Lettura
-		val, ok := kvs.Datastore[message.GetValue()]
+	} else if message.GetTypeOfMessage() == get { // Lettura
+		val, ok := kvs.GetDatastore()[message.GetValue()]
 		if !ok {
-			printRed("NON ESEGUITO", message, kvs)
-			if message.GetIdSender() == kvs.Id {
+			printRed("NON ESEGUITO", &message, kvs)
+			if message.GetIdSender() == kvs.GetIdServer() {
 				response.Result = false
 			}
 			return nil
 		}
-		if message.IdSender == kvs.Id { // Solo se io sono il sender imposto la risposta per il client
+		if message.GetIdSender() == kvs.GetIdServer() { // Solo se io sono il sender imposto la risposta per il client
 			response.Value = val
-			message.Args.Value = val //Fatto solo per DEBUG per il print
+			SetValue(&message, val) //Fatto solo per DEBUG per il print
 		}
 	}
 
 	printGreen("ESEGUITO", message, kvs)
 
-	if message.IdSender == kvs.Id {
+	if message.GetIdSender() == kvs.GetIdServer() {
 		response.Result = true
 	}
 
@@ -102,13 +103,15 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 	kvs.mutexClock.Lock()
 	defer kvs.mutexClock.Unlock()
 
-	kvs.LogicalClock++
+	kvs.SetLogicalClock(kvs.GetClock() + 1)
+	//kvs.LogicalClock++
+
 	numberAck := 0
-	if typeFunc == "Get" { // se è una get non serve aspettare ack
+	if typeFunc == get { // se è una get non serve aspettare ack
 		numberAck = common.Replicas
 	}
 
-	message := MessageS{common.GenerateUniqueID(), kvs.Id, typeFunc, args, kvs.LogicalClock, numberAck}
+	message := newMessageSeq(kvs.GetIdServer(), typeFunc, args, kvs.GetClock(), numberAck)
 
 	printDebugBlue("RICEVUTO da client", message, kvs)
 	return message
