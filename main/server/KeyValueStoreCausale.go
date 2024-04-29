@@ -13,7 +13,7 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
 	if err != nil {
-		response.Result = false
+		response.SetResult(false)
 		return err
 	}
 	return nil
@@ -26,7 +26,7 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
 	if err != nil {
-		response.Result = false
+		response.SetResult(false)
 		return err
 	}
 	return nil
@@ -39,7 +39,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
 	if err != nil {
-		response.Result = false
+		response.SetResult(false)
 		return err
 	}
 	return nil
@@ -58,18 +58,18 @@ func (kvc *KeyValueStoreCausale) realFunction(message *msg.MessageC, response *c
 		val, ok := kvc.GetDatastore()[message.GetKey()]
 		if !ok {
 			printRed("NON ESEGUITO", *message, kvc, nil)
-			response.Result = false
+			response.SetResult(false)
 			return nil
 		}
-		response.Value = val
+
+		response.SetValue(val)
 		message.SetValue(val) //Fatto solo per DEBUG per il print
-		//message.Common.Args.Value = val
 	} else {
 		return fmt.Errorf("command not found")
 	}
 
 	printGreen("ESEGUITO", *message, kvc, nil)
-	response.Result = true
+	response.SetResult(true)
 	return nil
 }
 

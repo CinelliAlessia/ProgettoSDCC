@@ -38,7 +38,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", *message, response)
 	if err != nil {
-		response.Result = false
+		response.SetResult(false)
 		return err
 	}
 	return nil
@@ -53,7 +53,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", *message, response)
 	if err != nil {
-		response.Result = false
+		response.SetResult(false)
 		return err
 	}
 	return nil
@@ -81,12 +81,12 @@ func (kvs *KeyValueStoreSequential) realFunction(message *msg.MessageS, response
 		if !ok {
 			printRed("NON ESEGUITO", *message, nil, kvs)
 			if message.GetIdSender() == kvs.GetIdServer() {
-				response.Result = false
+				response.SetResult(false)
 			}
 			return nil
 		}
 		if message.GetIdSender() == kvs.GetIdServer() { // Solo se io sono il sender imposto la risposta per il client
-			response.Value = val
+			response.SetValue(val)
 			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
 	}
@@ -94,7 +94,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message *msg.MessageS, response
 	printGreen("ESEGUITO", *message, nil, kvs)
 
 	if message.GetIdSender() == kvs.GetIdServer() {
-		response.Result = true
+		response.SetResult(true)
 	}
 
 	return nil

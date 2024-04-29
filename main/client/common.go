@@ -39,11 +39,11 @@ func debugPrintRun(rpcName string, args common.Args) {
 
 		switch name {
 		case put:
-			fmt.Println(color.BlueString("RUN Put"), args.Key+":"+args.Value)
+			fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue())
 		case get:
-			fmt.Println(color.BlueString("RUN Get"), args.Key)
+			fmt.Println(color.BlueString("RUN Get"), args.GetKey())
 		case del:
-			fmt.Println(color.BlueString("RUN Delete"), args.Key)
+			fmt.Println(color.BlueString("RUN Delete"), args.GetKey())
 		default:
 			fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
 		}
@@ -59,20 +59,20 @@ func debugPrintResponse(rpcName string, args common.Args, response common.Respon
 
 	switch name {
 	case put:
-		fmt.Println(color.GreenString("RISPOSTA Put"), "key:"+args.Key, "value:"+args.Value)
+		fmt.Println(color.GreenString("RISPOSTA Put"), "key:"+args.GetKey(), "value:"+args.GetValue())
 	case get:
 		if response.Result {
-			fmt.Println(color.GreenString("RISPOSTA Get"), "key:"+args.Key, "response:"+response.Value)
+			fmt.Println(color.GreenString("RISPOSTA Get"), "key:"+args.GetKey(), "response:"+response.GetValue())
 		} else {
-			fmt.Println(color.RedString("RISPOSTA Get fallita"), "key:"+args.Key)
+			fmt.Println(color.RedString("RISPOSTA Get fallita"), "key:"+args.GetKey())
 		}
 	case del:
 		if response.Result {
-			fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.Key)
+			fmt.Println(color.GreenString("RISPOSTA Delete"), "key:"+args.GetKey())
 		} else {
-			fmt.Println(color.RedString("RISPOSTA Delete fallita"), "key:"+args.Key)
+			fmt.Println(color.RedString("RISPOSTA Delete fallita"), "key:"+args.GetKey())
 		}
 	default:
-		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response)
+		fmt.Println(color.GreenString("RISPOSTA Unknown"), rpcName, args, response.GetValue())
 	}
 }

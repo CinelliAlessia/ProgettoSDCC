@@ -17,9 +17,9 @@ func NewMessageCau(idSender int, typeOfMessage string, args common.Args, vectorC
 	msg.setIdMessage()
 	msg.SetIdSender(idSender)
 	msg.SetTypeOfMessage(typeOfMessage)
-	msg.SetKey(args.Key)
-	msg.SetValue(args.Value)
-	msg.SetTimestampClient(args.Timestamp)
+	msg.SetKey(args.GetKey())
+	msg.SetValue(args.GetValue())
+	msg.SetTimestampClient(args.GetTimestamp())
 	msg.SetClock(vectorClock)
 	return msg
 }
@@ -47,15 +47,15 @@ func (msg *MessageC) SetValueClock(index int, value int) {
 }
 
 func (msg *MessageC) SetKey(key string) {
-	msg.Common.Args.Key = key
+	msg.Common.Args.SetKey(key)
 }
 
 func (msg *MessageC) SetValue(value string) {
-	msg.Common.Args.Value = value
+	msg.Common.Args.SetValue(value)
 }
 
 func (msg *MessageC) SetTimestampClient(timestamp int) {
-	msg.Common.Args.Timestamp = timestamp
+	msg.Common.Args.SetTimestamp(timestamp)
 }
 
 // ----- Metodi GET ----- //
@@ -73,17 +73,17 @@ func (msg *MessageC) GetTypeOfMessage() string {
 }
 
 func (msg *MessageC) GetKey() string {
-	return msg.Common.Args.Key
+	return msg.Common.Args.GetKey()
 }
 
 func (msg *MessageC) GetValue() string {
-	return msg.Common.Args.Value
+	return msg.Common.Args.GetValue()
+}
+
+func (msg *MessageC) GetOrderClient() int {
+	return msg.Common.Args.GetTimestamp()
 }
 
 func (msg *MessageC) GetClock() [common.Replicas]int {
 	return msg.VectorClock
-}
-
-func (msg *MessageC) GetOrderClient() int {
-	return msg.Common.Args.Timestamp
 }

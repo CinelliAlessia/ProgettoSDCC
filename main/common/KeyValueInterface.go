@@ -23,8 +23,14 @@ type KeyValueStoreService interface {
 
 /* ARGS STRUCT */
 
-func newArgs() Args {
-	return Args{}
+func NewArgs(timestamp int, key string, values ...string) Args {
+	args := Args{}
+	args.SetTimestamp(timestamp)
+	args.SetKey(key)
+	if len(values) > 0 {
+		args.SetValue(values[0])
+	}
+	return args
 }
 
 func (args *Args) SetKey(key string) {

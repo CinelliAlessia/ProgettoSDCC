@@ -26,7 +26,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message msg.MessageS, 
 	sendAck(&message)
 
 	// Inizializzo la risposta a false, corrisponde alla risposta che leggerà il client
-	response.Result = false
+	response.SetResult(false)
 
 	// Ciclo finché canExecute non restituisce true, in quel caso
 	// la richiesta può essere eseguita a livello applicativo

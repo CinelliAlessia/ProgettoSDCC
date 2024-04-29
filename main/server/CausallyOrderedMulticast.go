@@ -22,7 +22,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message msg.MessageC, 
 
 	// Ciclo finché controlSendToApplication restituisce true
 	// Controllo quando la richiesta può essere eseguita a livello applicativo
-	response.Result = false
+	response.SetResult(false)
 	// TODO: vale la pena aggiungere un mutex?
 	for {
 		kvc.executeFunctionMutex.Lock()
