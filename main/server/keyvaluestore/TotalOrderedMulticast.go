@@ -1,4 +1,4 @@
-package main
+package keyvaluestore
 
 import (
 	"fmt"
@@ -65,7 +65,7 @@ func (kvs *KeyValueStoreSequential) canExecute(message *msg.MessageS, response *
 func (kvs *KeyValueStoreSequential) ReceiveAck(message msg.MessageS, reply *bool) error {
 	*reply = kvs.updateAckMessage(&message)
 	if !(*reply) {
-		//fmt.Println("Ricevuto ack di un messaggio non presente", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value, "ts", message.Args.Timestamp)
+		//fmt.Println("Ricevuto ack di un messaggio non presente", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value, "ts", message.Args.TimestampClient)
 		kvs.addToSortQueue(&message)
 		*reply = kvs.updateAckMessage(&message)
 	}
@@ -269,7 +269,7 @@ func (kvs *KeyValueStoreSequential) secondCondition(message *msg.MessageS) bool 
 		}
 		if !found {
 			kvs.isAllEndKey()
-			//fmt.Println(message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "secondCondition non rispettata", "tsClient", message.Args.Timestamp, "assume", kvs.receiveAssumeFIFO)
+			//fmt.Println(message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "secondCondition non rispettata", "tsClient", message.Args.TimestampClient, "assume", kvs.receiveAssumeFIFO)
 			return false
 		}
 	}
