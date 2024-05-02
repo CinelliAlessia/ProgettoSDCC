@@ -14,7 +14,7 @@ func main() {
 	for {
 		// Stampa il menu interattivo
 		fmt.Println("Scegli un'operazione:")
-		fmt.Println("1. Consistenza Causale")
+		fmt.Println("1. Consistenza causale")
 		fmt.Println("2. Consistenza Sequenziale")
 
 		// Leggi l'input dell'utente per l'operazione

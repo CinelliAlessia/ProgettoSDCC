@@ -21,7 +21,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 
 		go func(operation []Operation) {
 			for _, op := range operation {
-				//args := common.Args{Key: op.Key, Value: op.Value, Timestamp: serverTimestamps[op.ServerIndex]}
+				//args := common.Args{Key: op.Key, Value: op.Value, TimestampClient: serverTimestamps[op.ServerIndex]}
 				args := common.NewArgs(serverTimestamps[op.ServerIndex], op.Key, op.Value)
 				responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, sync, specific)
 				serverTimestamps[op.ServerIndex]++ // In caso sincrono? qui?

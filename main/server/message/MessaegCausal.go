@@ -4,7 +4,7 @@ import (
 	"main/common"
 )
 
-// ----- Consistenza Causale ----- //
+// ----- Consistenza causale ----- //
 
 type MessageC struct {
 	Common      MessageCommon
