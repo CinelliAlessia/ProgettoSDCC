@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"main/common"
+	"main/server/keyvaluestore"
 	"net"
 	"net/rpc"
 	"os"
@@ -42,11 +43,12 @@ func main() {
 	// Inizializzazione delle strutture
 
 	// ----- CONSISTENZA CAUSALE -----
-	kvCausale := NewKeyValueStoreCausal(id)
+	kvCausale := keyvaluestore.NewKeyValueStoreCausal(id)
 
 	// ----- CONSISTENZA SEQUENZIALE -----
-	kvSequential := NewKeyValueStoreSequential(id)
+	kvSequential := keyvaluestore.NewKeyValueStoreSequential(id)
 
+	// ----- REGISTRAZIONE DEI SERVIZI RPC -----
 	// Registrazione dei servizi RPC
 	err = rpc.RegisterName("KeyValueStoreCausale", kvCausale)
 	if err != nil {
@@ -83,9 +85,16 @@ func main() {
 			defer func() {
 				err := conn.Close()
 				if err != nil {
-					//fmt.Println("SERVER: Errore nella chiusura della connessione:", err)
+					//fmt.Println("Errore nella chiusura della connessione:", err)
 				}
 			}()
 		}(conn)
+	}
+}
+
+func ifError(err error) {
+	if err != nil {
+		fmt.Println("Errore:", err)
+		os.Exit(1)
 	}
 }
