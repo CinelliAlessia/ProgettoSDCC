@@ -1,12 +1,13 @@
-package main
+package keyvaluestore
 
 import (
 	"fmt"
 	"main/common"
+
 	"main/server/message"
 )
 
-// CausallyOrderedMulticast esegue l'algoritmo multicast causalmente ordinato sul messaggio ricevuto.
+// CausallyOrderedMulticast esegue l'keyvaluestore multicast causalmente ordinato sul messaggio ricevuto.
 // Aggiunge il messaggio alla coda dei messaggi in attesa di essere eseguiti e cicla finché il controlSendToApplication
 // non restituisce true, indicando che la richiesta può essere eseguita a livello applicativo. Quando ciò accade,
 // la funzione esegue effettivamente l'operazione a livello applicativo tramite la chiamata a RealFunction e rimuove
@@ -89,7 +90,6 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *msg.MessageC)
 			kvc.mutexClock.Lock()
 
 			kvc.SetVectorClock(message.GetIdSender(), kvc.GetClock()[message.GetIdSender()]+1)
-
 			//kvc.VectorClock[message.GetIdSender()] += 1
 			kvc.mutexClock.Unlock()
 		}

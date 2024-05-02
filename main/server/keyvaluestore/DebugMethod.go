@@ -1,4 +1,4 @@
-package main
+package keyvaluestore
 
 import (
 	"fmt"
@@ -23,15 +23,15 @@ func printDebugBlue(blueString string, message interface{}, kvc *KeyValueStoreCa
 		switch message := message.(type) {
 		case msg.MessageS:
 			if kvs != nil {
-				fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "clockClient", message.GetOrderClient(),
-					"clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
+				fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+					"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 			} else {
 				fmt.Println("ERRORE")
 			}
 		case msg.MessageC:
 			if kvc != nil {
-				fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "clockClient", message.GetOrderClient(),
-					"clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
+				fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+					"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 			} else {
 				fmt.Println("ERRORE")
 			}
@@ -49,11 +49,11 @@ func printGreen(greenString string, message interface{}, kvc *KeyValueStoreCausa
 
 	switch message := message.(type) {
 	case msg.MessageS:
-		fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "clockClient", message.GetOrderClient(),
-			"clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
+		fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+			"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 	case msg.MessageC:
-		fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "clockClient", message.GetOrderClient(),
-			"clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
+		fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+			"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 	}
 }
 
