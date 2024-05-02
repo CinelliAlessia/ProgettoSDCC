@@ -2,9 +2,10 @@ package common
 
 // Args rappresenta gli argomenti delle chiamate RPC
 type Args struct {
-	Key       string
-	Value     string
-	Timestamp int // Chiedere ulteriori spiegazioni
+	Key             string
+	Value           string
+	TimestampClient int    // Chiedere ulteriori spiegazioni
+	ClientId        string // Per identificare il client nella operazione RPC
 }
 
 // Response è una struttura creata per memorizzare la risposta delle chiamate RPC
@@ -27,10 +28,20 @@ func NewArgs(timestamp int, key string, values ...string) Args {
 	args := Args{}
 	args.SetTimestamp(timestamp)
 	args.SetKey(key)
+	args.setIdClient(GenerateUniqueID())
+
 	if len(values) > 0 {
 		args.SetValue(values[0])
 	}
 	return args
+}
+
+func (args *Args) setIdClient(id string) {
+	args.ClientId = id
+}
+
+func (args *Args) GetIdClient() string {
+	return args.ClientId
 }
 
 func (args *Args) SetKey(key string) {
@@ -42,7 +53,7 @@ func (args *Args) SetValue(value string) {
 }
 
 func (args *Args) SetTimestamp(timestamp int) {
-	args.Timestamp = timestamp
+	args.TimestampClient = timestamp
 }
 
 func (args *Args) GetKey() string {
@@ -54,7 +65,7 @@ func (args *Args) GetValue() string {
 }
 
 func (args *Args) GetTimestamp() int {
-	return args.Timestamp
+	return args.TimestampClient
 }
 
 /* RESPONDE STRUCT */

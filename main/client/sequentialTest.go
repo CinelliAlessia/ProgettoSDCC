@@ -21,7 +21,7 @@ func testSequential(rpcName string, operations []Operation) {
 	// e se è indirizzata ad un server specifico o random
 	for _, operation := range operations {
 
-		//args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: serverTimestamps[operation.ServerIndex]}
+		//args := common.Args{Key: operation.Key, Value: operation.Value, TimestampClient: serverTimestamps[operation.ServerIndex]}
 		args := common.NewArgs(serverTimestamps[operation.ServerIndex], operation.Key, operation.Value)
 
 		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
@@ -45,7 +45,7 @@ func testSequential(rpcName string, operations []Operation) {
 	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
 	endOps := getEndOps()
 	for _, operation := range endOps {
-		//args := common.Args{Key: operation.Key, Value: operation.Value, Timestamp: timestamp}
+		//args := common.Args{Key: operation.Key, Value: operation.Value, TimestampClient: timestamp}
 		args := common.NewArgs(timestamp, operation.Key, operation.Value)
 
 		_, err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
