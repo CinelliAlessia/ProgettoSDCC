@@ -1,10 +1,12 @@
 package keyvaluestore
 
-import "sync"
+import (
+	"sync"
+)
 
-type ClockServer interface {
-	GetDatastore() map[string]string
-	GetIdServer() int
+type KeyValueStore struct {
+	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
+	Id        int               // Id che identifica il server stesso
 }
 
 // ClientMap rappresenta la struttura dati per memorizzare i timestamp delle richieste dei client, cosi da realizzare
@@ -17,7 +19,22 @@ type ClientMap struct {
 	ExecuteTs    int // TimestampClient di esecuzione della richiesta
 }
 
-type KeyValueStore struct {
-	Datastore map[string]string // Mappa -> struttura dati che associa chiavi a valori
-	Id        int               // Id che identifica il server stesso
+func (m *ClientMap) SetRequestTs(ts int) {
+	m.MutexRequest.Lock()
+	defer m.MutexRequest.Unlock()
+	m.RequestTs = ts
+}
+
+func (m *ClientMap) GetRequestTs() int {
+	return m.RequestTs
+}
+
+func (m *ClientMap) SetExecuteTs(ts int) {
+	m.MutexExecute.Lock()
+	defer m.MutexExecute.Unlock()
+	m.ExecuteTs = ts
+}
+
+func (m *ClientMap) GetExecuteTs() int {
+	return m.ExecuteTs
 }
