@@ -10,13 +10,18 @@ import (
 	"time"
 )
 
-// Replicas Numero di repliche del server -> almeno 3
-const Replicas = 3
+const (
+	Replicas = 3    // Numero di repliche del server -> almeno 3
+	TIMER    = 1000 // Ritardo di rete max espresso in Millisecondi
+)
+
+const (
+	EndKey   = "endKey"
+	EndValue = "endValue"
+)
 
 // ReplicaPorts Lista delle porte su cui le repliche possono essere contattate
 var ReplicaPorts = [Replicas]string{"8085", "8086", "8087"}
-
-const TIMER = 1000 // Ritardo di rete max espresso in Millisecondi
 
 // GenerateUniqueID Genera un ID univoco utilizzando UUID
 func GenerateUniqueID() string {

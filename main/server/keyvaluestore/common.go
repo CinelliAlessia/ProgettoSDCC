@@ -1,9 +1,16 @@
-package main
+package keyvaluestore
 
 import (
 	"fmt"
 	"main/common"
+	message2 "main/server/message"
 	"net/rpc"
+)
+
+const (
+	put = "Put"
+	get = "Get"
+	del = "Delete"
 )
 
 func sendToAllServer(rpcName string, message interface{}, response *common.Response) error {
@@ -12,16 +19,7 @@ func sendToAllServer(rpcName string, message interface{}, response *common.Respo
 
 	// Itera su tutte le repliche e avvia le chiamate RPC
 	for i := 0; i < common.Replicas; i++ {
-		go func(i int) {
-			switch msg := message.(type) {
-			case MessageC:
-				callRPC(rpcName, msg, response, resultChan, i)
-			case MessageS:
-				callRPC(rpcName, msg, response, resultChan, i)
-			default:
-				resultChan <- fmt.Errorf("unsupported message type: %T", msg)
-			}
-		}(i)
+		go callRPC(rpcName, message, response, resultChan, i)
 	}
 
 	// Raccoglie i risultati dalle chiamate RPC
@@ -44,9 +42,9 @@ func callRPC(rpcName string, message interface{}, response *common.Response, res
 
 	common.RandomDelay()
 	switch msg := message.(type) {
-	case MessageC:
+	case message2.MessageC:
 		err = conn.Call(rpcName, msg, response)
-	case MessageS:
+	case message2.MessageS:
 		err = conn.Call(rpcName, msg, response)
 	default:
 		resultChan <- fmt.Errorf("unsupported message type: %T", msg)
