@@ -150,6 +150,7 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message *commonMsg.MessageS) 
 
 		// Ordina la coda in base al logicalClock, a parità di timestamp l'ordinamento è deterministico in base all'ID
 		sort.Slice(kvs.GetQueue(), func(i, j int) bool {
+			// Forzo l'aggiunta di endKey in coda
 			if kvs.GetMsgToQueue(i).GetKey() == common.EndKey {
 				return false // i messaggi con key: endKey vanno sempre alla fine
 			}
