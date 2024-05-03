@@ -28,7 +28,7 @@ func NewArgs(timestamp int, key string, values ...string) Args {
 	args := Args{}
 	args.SetTimestamp(timestamp)
 	args.SetKey(key)
-	args.setIdClient(GenerateUniqueID())
+	args.setIDClient(GenerateUniqueID())
 
 	if len(values) > 0 {
 		args.SetValue(values[0])
@@ -36,11 +36,11 @@ func NewArgs(timestamp int, key string, values ...string) Args {
 	return args
 }
 
-func (args *Args) setIdClient(id string) {
+func (args *Args) setIDClient(id string) {
 	args.ClientId = id
 }
 
-func (args *Args) GetIdClient() string {
+func (args *Args) GetIDClient() string {
 	return args.ClientId
 }
 
@@ -66,6 +66,10 @@ func (args *Args) GetValue() string {
 
 func (args *Args) GetTimestamp() int {
 	return args.TimestampClient
+}
+
+func (args *Args) SetIDClient(client string) {
+	args.ClientId = client
 }
 
 /* RESPONDE STRUCT */
