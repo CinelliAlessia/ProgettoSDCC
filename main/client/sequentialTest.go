@@ -6,12 +6,22 @@ import (
 )
 
 func testSequential(rpcName string, operations []Operation) {
+	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
+	endOps := getEndOps()
+
+	for _, operation := range endOps {
+		operations = append(operations, operation)
+	}
 
 	// serverTimestamps è una mappa che associa a ogni server un timestamp
 	serverTimestamps := make(map[int]int)
+	listArgs := [common.Replicas]common.Args{}
+
 	for i := 0; i < common.Replicas; i++ {
 		serverTimestamps[i] = 0
+		listArgs[i] = common.NewArgs(serverTimestamps[i], "", "")
 	}
+
 	responses := [common.Replicas]common.Response{}
 	var err error
 
@@ -19,43 +29,52 @@ func testSequential(rpcName string, operations []Operation) {
 	// in questo for vengono eseguite tutte le operazioni passate come argomento
 	// async e specific sono due variabili booleane che indicano rispettivamente se la chiamata è sincrona o asincrona
 	// e se è indirizzata ad un server specifico o random
-	for _, operation := range operations {
 
-		//args := common.Args{Key: operation.Key, Value: operation.Value, TimestampClient: serverTimestamps[operation.ServerIndex]}
-		args := common.NewArgs(serverTimestamps[operation.ServerIndex], operation.Key, operation.Value)
+	//args := common.Args{Key: op.Key, Value: op.Value, TimestampClient: serverTimestamps[op.ServerIndex]}
+	//args := common.NewArgs(serverTimestamps[op.ServerIndex], op.Key, op.Value)
+	for _, op := range operations {
 
-		responses[operation.ServerIndex], err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
-		serverTimestamps[operation.ServerIndex]++
+		args := listArgs[op.ServerIndex]
 
-		if err != nil {
-			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
-			return
-		}
-	}
+		args.SetTimestamp(serverTimestamps[op.ServerIndex])
+		args.SetKey(op.Key)
+		args.SetValue(op.Value)
 
-	// ----- Da qui inseriamo le operazioni di fine ----- //
+		responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
-	// timestamp è il massimo tra i timestamp dei server + 1
-	timestamp := 0
-	for i, _ := range serverTimestamps {
-		timestamp = common.Max(serverTimestamps[i], timestamp)
-	}
-	timestamp += 1
-
-	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
-	endOps := getEndOps()
-	for _, operation := range endOps {
-		//args := common.Args{Key: operation.Key, Value: operation.Value, TimestampClient: timestamp}
-		args := common.NewArgs(timestamp, operation.Key, operation.Value)
-
-		_, err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
-		serverTimestamps[operation.ServerIndex] = timestamp + 1
+		serverTimestamps[op.ServerIndex]++
+		fmt.Println("Richiesta effettuata con ts", args.GetTimestamp(), "al server", op.ServerIndex, "nuovo ts", serverTimestamps[op.ServerIndex])
 
 		if err != nil {
 			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
 			return
 		}
 	}
+	/*
+		// ----- Da qui inseriamo le operazioni di fine ----- //
+
+		// timestamp è il massimo tra i timestamp dei server + 1
+		timestamp := 0
+		for i, _ := range serverTimestamps {
+			timestamp = common.Max(serverTimestamps[i], timestamp)
+		}
+		timestamp += 1
+
+		// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
+		endOps := getEndOps()
+		for _, operation := range endOps {
+			//args := common.Args{Key: op.Key, Value: op.Value, TimestampClient: timestamp}
+			args := common.NewArgs(timestamp, operation.Key, operation.Value)
+
+			_, err = executeCall(operation.ServerIndex, rpcName+operation.OperationType, args, async, specific)
+			serverTimestamps[operation.ServerIndex] = timestamp + 1
+
+			if err != nil {
+				fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
+				return
+			}
+		}
+	*/
 }
 
 // getEndOps restituisce un array di operazioni di tipo put che vengono eseguite su tutti i server
