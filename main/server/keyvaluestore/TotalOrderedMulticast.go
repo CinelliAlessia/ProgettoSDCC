@@ -8,10 +8,12 @@ import (
 	"sort"
 )
 
+//TODO: problema tra get, requestTS e queue pari a 1, specifico caso di get
+
 // TotalOrderedMulticast gestione dell'evento esterno ricevuto da un server
 // Implementazione del multicast totalmente ordinato
 // Il server ha inviato in multicast il messaggio di update per msg
-func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message msg.MessageS, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message commonMsg.MessageS, response *common.Response) error {
 	// Solo per debug
 	kvs.mutexClock.Lock()
 	if kvs.GetIdServer() != message.GetIdSender() {
@@ -42,39 +44,21 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message msg.MessageS, 
 	return nil
 }
 
-func (kvs *KeyValueStoreSequential) canExecute(message *msg.MessageS, response *common.Response) (bool, error) {
-	kvs.executeFunctionMutex.Lock()
-	defer kvs.executeFunctionMutex.Unlock()
-
-	canSend := kvs.controlSendToApplication(message)
-	if canSend {
-		// Invio a livello applicativo
-		err := kvs.realFunction(message, response)
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}
-	return false, nil
-}
-
 // ----- FUNZIONI PER GESTIRE GLI ACK ----- //
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
 // Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti lo inserisce in coda e incrementa il numero di ack ricevuti.
-func (kvs *KeyValueStoreSequential) ReceiveAck(message msg.MessageS, reply *bool) error {
+func (kvs *KeyValueStoreSequential) ReceiveAck(message commonMsg.MessageS, reply *bool) error {
 	*reply = kvs.updateAckMessage(&message)
 	if !(*reply) {
-		//fmt.Println("Ricevuto ack di un messaggio non presente", message.TypeOfMessage, message.Args.Key, ":", message.Args.Value, "ts", message.Args.TimestampClient)
 		kvs.addToSortQueue(&message)
 		*reply = kvs.updateAckMessage(&message)
 	}
-	//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 	return nil
 }
 
 // sendAck invia con una goroutine a ciascun server un ack del messaggio ricevuto
-func sendAck(message *msg.MessageS) {
+func sendAck(message *commonMsg.MessageS) {
 	canSend := 0 // Contatore del numero di ack inviati che sono stati ricevuti (ho avuto una risposta alla chiamata RPC)
 	//fmt.Println("sendAck", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi stavo riferendo.
@@ -119,7 +103,7 @@ func sendAck(message *msg.MessageS) {
 }
 
 // sendAckRPC invia l'ack tramite RPC, applicando un ritardo random
-func sendAckRPC(conn *rpc.Client, message *msg.MessageS, reply *bool) error {
+func sendAckRPC(conn *rpc.Client, message *commonMsg.MessageS, reply *bool) error {
 	common.RandomDelay()
 
 	err := conn.Call("KeyValueStoreSequential.ReceiveAck", &message, reply)
@@ -144,7 +128,7 @@ func sendAckRPC(conn *rpc.Client, message *msg.MessageS, reply *bool) error {
 // l'ordinamento è deterministico: per garantire l'ordinamento totale verranno usati gli ID associati al messaggio.
 // La funzione è threadSafe per l'utilizzo della coda kvs.queue tramite kvs.mutexQueue
 // Prima di aggiungere il messaggio alla coda, verifica che non sia già presente.
-func (kvs *KeyValueStoreSequential) addToSortQueue(message *msg.MessageS) {
+func (kvs *KeyValueStoreSequential) addToSortQueue(message *commonMsg.MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
 
@@ -166,46 +150,43 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message *msg.MessageS) {
 
 		// Ordina la coda in base al logicalClock, a parità di timestamp l'ordinamento è deterministico in base all'ID
 		sort.Slice(kvs.GetQueue(), func(i, j int) bool {
-			if kvs.GetQueue()[i].GetKey() == common.EndKey {
+			if kvs.GetMsgToQueue(i).GetKey() == common.EndKey {
 				return false // i messaggi con key: endKey vanno sempre alla fine
 			}
-			if kvs.GetQueue()[j].GetKey() == common.EndKey {
+			if kvs.GetMsgToQueue(j).GetKey() == common.EndKey {
 				return true // i messaggi con key: endKey vanno sempre alla fine
 			}
-			if kvs.GetQueue()[i].GetClock() == kvs.GetQueue()[j].GetClock() {
-				return kvs.GetQueue()[i].GetIdMessage() < kvs.GetQueue()[j].GetIdMessage()
+			if kvs.GetMsgToQueue(i).GetClock() == kvs.GetMsgToQueue(j).GetClock() {
+				return kvs.GetMsgToQueue(i).GetIdMessage() < kvs.GetMsgToQueue(j).GetIdMessage()
 			}
-			return kvs.GetQueue()[i].GetClock() < kvs.GetQueue()[j].GetClock()
+			return kvs.GetMsgToQueue(i).GetClock() < kvs.GetMsgToQueue(j).GetClock()
 		})
 	}
 }
 
 // removeMessageToQueue Rimuove il messaggio passato come argomento dalla coda solamente se è l'elemento in testa, l'eliminazione si basa sull'ID
-func (kvs *KeyValueStoreSequential) removeMessageToQueue(message *msg.MessageS) {
+func (kvs *KeyValueStoreSequential) removeMessageToQueue(message *commonMsg.MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
 
-	if len(kvs.GetQueue()) > 0 && kvs.GetQueue()[0].GetClock() == message.GetClock() && kvs.GetQueue()[0].GetIdMessage() == message.GetIdMessage() {
+	if len(kvs.GetQueue()) > 0 && kvs.GetMsgToQueue(0).GetClock() == message.GetClock() && kvs.GetMsgToQueue(0).GetIdMessage() == message.GetIdMessage() {
 		// Rimuovi il primo elemento dalla slice
-		//kvs.Queue = kvs.Queue[1:]
 		kvs.SetQueue(kvs.GetQueue()[1:])
+		//fmt.Println("Rimosso messaggio dalla coda:", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "tsClient", message.GetOrderClient(), "lenQ", len(kvs.GetQueue()))
 		return
 	}
-
-	//fmt.Println("removeMessageToQueue: Messaggio con ID", message.Id, "non trovato nella coda")
-	//fmt.Println(message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 }
 
 // updateAckMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
-func (kvs *KeyValueStoreSequential) updateAckMessage(message *msg.MessageS) bool {
+func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS) bool {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
 
 	for i := range kvs.GetQueue() {
-		if kvs.GetQueue()[i].GetClock() == message.GetClock() && kvs.GetQueue()[i].GetIdMessage() == message.GetIdMessage() {
+		if kvs.GetMsgToQueue(i).GetClock() == message.GetClock() && kvs.GetMsgToQueue(i).GetIdMessage() == message.GetIdMessage() {
 			//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
-			kvs.GetQueue()[i].SetNumberAck(kvs.GetQueue()[i].GetNumberAck() + 1)
+			kvs.GetMsgToQueue(i).SetNumberAck(kvs.GetMsgToQueue(i).GetNumberAck() + 1)
 			//kvs.Queue[i].NumberAck++
 			return true
 		}
@@ -215,19 +196,36 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *msg.MessageS) bool
 
 // ----- FUNZIONI PER GESTIRE L'ESECUZIONE DEL MESSAGGIO A LIVELLO APPLICATIVO ----- //
 
+func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS, response *common.Response) (bool, error) {
+	kvs.executeFunctionMutex.Lock()
+	defer kvs.executeFunctionMutex.Unlock()
+
+	canSend := kvs.controlSendToApplication(message)
+	if canSend {
+		// Invio a livello applicativo
+		err := kvs.realFunction(message, response)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	//time.Sleep(1 * time.Second)
+	return false, nil
+}
+
 // controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo, Pj consegna msg_i all’applicazione se:
 // 1. msg_i è in testa a queue_j
 // 2. tutti gli ack relativi a msg_i sono stati ricevuti da Pj e,
 // per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i (quest’ultima condizione sta a indicare
 // che nessun altro processo può inviare in multicast un messaggio con timestamp potenzialmente minore o uguale a quello di msg_i)
-func (kvs *KeyValueStoreSequential) controlSendToApplication(message *msg.MessageS) bool {
+func (kvs *KeyValueStoreSequential) controlSendToApplication(message *commonMsg.MessageS) bool {
 	// Per la corretta gestione di Common.EndKey
 	if len(kvs.GetQueue()) == 0 {
 		return true
 	}
 
-	switch {
-	case kvs.isExecutableMessage(message): // Entrambe le condizioni per il Multicast Totalmente Ordinato sono soddisfatte
+	if kvs.conditionMessage(message) { // Entrambe le condizioni per il Multicast Totalmente Ordinato sono soddisfatte
 
 		// Ho ricevuto tutti gli ack, posso eliminare il messaggio dalla coda
 		go kvs.removeMessageToQueue(message)
@@ -235,41 +233,65 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message *msg.Messag
 		// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
 		kvs.updateLogicalClock(message)
 		return true
-
-	case kvs.isEndKeyMessage(message): // Controllo se il messaggio è un endKey
-		return true
 	}
 
 	// Non è stato eseguito il messaggio a livello applicativo
+	kvs.isAllEndKey()
+
+	//fmt.Println(kvs.GetQueue())
+	//fmt.Println(message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "controlSendToApplication non rispettata", "tsClient", message.GetOrderClient())
 	return false
 }
 
-// isExecutableMessage ritorna true se:
+// conditionMessage ritorna true se:
 // 1. msg_i è in testa a queue_j
 // 2. tutti gli ack relativi a msg_i sono stati ricevuti da Pj
 // 3. per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
-func (kvs *KeyValueStoreSequential) isExecutableMessage(message *msg.MessageS) bool {
-	return len(kvs.GetQueue()) > 0 && kvs.GetQueue()[0].GetIdMessage() == message.GetIdMessage() && kvs.GetQueue()[0].GetNumberAck() == common.Replicas && kvs.secondCondition(message)
+func (kvs *KeyValueStoreSequential) conditionMessage(message *commonMsg.MessageS) bool {
+	/*fmt.Println("Valutazione messaggio:", message)
+	if len(kvs.GetQueue()) > 0 {
+		if kvs.GetMsgToQueue(0).GetIdMessage() == message.GetIdMessage() {
+			if kvs.GetMsgToQueue(0).GetNumberAck() == common.Replicas {
+				if kvs.secondCondition(message) {
+					fmt.Println("andata a buon fine")
+				} else {
+					fmt.Println("non ci sono messaggi con timestamp superiore in coda:", kvs.GetQueue())
+				}
+			} else {
+				fmt.Println("il msg non ha ricevuto tutti gli ack", kvs.GetMsgToQueue(0).GetNumberAck())
+			}
+		} else {
+			fmt.Println("il msg non è in testa alla coda")
+		}
+
+	} else {
+		fmt.Println("non ci sono messaggi nella coda")
+	}*/
+
+	return len(kvs.GetQueue()) > 0 && // Se ci sono elementi in coda
+		kvs.GetMsgToQueue(0).GetIdMessage() == message.GetIdMessage() && // Se il messaggio in testa è il messaggio in argomento
+		kvs.GetMsgToQueue(0).GetNumberAck() == common.Replicas && // Se ha ricevuto tutti gli ack
+		kvs.secondCondition(message) // Se la seconda condizione è rispettata
 }
 
 // secondCondition ritorna true se:
-// Per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
-// Dato il messaggio in argomento: Ci devono essere almeno un messaggio per ciascun server con timestamp maggiore (msg.IdSender)
-func (kvs *KeyValueStoreSequential) secondCondition(message *msg.MessageS) bool {
-	//time.Sleep(2000 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
+//   - Per ogni processo pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di message passato come argomento
+func (kvs *KeyValueStoreSequential) secondCondition(message *commonMsg.MessageS) bool {
 	// Controllo che ci sia almeno un messaggio per ciascun server con timestamp maggiore
-
+	// rispetto a quello del messaggio in argomento
 	for i := 0; i < common.Replicas; i++ {
 		found := false
-		for _, messageS := range kvs.GetQueue() {
-			if messageS.GetIdSender() == i && messageS.GetClock() > message.GetClock() {
+		for _, msg := range kvs.GetQueue() {
+			if msg.GetClock() > message.GetClock() && // il messaggio in coda ha un timestamp maggiore
+				msg.GetIdSender() == i { // Se il messaggio è stato inviato dal server i
 				found = true
 				break
 			}
 		}
 		if !found {
 			kvs.isAllEndKey()
-			//fmt.Println(message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "secondCondition non rispettata", "tsClient", message.Args.TimestampClient, "assume", kvs.receiveAssumeFIFO)
+			//fmt.Println(message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+			//	"secondCondition non rispettata", "tsClient", message.GetOrderClient())
 			return false
 		}
 	}
@@ -278,13 +300,13 @@ func (kvs *KeyValueStoreSequential) secondCondition(message *msg.MessageS) bool 
 
 // updateLogicalClock aggiorna il LogicalClock del server, calcolando il max tra il LogicalClock del server e quello del messaggio ricevuto
 // e incrementando il LogicalClock di uno se il messaggio ricevuto non è stato inviato in multicast dal server stesso
-func (kvs *KeyValueStoreSequential) updateLogicalClock(message *msg.MessageS) {
+func (kvs *KeyValueStoreSequential) updateLogicalClock(message *commonMsg.MessageS) {
 	kvs.mutexClock.Lock()
 	defer kvs.mutexClock.Unlock()
 
-	kvs.SetLogicalClock(common.Max(message.GetClock(), kvs.GetClock()))
+	kvs.SetClock(common.Max(message.GetClock(), kvs.GetClock()))
 	if kvs.GetIdServer() != message.GetIdSender() {
-		kvs.SetLogicalClock(kvs.GetClock() + 1) // Devo incrementare il clock per gestire l'evento di receive
+		kvs.SetClock(kvs.GetClock() + 1) // Devo incrementare il clock per gestire l'evento di receive
 	}
 }
 
@@ -294,15 +316,17 @@ func (kvs *KeyValueStoreSequential) updateLogicalClock(message *msg.MessageS) {
 // 1. il messaggio in testa alla coda è uguale a message
 // 2. il messaggio in testa alla coda ha ricevuto tutti gli ack
 // 3. il messaggio in testa alla coda ha come chiave common.EndKey
-func (kvs *KeyValueStoreSequential) isEndKeyMessage(message *msg.MessageS) bool {
-	return len(kvs.GetQueue()) > 0 && kvs.GetQueue()[0].GetIdMessage() == message.GetIdMessage() && kvs.GetQueue()[0].GetNumberAck() == common.Replicas && message.GetKey() == common.EndKey
+func (kvs *KeyValueStoreSequential) isEndKeyMessage(message *commonMsg.MessageS) bool {
+	return len(kvs.GetQueue()) > 0 &&
+		message.GetKey() == common.EndKey &&
+		kvs.GetMsgToQueue(0).GetIdMessage() == message.GetIdMessage() &&
+		kvs.GetMsgToQueue(0).GetNumberAck() == common.Replicas
 }
 
 // isAllEndKey controlla se tutti i messaggi rimanenti in coda sono endKey
 // se lo sono, svuota la coda
 func (kvs *KeyValueStoreSequential) isAllEndKey() {
-	kvs.updateEndKeyTimestamp()
-	//printQueue(kvs)
+	//kvs.updateEndKeyTimestamp()
 
 	// Se in coda sono rimasti solamente i Common.Replicas
 	// messaggi di endKey, e il receiveAssumeFIFO è pari a message.args.timestamp -> svuota la coda
@@ -321,14 +345,13 @@ func (kvs *KeyValueStoreSequential) isAllEndKey() {
 			for range kvs.GetQueue() {
 				// Rimuovi il primo elemento dalla coda
 				kvs.SetQueue(kvs.GetQueue()[1:])
-				//kvs.Queue = kvs.Queue[1:]
 			}
 			return
 		}
 	}
 }
 
-// updateEndKeyTimestamp aggiorna il timestamp dei messaggi di endKey
+// AupdateEndKeyTimestamp aggiorna il timestamp dei messaggi di endKey
 // Se il primo messaggio in coda ha un timestamp uguale o maggiore a quello dell'endKey, incrementa il timestamp dell'endKey con il suo +1
 // cosi da averli sicuramente alla fine della coda -> Non dovrebbe succedere secondo l'assunzione di una coda fifo
 func (kvs *KeyValueStoreSequential) updateEndKeyTimestamp() {
@@ -340,10 +363,9 @@ func (kvs *KeyValueStoreSequential) updateEndKeyTimestamp() {
 	for i, messageS := range kvs.GetQueue() {
 		if messageS.GetKey() == common.EndKey {
 			// Se il primo messaggio nella coda ha un timestamp uguale o maggiore a quello dell'endKey
-			if kvs.GetQueue()[0].GetClock() >= messageS.GetClock() {
+			if kvs.GetMsgToQueue(0).GetClock() >= messageS.GetClock() {
 				// Incremento il timestamp di endKey con il mio +1
-				kvs.GetQueue()[i].SetClock(kvs.GetQueue()[0].GetClock() + 1)
-				//kvs.GetQueue()[i].LogicalClock = kvs.GetQueue()[0].GetClock() + 1
+				kvs.GetMsgToQueue(i).SetClock(kvs.GetMsgToQueue(0).GetClock() + 1)
 				break
 			}
 		}
