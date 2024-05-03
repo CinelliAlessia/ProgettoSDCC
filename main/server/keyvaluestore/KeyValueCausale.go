@@ -13,7 +13,7 @@ type KeyValueStoreCausale struct {
 	VectorClock [common.Replicas]int // Orologio vettoriale
 	mutexClock  sync.Mutex
 
-	Queue      []msg.MessageC
+	Queue      []commonMsg.MessageC
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
 	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
@@ -32,7 +32,7 @@ func NewKeyValueStoreCausal(idServer int) *KeyValueStoreCausale {
 		kvc.SetVectorClock(0, 0) // Inizializzazione dell'orologio logico vettoriale
 	}
 
-	kvc.SetQueue(make([]msg.MessageC, 0)) // Inizializzazione della coda
+	kvc.SetQueue(make([]commonMsg.MessageC, 0)) // Inizializzazione della coda
 	kvc.SetIdServer(idServer)
 
 	return kvc
@@ -46,7 +46,7 @@ func (kvc *KeyValueStoreCausale) SetVectorClock(index int, value int) {
 	kvc.VectorClock[index] = value
 }
 
-func (kvc *KeyValueStoreCausale) SetQueue(queue []msg.MessageC) {
+func (kvc *KeyValueStoreCausale) SetQueue(queue []commonMsg.MessageC) {
 	kvc.Queue = queue
 }
 
@@ -62,7 +62,7 @@ func (kvc *KeyValueStoreCausale) GetDatastore() map[string]string {
 	return kvc.Common.Datastore
 }
 
-func (kvc *KeyValueStoreCausale) GetQueue() []msg.MessageC {
+func (kvc *KeyValueStoreCausale) GetQueue() []commonMsg.MessageC {
 	return kvc.Queue
 }
 

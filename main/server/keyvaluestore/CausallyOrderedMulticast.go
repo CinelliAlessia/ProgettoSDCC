@@ -12,7 +12,7 @@ import (
 // non restituisce true, indicando che la richiesta può essere eseguita a livello applicativo. Quando ciò accade,
 // la funzione esegue effettivamente l'operazione a livello applicativo tramite la chiamata a RealFunction e rimuove
 // il messaggio dalla coda. Restituisce un booleano tramite reply per indicare se l'operazione è stata eseguita con successo.
-func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message msg.MessageC, response *common.Response) error {
+func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message commonMsg.MessageC, response *common.Response) error {
 
 	kvc.addToQueue(&message)
 
@@ -45,7 +45,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message msg.MessageC, 
 }
 
 // addToQueue aggiunge il messaggio passato come argomento alla coda.
-func (kvc *KeyValueStoreCausale) addToQueue(message *msg.MessageC) {
+func (kvc *KeyValueStoreCausale) addToQueue(message *commonMsg.MessageC) {
 	kvc.mutexQueue.Lock()
 	defer kvc.mutexQueue.Unlock()
 
@@ -58,7 +58,7 @@ func (kvc *KeyValueStoreCausale) addToQueue(message *msg.MessageC) {
 // livello applicativo finché non si verificano entrambe le seguenti condizioni:
 //   - `t(m)[i] = Vj[i] + 1` (il messaggio `m` è il successivo che `pj` si aspetta da `pi`).
 //   - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
-func (kvc *KeyValueStoreCausale) controlSendToApplication(message *msg.MessageC) bool {
+func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.MessageC) bool {
 	result := false
 
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
@@ -104,7 +104,7 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *msg.MessageC)
 }
 
 // removeMessageToQueue Rimuove un messaggio dalla coda basato sull'ID del messaggio passato come argomento
-func (kvc *KeyValueStoreCausale) removeMessageToQueue(message *msg.MessageC) {
+func (kvc *KeyValueStoreCausale) removeMessageToQueue(message *commonMsg.MessageC) {
 	kvc.mutexQueue.Lock()
 	defer kvc.mutexQueue.Unlock()
 

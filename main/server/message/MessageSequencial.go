@@ -1,4 +1,4 @@
-package msg
+package commonMsg
 
 import (
 	"main/common"
@@ -18,10 +18,14 @@ func NewMessageSeq(idSender int, typeOfMessage string, args common.Args, logical
 
 	msg.setIdMessage()
 	msg.SetIdSender(idSender)
+	msg.SetClientID(args.GetIDClient())
+
 	msg.SetTypeOfMessage(typeOfMessage)
 	msg.SetKey(args.GetKey())
 	msg.SetValue(args.GetValue())
+
 	msg.SetTimestampClient(args.GetTimestamp())
+
 	msg.SetClock(logicalClock)
 	msg.SetNumberAck(numberAck)
 
@@ -30,10 +34,12 @@ func NewMessageSeq(idSender int, typeOfMessage string, args common.Args, logical
 
 // ----- Metodi SET ----- //
 
+// Assegna un id univoco al messaggio
 func (msg *MessageS) setIdMessage() {
 	msg.Common.Id = common.GenerateUniqueID()
 }
 
+// SetIdSender Assegna l'id tra 0 e common.Replicas-1 del server che ha inviato il messaggio
 func (msg *MessageS) SetIdSender(idSender int) {
 	msg.Common.IdSender = idSender
 }
@@ -46,6 +52,7 @@ func (msg *MessageS) SetNumberAck(numberAck int) {
 	msg.NumberAck = numberAck
 }
 
+// SetClock Associa il clock logico al messaggio
 func (msg *MessageS) SetClock(clock int) {
 	msg.LogicalClock = clock
 }
@@ -58,11 +65,21 @@ func (msg *MessageS) SetValue(value string) {
 	msg.Common.Args.SetValue(value)
 }
 
+// SetTimestampClient Associa il timestamp logico del client al messaggio
+// - timestamp logico del client che lui associa alla richiesta per poi inviarlo al server
 func (msg *MessageS) SetTimestampClient(timestamp int) {
 	msg.Common.Args.SetTimestamp(timestamp)
 }
 
+func (msg *MessageS) SetClientID(client string) {
+	msg.Common.Args.SetIDClient(client)
+}
+
 /* METODI GET */
+
+func (msg *MessageS) GetArgs() common.Args {
+	return msg.Common.Args
+}
 
 func (msg *MessageS) GetNumberAck() int {
 	return msg.NumberAck
@@ -93,5 +110,10 @@ func (msg *MessageS) GetClock() int {
 }
 
 func (msg *MessageS) GetOrderClient() int {
-	return msg.Common.Args.GetTimestamp()
+	args := msg.GetArgs()
+	return args.GetTimestamp()
+}
+
+func (msg *MessageS) GetIdClient() string {
+	return msg.Common.Args.GetIDClient()
 }

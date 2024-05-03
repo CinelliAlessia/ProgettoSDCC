@@ -46,7 +46,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 }
 
 // RealFunction esegue l'operazione di put e di delete realmente
-func (kvc *KeyValueStoreCausale) realFunction(message *msg.MessageC, response *common.Response) error {
+func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, response *common.Response) error {
 	if message.GetTypeOfMessage() == put { // Scrittura
 		kvc.GetDatastore()[message.GetKey()] = message.GetValue()
 
@@ -73,14 +73,14 @@ func (kvc *KeyValueStoreCausale) realFunction(message *msg.MessageC, response *c
 	return nil
 }
 
-func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string) *msg.MessageC {
+func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string) *commonMsg.MessageC {
 	kvc.mutexClock.Lock()
 	defer kvc.mutexClock.Unlock()
 
 	//kvc.VectorClock[kvc.GetIdServer()]++
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
 
-	message := msg.NewMessageCau(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
+	message := commonMsg.NewMessageCau(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
 
 	printDebugBlue("RICEVUTO da client", *message, kvc, nil)
 	return message
