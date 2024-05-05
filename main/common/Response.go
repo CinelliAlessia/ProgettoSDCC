@@ -2,9 +2,11 @@ package common
 
 // Response è una struttura creata per memorizzare la risposta delle chiamate RPC
 type Response struct {
-	Value  string
-	Result bool
-	Done   chan bool
+	Value     string
+	Result    bool
+	Done      chan bool
+	ServerId  int // non dovrebbe servire
+	Timestamp int
 }
 
 /* RESPONDE STRUCT */
@@ -13,22 +15,38 @@ func (response *Response) SetValue(value string) {
 	response.Value = value
 }
 
-func (response *Response) SetResult(result bool) {
-	response.Result = result
-}
-
-func (response *Response) SetDone(done chan bool) {
-	response.Done = done
-}
-
 func (response *Response) GetValue() string {
 	return response.Value
+}
+
+func (response *Response) SetResult(result bool) {
+	response.Result = result
 }
 
 func (response *Response) GetResult() bool {
 	return response.Result
 }
 
+func (response *Response) SetDone(done chan bool) {
+	response.Done = done
+}
+
 func (response *Response) GetDone() chan bool {
 	return response.Done
+}
+
+func (response *Response) SetServerId(serverId int) {
+	response.ServerId = serverId
+}
+
+func (response *Response) GetServerId() int {
+	return response.ServerId
+}
+
+func (response *Response) SetTimestamp(timestamp int) {
+	response.Timestamp = timestamp
+}
+
+func (response *Response) GetTimestamp() int {
+	return response.Timestamp
 }
