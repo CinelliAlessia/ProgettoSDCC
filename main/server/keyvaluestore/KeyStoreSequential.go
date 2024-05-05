@@ -22,6 +22,9 @@ type KeyValueStoreSequential struct {
 
 	ClientMaps map[string]*ClientMap // Mappa -> struttura dati che associa chiavi a valori
 	mutexMaps  sync.Mutex            // Mutex per proteggere l'accesso concorrente alla mappa
+
+	ResponseOrderingFIFO      int
+	mutexResponseOrderingFIFO sync.Mutex
 }
 
 // ----- CONSISTENZA SEQUENZIALE ----- //
@@ -145,4 +148,17 @@ func (kvs *KeyValueStoreSequential) GetExecuteTsClient(id string) (int, error) {
 	}
 	// Gestisci l'errore qui. Potresti restituire un valore predefinito o generare un errore.
 	return -1, fmt.Errorf("key non presente")
+}
+
+func (kvs *KeyValueStoreSequential) SetResponseOrderingFIFO() {
+	kvs.mutexResponseOrderingFIFO.Lock()
+	defer kvs.mutexResponseOrderingFIFO.Unlock()
+	kvs.ResponseOrderingFIFO += 1
+}
+
+func (kvs *KeyValueStoreSequential) GetResponseOrderingFIFO() int {
+	kvs.mutexResponseOrderingFIFO.Lock()
+	defer kvs.mutexResponseOrderingFIFO.Unlock()
+
+	return kvs.ResponseOrderingFIFO
 }
