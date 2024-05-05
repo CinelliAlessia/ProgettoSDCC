@@ -77,22 +77,11 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // realFunction esegue l'operazione di get, put e di delete realmente,
-//  1. Controlla se deve inviare prima altri messaggi al client //TODO: serve? in teoria no, è il client che li deve leggere come si deve
 //
 // inserendo la risposta adeguata nella struttura common.Response
 // Se l'operazione è andata a buon fine, restituisce true, altrimenti restituisce false,
 // sarà la risposta che leggerà il client
 func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, response *common.Response) error {
-
-	/*if message.GetIdSender() == kvs.GetIdServer() {
-		for {
-			// Aspetta di aver inviato il messaggio precedente
-			stop, _ := kvs.canExecuteForTS(message)
-			if stop {
-				break
-			}
-		}
-	}*/
 
 	if message.GetTypeOfMessage() == put { // Scrittura
 		if kvs.isEndKeyMessage(message) {
@@ -120,11 +109,14 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 		}
 	}
 
-	printGreen("ESEGUITO", *message, nil, kvs)
-	kvs.GetQueue()
+	// Stampa di debug
+	//kvs.GetQueue()
 
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(true)
+		response.SetTimestamp(kvs.GetResponseOrderingFIFO())
+		kvs.SetResponseOrderingFIFO()
+		printGreen("ESEGUITO", *message, nil, kvs)
 	}
 
 	return nil
