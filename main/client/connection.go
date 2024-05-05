@@ -111,7 +111,7 @@ func connect(index int) (*rpc.Client, error) {
 func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Response, rpcName string) error {
 
 	for {
-		if clientState.SendIndex[index] == args.GetTimestamp() {
+		if clientState.SendIndex[index] == args.GetSendingFIFO() {
 			clientState.MutexSent[index].Lock()
 			clientState.SendIndex[index]++
 			break
@@ -142,7 +142,7 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 	// TODO: per quanto riguarda la async a me non interessa inviarli in ordine
 	for {
-		if clientState.SendIndex[index] == args.GetTimestamp() {
+		if clientState.SendIndex[index] == args.GetSendingFIFO() {
 			clientState.MutexSent[index].Lock()
 			clientState.SendIndex[index]++
 			break
@@ -181,13 +181,13 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 func waitToAccept(index int, args common.Args, rpcName string, response *common.Response) {
 	for {
-		if clientState.ReceiveIndex[index] == response.GetTimestamp() {
+		if clientState.ReceiveIndex[index] == response.GetReceptionFIFO() {
 			clientState.MutexReceive[index].Lock()
 			clientState.ReceiveIndex[index]++
 			debugPrintResponse(rpcName, args, *response)
 			clientState.MutexReceive[index].Unlock()
 			return
 		}
-		//fmt.Println("waitToAccept: server:", index, "clock", response.GetTimestamp(), "client clock", clientState.ReceiveIndex[index])
+		//fmt.Println("waitToAccept: server:", index, "clock", response.GetSendingFIFO(), "client clock", clientState.ReceiveIndex[index])
 	}
 }

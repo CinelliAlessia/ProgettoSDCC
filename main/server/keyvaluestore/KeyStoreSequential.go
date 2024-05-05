@@ -118,7 +118,7 @@ func (kvs *KeyValueStoreSequential) SetRequestClient(id string, ts int) {
 }
 
 func (kvs *KeyValueStoreSequential) IncreaseRequestTsClient(args common.Args) {
-	kvs.SetRequestClient(args.GetIDClient(), args.GetTimestamp()+1)
+	kvs.SetRequestClient(args.GetIDClient(), args.GetSendingFIFO()+1)
 }
 
 // TODO: errore qui, -1 gestire
@@ -135,7 +135,7 @@ func (kvs *KeyValueStoreSequential) IncreaseExecuteTsClient(args common.Args) {
 	clientMap := kvs.ClientMaps[args.GetIDClient()]
 	clientMap.MutexExecute.Lock()
 
-	executeTs := args.GetTimestamp() + 1
+	executeTs := args.GetSendingFIFO() + 1
 	clientMap.SetExecuteTs(executeTs)
 
 	clientMap.MutexExecute.Unlock()
@@ -150,7 +150,7 @@ func (kvs *KeyValueStoreSequential) GetExecuteTsClient(id string) (int, error) {
 	return -1, fmt.Errorf("key non presente")
 }
 
-func (kvs *KeyValueStoreSequential) SetResponseOrderingFIFO() {
+func (kvs *KeyValueStoreSequential) IncreaseResponseOrderingFIFO() {
 	kvs.mutexResponseOrderingFIFO.Lock()
 	defer kvs.mutexResponseOrderingFIFO.Unlock()
 	kvs.ResponseOrderingFIFO += 1

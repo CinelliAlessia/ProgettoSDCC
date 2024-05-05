@@ -50,7 +50,6 @@ func (kvc *KeyValueStoreCausale) addToQueue(message *commonMsg.MessageC) {
 	defer kvc.mutexQueue.Unlock()
 
 	kvc.SetQueue(append(kvc.GetQueue(), *message))
-	//kvc.Queue = append(kvc.Queue, message)
 }
 
 // controlSendToApplication realizza questo controllo:
@@ -62,11 +61,14 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 	result := false
 
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
-	if (message.GetIdSender() != kvc.GetIdServer()) && (message.GetClock()[message.GetIdSender()] == (kvc.GetClock()[message.GetIdSender()] + 1)) {
+	if (message.GetIdSender() != kvc.GetIdServer()) &&
+		(message.GetClock()[message.GetIdSender()] == (kvc.GetClock()[message.GetIdSender()] + 1)) {
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
 		for index := range message.GetClock() {
-			if (index != message.GetIdSender()) && (index != kvc.GetIdServer()) && (message.GetClock()[index] > kvc.GetClock()[index]) {
+			if (index != message.GetIdSender()) &&
+				(index != kvc.GetIdServer()) &&
+				(message.GetClock()[index] > kvc.GetClock()[index]) {
 				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
 				//fmt.Println("non ho ancora visto dei messaggi", "msg", message.VectorClock, "mio", kvc.VectorClock)
 				result = false
@@ -111,7 +113,6 @@ func (kvc *KeyValueStoreCausale) removeMessageToQueue(message *commonMsg.Message
 	for i, m := range kvc.GetQueue() {
 		if m.GetIdMessage() == message.GetIdMessage() {
 			kvc.SetQueue(append(kvc.GetQueue()[:i], kvc.GetQueue()[i+1:]...))
-			//kvc.Queue = append(kvc.Queue[:i], kvc.Queue[i+1:]...)
 			return
 		}
 	}

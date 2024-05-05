@@ -77,10 +77,9 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 	kvc.mutexClock.Lock()
 	defer kvc.mutexClock.Unlock()
 
-	//kvc.VectorClock[kvc.GetIdServer()]++
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
 
-	message := commonMsg.NewMessageCau(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
+	message := commonMsg.NewMessageC(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
 
 	printDebugBlue("RICEVUTO da client", *message, kvc, nil)
 	return message

@@ -37,14 +37,14 @@ func testSequential(rpcName string, operations []Operation) {
 
 		args := listArgs[op.ServerIndex]
 
-		args.SetTimestamp(serverTimestamps[op.ServerIndex])
+		args.SetSendingFIFO(serverTimestamps[op.ServerIndex])
 		args.SetKey(op.Key)
 		args.SetValue(op.Value)
 
 		responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
 		serverTimestamps[op.ServerIndex]++
-		fmt.Println("Richiesta effettuata con ts", args.GetTimestamp(), "al server", op.ServerIndex, "nuovo ts", serverTimestamps[op.ServerIndex])
+		fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", serverTimestamps[op.ServerIndex])
 
 		if err != nil {
 			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)

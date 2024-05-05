@@ -23,6 +23,29 @@ var clientState = ClientState{
 	MutexReceive: make([]sync2.Mutex, common.Replicas),
 }
 
+const (
+	put = ".Put"
+	get = ".Get"
+	del = ".Delete"
+)
+
+const (
+	sync  = "sync"
+	async = "async"
+)
+
+const (
+	random   = "random"
+	specific = "specific"
+)
+
+type Operation struct {
+	ServerIndex   int
+	OperationType string
+	Key           string
+	Value         string
+}
+
 func main() {
 
 	for {

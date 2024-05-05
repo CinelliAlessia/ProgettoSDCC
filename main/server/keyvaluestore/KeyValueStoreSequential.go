@@ -114,8 +114,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(true)
-		response.SetTimestamp(kvs.GetResponseOrderingFIFO())
-		kvs.SetResponseOrderingFIFO()
+		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO())
+		kvs.IncreaseResponseOrderingFIFO()
 		printGreen("ESEGUITO", *message, nil, kvs)
 	}
 
@@ -151,23 +151,23 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 	if _, ok := kvs.ClientMaps[args.GetIDClient()]; !ok {
 		// Non ho mai ricevuto un messaggio da questo client
 
-		if args.GetTimestamp() == 0 { //  Se è il primo messaggio che avrei dovuto ricevere lo prendo
+		if args.GetSendingFIFO() == 0 { //  Se è il primo messaggio che avrei dovuto ricevere lo prendo
 			kvs.NewClientMap(args.GetIDClient())
 			kvs.IncreaseRequestTsClient(args)
 			return true
 		} else {
 			fmt.Println("Ho ricevuto un messaggio da un client che non conosco ma me ne aspetto altri:",
-				"Timestamp msg client", args.GetTimestamp())
+				"ReceptionFIFO msg client", args.GetSendingFIFO())
 		}
 	} else { // Avevo già ricevuto messaggi da questo client
 		requestTs, err := kvs.GetRequestTsClient(args.GetIDClient())
-		if args.GetTimestamp() == requestTs && err == nil {
+		if args.GetSendingFIFO() == requestTs && err == nil {
 			// Se il messaggio che ricevo dal client è il successivo rispetto all'ultimo ricevuto, lo posso aggiungere alla coda
 			kvs.IncreaseRequestTsClient(args)
 			return true
 		} else {
 			fmt.Println("Ho ricevuto un messaggio da un client ma me ne aspetto altri:",
-				"Timestamp msg client", args.GetTimestamp(), "ts mio", requestTs, "err", err)
+				"ReceptionFIFO msg client", args.GetSendingFIFO(), "ts mio", requestTs, "err", err)
 		}
 	}
 	//time.Sleep(1 * time.Second)
@@ -195,7 +195,7 @@ func (kvs *KeyValueStoreSequential) canExecuteForTS(message *commonMsg.MessageS)
 		executeTs, err := kvs.GetExecuteTsClient(message.GetIdClient())
 		args := message.GetArgs()
 
-		if args.GetTimestamp() == executeTs && err != nil { // Se il messaggio è il prossimo da inviare, lo invio
+		if args.GetSendingFIFO() == executeTs && err != nil { // Se il messaggio è il prossimo da inviare, lo invio
 			kvs.IncreaseExecuteTsClient(args)
 			return true, nil
 		}
@@ -207,6 +207,6 @@ func (kvs *KeyValueStoreSequential) canExecuteForTS(message *commonMsg.MessageS)
 		return false, err
 	}
 
-	fmt.Println("Timestamp client", message.GetOrderClient(), "ExecuteTs", executeTs)
+	fmt.Println("ReceptionFIFO client", message.GetSendingFIFO(), "ExecuteTs", executeTs)
 	return false, err
 }

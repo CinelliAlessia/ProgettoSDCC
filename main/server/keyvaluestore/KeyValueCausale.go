@@ -42,28 +42,32 @@ func (kvc *KeyValueStoreCausale) SetDatastore(key string, value string) {
 	kvc.Common.Datastore[key] = value
 }
 
+func (kvc *KeyValueStoreCausale) GetDatastore() map[string]string {
+	return kvc.Common.Datastore
+}
+
 func (kvc *KeyValueStoreCausale) SetVectorClock(index int, value int) {
 	kvc.VectorClock[index] = value
-}
-
-func (kvc *KeyValueStoreCausale) SetQueue(queue []commonMsg.MessageC) {
-	kvc.Queue = queue
-}
-
-func (kvc *KeyValueStoreCausale) SetIdServer(id int) {
-	kvc.Common.Id = id
 }
 
 func (kvc *KeyValueStoreCausale) GetClock() [common.Replicas]int {
 	return kvc.VectorClock
 }
 
-func (kvc *KeyValueStoreCausale) GetDatastore() map[string]string {
-	return kvc.Common.Datastore
+func (kvc *KeyValueStoreCausale) GetClockIDServer(id int) int {
+	return kvc.VectorClock[id]
+}
+
+func (kvc *KeyValueStoreCausale) SetQueue(queue []commonMsg.MessageC) {
+	kvc.Queue = queue
 }
 
 func (kvc *KeyValueStoreCausale) GetQueue() []commonMsg.MessageC {
 	return kvc.Queue
+}
+
+func (kvc *KeyValueStoreCausale) SetIdServer(id int) {
+	kvc.Common.Id = id
 }
 
 func (kvc *KeyValueStoreCausale) GetIdServer() int {

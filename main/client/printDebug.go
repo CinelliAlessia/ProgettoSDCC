@@ -7,29 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	put = ".Put"
-	get = ".Get"
-	del = ".Delete"
-)
-
-const (
-	sync  = "sync"
-	async = "async"
-)
-
-const (
-	random   = "random"
-	specific = "specific"
-)
-
-type Operation struct {
-	ServerIndex   int
-	OperationType string
-	Key           string
-	Value         string
-}
-
 /* ----- FUNZIONI PER PRINT DI DEBUG ----- */
 
 func debugPrintRun(rpcName string, args common.Args) {

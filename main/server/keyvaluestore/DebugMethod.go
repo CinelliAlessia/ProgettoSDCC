@@ -24,14 +24,14 @@ func printDebugBlue(blueString string, message interface{}, kvc *KeyValueStoreCa
 		case commonMsg.MessageS:
 			if kvs != nil {
 				fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
-					"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
+					"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 			} else {
 				fmt.Println("ERRORE")
 			}
 		case commonMsg.MessageC:
 			if kvc != nil {
 				fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
-					"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
+					"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 			} else {
 				fmt.Println("ERRORE")
 			}
@@ -50,10 +50,10 @@ func printGreen(greenString string, message interface{}, kvc *KeyValueStoreCausa
 	switch message := message.(type) {
 	case commonMsg.MessageS:
 		fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
-			"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
+			"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 	case commonMsg.MessageC:
 		fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
-			"clockClient", message.GetOrderClient(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
+			"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 	}
 }
 

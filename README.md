@@ -1,6 +1,6 @@
 **Dipendenze Esterne** Per garantire il corretto funzionamento del sistema, sono state aggiunte alcune dipendenze 
-esterne che facilitano determinate funzionalità all'interno del codice. In particolare, abbiamo incluso le seguenti 
-dipendenze:
+esterne che facilitano determinate funzionalità all'interno del codice. 
+In particolare, abbiamo incluso le seguenti dipendenze:
 
 *   **github.com/google/uuid**: Questa libreria è stata utilizzata per generare in modo univoco gli identificatori 
 * univoci (UUID) necessari per identificare in modo univoco le chiavi all'interno del nostro sistema di memorizzazione 
@@ -24,8 +24,8 @@ per indicare se si vorrebbero avere maggior print di debug per una spiegazione e
 Questo progetto consiste nel realizzare un server che dia garanzia, a scelta del client, di avere repliche di datastore
 che rispettino la consistenza sequenziale o la consistenza causale. 
 
-- Per garantire la consistenza sequenziale si utilizza l'algoritmo di multicast totalmente ordinato.
-- Per garantire la consistenza causale si utilizza l'algoritmo di multicast causalmente ordinato.
+- Per garantire la consistenza causale si utilizza l'algoritmo di Multicast causalmente ordinato.
+- Per garantire la consistenza sequenziale si utilizza l'algoritmo di Multicast totalmente ordinato.
 
 **Multicast Causalmente Ordinato**
 
@@ -33,11 +33,12 @@ Il client effettua le richieste RPC chiamando le `KeyValueStoreCausale.Put`, `Ke
 `KeyValueStoreCausale.Delete`.
 
 Ciascuna di queste funzioni RPC, lato server, una volta ricevuta la richiesta incrementano il clock vettoriale 
-associato al server (protetto da un mutex), lo associa alla richiesta ricevuta e genera un messaggio da inviare 
+associato al server (protetto da un mutex) per conteggiare l'evento di receive.
+Associa il proprio clock vettoriale alla richiesta ricevuta e genera un messaggio da inviare 
 in multicast, tramite `sendToAllServer()`.
 
 Ciascun server che riceve un messaggio di multicast, in `CausallyOrderedMulticast()`, aggiunge la richiesta alla coda e
-controlla (ogni 100 Millisecondi) se può essere eseguita a livello applicativo.
+controllerà ripetutamente se può essere eseguita a livello applicativo.
 
 Il controllo avviene in `controlSendToApplication()`, quando il processo `pj` riceve il messaggio `m` da `pi`, dove per
 `t(m)` si intende il clock vettoriale associato al messaggio inviato:
@@ -45,10 +46,14 @@ Il controllo avviene in `controlSendToApplication()`, quando il processo `pj` ri
 - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti
 da `pi`).
 - Viene ulteriormente controllato se il messaggio ricevuto è stato inviato da se stesso, in quel caso è sicuramente un 
-"messaggio che si aspetta di ricevere".
+messaggio che "si aspetta di ricevere".
+- Un ulteriore controllo si effettua nel caso sia una richiesta di `Get`, nel caso un client ha effettuato una richiesta
+di lettura di una key non presente nel datastore, questa richiesta verrà eseguita solo quando il server avrà ricevuto
+almeno una richiesta di `Put` per quella Key, cioè la chiave dovrà essere presente nel datastore. 
 
 In caso il controllo vada a buon fine:
-- Se non si è il sender del messaggio, si incrementa il clock relativo al server che ha inviato il messaggio.
+- Se non si è il sender del messaggio, si incrementa il clock relativo al server che ha inviato il messaggio, per 
+conteggiare l'evento di receive.
 - Viene rimosso il messaggio dalla coda.
 - è possibile inviare il messaggio a livello applicativo eseguendo `realFunction()` che esegue l'operazione richiesta
 nel datastore del server. 
@@ -58,23 +63,37 @@ nel datastore del server.
 Il client effettua le richieste RPC chiamando le `KeyValueStoreSequential.Put`, `KeyValueStoreSequential.Get`, 
 `KeyValueStoreSequential.Delete`.
 
+Il Multicast Totalmente Ordinato, per essere realizzato ha bisogno di una assunzione: 
+- I messaggi vengono consegnati al server nello stesso ordine in cui il client lo invia. Assunzione FIFO Ordering
+
+Il server, alla ricezione di qualsiasi delle tre chiamate RPC, per rispettare l'assunzione di FIFO Ordering, esegue la 
+funzione `canReceive()`, controllando se ha ricevuto tutti i messaggi precedenti a quello attuale da parte del client, 
+continuerà l'esecuzione solo se ha ricevuto tutti i messaggi precedenti.
+
 Ciascuna di queste funzioni RPC, lato server, una volta ricevuta la richiesta incrementano il suo clock logico scalare 
-(protetto da un mutex):
-- Per le richieste di tipo `GET` viene eseguita direttamente la richiesta e restituito il risultato al client.
-- Per le richieste di tipo `PUT` e `DELETE` viene generato un messaggio da inviare in multicast, tramite `sendToAllServer()`.
+(protetto da un mutex) e aggiungono il messaggio creato alla coda:
+- Per le richieste di tipo `GET`, se il messaggio relativo è in testa alla coda, verrà eseguita direttamente la 
+richiesta e restituito il risultato al client, poiché le operazioni di lettura sono considerate eventi interni, 
+e non c'è bisogno che tutti i datastore replica ne siano a conoscenza.
+- Per le richieste di tipo `PUT` e `DELETE` viene generato un messaggio da inviare in multicast, tramite 
+`sendToAllServer()`, essendo essi eventi esterni, che vanno a modificare tutti i datastore replica.
 
 Ciascun server che riceve un messaggio di multicast (da una richiesta di `PUT` o `DELETE`), in `TotalOrderedMulticast()`:
-- Aggiunge la richiesta alla coda, ordinata in base al timestamp locale.
 - Invia un ack a tutti i server per indicare che lui ha letto quel messaggio, tramite `sendAck()`.
-- Controlla se può essere eseguita a livello applicativo.
+- Controlla se può essere eseguita a livello applicativo, tramite `canExecute()`.
 
 Il controllo avviene in `controlSendToApplication()`: verificando se il messaggio è in testa alla coda e ha ricevuto 
-tutti gli ack relativi a quella richiesta. 
-In caso il controllo vada a buon fine è possibile inviare il messaggio a livello applicativo:
+tutti gli ack da parte dei server. 
+In caso il controllo vada a buon fine è possibile inviare il messaggio a livello applicativo, l'esecuzione è protetta da
+un mutex per garantirne un esecuzione atomica:
 - Viene rimosso il messaggio dalla coda 
 - Calcola il max tra il suo clock scalare e il clock scalare del messaggio ricevuto.
 - Incrementa di uno il clock scalare, per conteggiare l'evento 
 - Viene eseguita `realFunction()` che esegue l'operazione richiesta nel datastore del server. 
+
+`realFunction()` esegue l'operazione richiesta nel datastore del server, in caso di `PUT` e `DELETE` viene aggiornato il
+datastore replica, in caso di `GET` viene restituito il valore associato alla chiave richiesta.
+Gestisce l'assunzione FIFO Ordering per i messaggi di risposta, impostando un timestamp per l'ordinamento dei messaggi.
 
 `sendAck()` invia un messaggio di ack a tutti i server, in modo asincrono.
 Viene effettuata una chiamata RPC `ReceiveAck()`, che gestisce la ricezione dell'ack, se fa riferimento ad un messaggio 

@@ -2,11 +2,11 @@ package common
 
 // Response è una struttura creata per memorizzare la risposta delle chiamate RPC
 type Response struct {
-	Value     string
-	Result    bool
-	Done      chan bool
-	ServerId  int // non dovrebbe servire
-	Timestamp int
+	Value         string
+	Result        bool
+	Done          chan bool // lo setto ma non viene mai letto da nessuno
+	ServerId      int       // non dovrebbe servire, non lo uso
+	ReceptionFIFO int
 }
 
 /* RESPONDE STRUCT */
@@ -43,10 +43,10 @@ func (response *Response) GetServerId() int {
 	return response.ServerId
 }
 
-func (response *Response) SetTimestamp(timestamp int) {
-	response.Timestamp = timestamp
+func (response *Response) SetReceptionFIFO(timestamp int) {
+	response.ReceptionFIFO = timestamp
 }
 
-func (response *Response) GetTimestamp() int {
-	return response.Timestamp
+func (response *Response) GetReceptionFIFO() int {
+	return response.ReceptionFIFO
 }

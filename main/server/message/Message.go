@@ -13,7 +13,7 @@ type Message interface {
 	GetKey() string
 	GetValue() string
 
-	GetOrderClient() int
+	GetSendingFIFO() int
 }
 
 type MessageCommon struct {

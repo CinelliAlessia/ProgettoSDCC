@@ -2,17 +2,17 @@ package common
 
 // Args rappresenta gli argomenti delle chiamate RPC
 type Args struct {
-	Key             string
-	Value           string
-	TimestampClient int    // Chiedere ulteriori spiegazioni
-	ClientId        string // Per identificare il client nella operazione RPC
+	Key         string
+	Value       string
+	SendingFIFO int    // Assunzione FIFO Ordering
+	ClientId    string // Per identificare il client nella operazione RPC
 }
 
 /* ARGS STRUCT */
 
 func NewArgs(timestamp int, key string, values ...string) Args {
 	args := Args{}
-	args.SetTimestamp(timestamp)
+	args.SetSendingFIFO(timestamp)
 	args.SetKey(key)
 	args.SetIDClient(GenerateUniqueID())
 
@@ -38,12 +38,12 @@ func (args *Args) GetValue() string {
 	return args.Value
 }
 
-func (args *Args) SetTimestamp(timestamp int) {
-	args.TimestampClient = timestamp
+func (args *Args) SetSendingFIFO(timestamp int) {
+	args.SendingFIFO = timestamp
 }
 
-func (args *Args) GetTimestamp() int {
-	return args.TimestampClient
+func (args *Args) GetSendingFIFO() int {
+	return args.SendingFIFO
 }
 
 func (args *Args) SetIDClient(id string) {
