@@ -101,8 +101,7 @@ func connect(index int) (*rpc.Client, error) {
 	//fmt.Println("CLIENT: Contatto il server:", serverName)
 	conn, err := rpc.Dial("tcp", serverName)
 	if err != nil {
-		fmt.Println("specificConnect: Errore durante la connessione al server:", err)
-		return nil, fmt.Errorf("specificConnect: Errore durante la connessione al server", err)
+		return nil, fmt.Errorf("specificConnect: Errore durante la connessione al server %v\n", err)
 	}
 	return conn, err
 }
@@ -129,6 +128,7 @@ func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Re
 	clientState.MutexSent[index].Unlock()
 
 	waitToAccept(index, args, rpcName, response)
+	//debugPrintResponse(rpcName, args, *response)
 
 	err = conn.Close()
 	if err != nil {
@@ -157,9 +157,10 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 	go func() {
 		<-call.Done // Aspetta che la chiamata RPC sia completata
-		//TODO: le ricevi bene da parte del client, prendi la risposta in maniera ordinata !!!
 
+		//TODO: le ricevi bene da parte del client, prendi la risposta in maniera ordinata !!!
 		waitToAccept(index, args, rpcName, response)
+		//debugPrintResponse(rpcName, args, *response)
 
 		if call.Error != nil {
 			fmt.Printf("asyncCall: errore durante la chiamata RPC in client: %s\n", call.Error)
@@ -180,12 +181,13 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 func waitToAccept(index int, args common.Args, rpcName string, response *common.Response) {
 	for {
-		if clientState.ReceiveIndex[index] == args.GetTimestamp() {
+		if clientState.ReceiveIndex[index] == response.GetTimestamp() {
 			clientState.MutexReceive[index].Lock()
 			clientState.ReceiveIndex[index]++
 			debugPrintResponse(rpcName, args, *response)
 			clientState.MutexReceive[index].Unlock()
-			break
+			return
 		}
+		//fmt.Println("waitToAccept: server:", index, "clock", response.GetTimestamp(), "client clock", clientState.ReceiveIndex[index])
 	}
 }
