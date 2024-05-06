@@ -1,8 +1,6 @@
 package keyvaluestore
 
 import (
-	"errors"
-	"fmt"
 	"main/common"
 	"main/server/message"
 )
@@ -83,27 +81,28 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 // sarà la risposta che leggerà il client
 func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, response *common.Response) error {
 
+	result := true
+
 	if message.GetTypeOfMessage() == put { // Scrittura
 		if kvs.isEndKeyMessage(message) {
 			kvs.isAllEndKey()
-			return nil
+		} else {
+			kvs.PutInDatastore(message.GetKey(), message.GetValue())
 		}
-
-		kvs.PutInDatastore(message.GetKey(), message.GetValue())
 
 	} else if message.GetTypeOfMessage() == del { // Scrittura
 		delete(kvs.GetDatastore(), message.GetValue()) //TODO: controllare se funziona
 
 	} else if message.GetTypeOfMessage() == get { // Lettura
-		val, ok := kvs.GetDatastore()[message.GetKey()] //TODO: getKey, corretto?
+		val, ok := kvs.GetDatastore()[message.GetKey()]
 		if !ok {
 			printRed("NON ESEGUITO", *message, nil, kvs)
 			if message.GetIdSender() == kvs.GetIdServer() {
-				response.SetResult(false)
+				result = false
 			}
-			return nil
-		}
-		if message.GetIdSender() == kvs.GetIdServer() { // Solo se io sono il sender imposto la risposta per il client
+		} else if message.GetIdSender() == kvs.GetIdServer() {
+			// Solo se io sono il sender imposto la risposta per il client
+
 			response.SetValue(val)
 			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
@@ -113,11 +112,12 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	//kvs.GetQueue()
 
 	if message.GetIdSender() == kvs.GetIdServer() {
-		response.SetResult(true)
+		response.SetResult(result)
 		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO())
 		kvs.IncreaseResponseOrderingFIFO()
-		printGreen("ESEGUITO", *message, nil, kvs)
 	}
+
+	printGreen("ESEGUITO", *message, nil, kvs)
 
 	return nil
 }
@@ -156,8 +156,7 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 			kvs.IncreaseRequestTsClient(args)
 			return true
 		} else {
-			fmt.Println("Ho ricevuto un messaggio da un client che non conosco ma me ne aspetto altri:",
-				"ReceptionFIFO msg client", args.GetSendingFIFO())
+			//fmt.Println("Ho ricevuto un messaggio da un client che non conosco ma me ne aspetto altri:", "ReceptionFIFO msg client", args.GetSendingFIFO())
 		}
 	} else { // Avevo già ricevuto messaggi da questo client
 		requestTs, err := kvs.GetRequestTsClient(args.GetIDClient())
@@ -166,47 +165,8 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 			kvs.IncreaseRequestTsClient(args)
 			return true
 		} else {
-			fmt.Println("Ho ricevuto un messaggio da un client ma me ne aspetto altri:",
-				"ReceptionFIFO msg client", args.GetSendingFIFO(), "ts mio", requestTs, "err", err)
+			//fmt.Println("Ho ricevuto un messaggio da un client ma me ne aspetto altri:", "ReceptionFIFO msg client", args.GetSendingFIFO(), "ts mio", requestTs, "err", err)
 		}
 	}
-	//time.Sleep(1 * time.Second)
 	return false
-}
-
-func (kvs *KeyValueStoreSequential) canExecuteForTS(message *commonMsg.MessageS) (bool, error) {
-	fmt.Println("CanExecuteForTS: ", message.GetIdClient())
-
-	// Controllo se il client è presente nella mappa
-	_, ok := kvs.ClientMaps[message.GetIdClient()]
-
-	var err error
-
-	// Se il client non è presente nella mappa
-	if !ok {
-		if message.GetIdSender() != kvs.GetIdServer() {
-			return true, nil
-		} else {
-			println("client non presente nella mappa", message.GetIdClient())
-			err = errors.New("client non presente nella mappa")
-		}
-	} else {
-		// timestamp della richiesta da inviare al client
-		executeTs, err := kvs.GetExecuteTsClient(message.GetIdClient())
-		args := message.GetArgs()
-
-		if args.GetSendingFIFO() == executeTs && err != nil { // Se il messaggio è il prossimo da inviare, lo invio
-			kvs.IncreaseExecuteTsClient(args)
-			return true, nil
-		}
-	}
-
-	executeTs, err := kvs.GetExecuteTsClient(message.GetIdClient())
-	if err != nil {
-		fmt.Println("key client non presente nel datastore")
-		return false, err
-	}
-
-	fmt.Println("ReceptionFIFO client", message.GetSendingFIFO(), "ExecuteTs", executeTs)
-	return false, err
 }

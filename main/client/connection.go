@@ -188,6 +188,7 @@ func waitToAccept(index int, args common.Args, rpcName string, response *common.
 			clientState.MutexReceive[index].Unlock()
 			return
 		}
-		//fmt.Println("waitToAccept: server:", index, "clock", response.GetSendingFIFO(), "client clock", clientState.ReceiveIndex[index])
+		//fmt.Println("waitToAccept: server:", index, "clock", response.GetReceptionFIFO(), "client clock", clientState.ReceiveIndex[index])
+		//time.Sleep(1 * time.Second)
 	}
 }

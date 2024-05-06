@@ -45,7 +45,8 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message commonMsg.Mess
 // ----- FUNZIONI PER GESTIRE GLI ACK ----- //
 
 // ReceiveAck gestisce gli ack dei messaggi ricevuti.
-// Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti lo inserisce in coda e incrementa il numero di ack ricevuti.
+// Se il messaggio è presente nella coda incrementa il numero di ack e restituisce true, altrimenti lo inserisce in coda
+// e incrementa il numero di ack ricevuti.
 func (kvs *KeyValueStoreSequential) ReceiveAck(message commonMsg.MessageS, reply *bool) error {
 	*reply = kvs.updateAckMessage(&message)
 	if !(*reply) {
@@ -59,7 +60,8 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message commonMsg.MessageS, reply
 func sendAck(message *commonMsg.MessageS) {
 	canSend := 0 // Contatore del numero di ack inviati che sono stati ricevuti (ho avuto una risposta alla chiamata RPC)
 	//fmt.Println("sendAck", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
-	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi stavo riferendo.
+	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi
+	//stavo riferendo.
 	for i := 0; i < common.Replicas; i++ {
 		// Invio ack in una goroutine
 		go func(replicaPort string, index int) {
@@ -113,8 +115,8 @@ func sendAckRPC(conn *rpc.Client, message *commonMsg.MessageS, reply *bool) erro
 		return fmt.Errorf("sendAckRPC: Errore ReceiveAck ha risposto false, non dovrebbe accadere %v\n", &message)
 	}
 	// Problema: Se un messaggio ha un ritardo eccessivo, ...
-	// La soluzione al ritardo eccessivo è non inviare a livello applicativo il messaggio se il server che contatto non mi risponde true
-	// mi aspetto una risposta ad un ack
+	// La soluzione al ritardo eccessivo è non inviare a livello applicativo il messaggio se il server che contatto
+	// non mi risponde true mi aspetto una risposta ad un ack
 	// Posso creare un lucchetto per messaggio o un canale, se è lockato non ho ricevuto almeno una risposta all'ack che ho inviato.
 	// Questo dovrebbe rientrare nelle assunzioni di comunicazione affidabile
 	return nil
@@ -131,8 +133,8 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message *commonMsg.MessageS) 
 	defer kvs.mutexQueue.Unlock()
 
 	// Verifica se il messaggio è già presente nella coda se è già presente non fare nulla
-	// Controllo effettuato perché è possibile che una richiesta venga aggiunta in coda sia alla ricezione della richiesta stessa
-	// sia di un ack che ne faccia riferimento, e quella richiesta non era ancora in coda
+	// Controllo effettuato perché è possibile che una richiesta venga aggiunta in coda sia alla ricezione della
+	// richiesta stessa sia di un ack che ne faccia riferimento, e quella richiesta non era ancora in coda
 	isPresent := false
 	for _, messageS := range kvs.GetQueue() {
 		if messageS.GetIdMessage() == message.GetIdMessage() {
@@ -163,12 +165,16 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message *commonMsg.MessageS) 
 	}
 }
 
-// removeMessageToQueue Rimuove il messaggio passato come argomento dalla coda solamente se è l'elemento in testa, l'eliminazione si basa sull'ID
+// removeMessageToQueue Rimuove il messaggio passato come argomento dalla coda solamente se è l'elemento in testa,
+// l'eliminazione si basa sull'ID
 func (kvs *KeyValueStoreSequential) removeMessageToQueue(message *commonMsg.MessageS) {
 	kvs.mutexQueue.Lock()
 	defer kvs.mutexQueue.Unlock()
 
-	if len(kvs.GetQueue()) > 0 && kvs.GetMsgToQueue(0).GetClock() == message.GetClock() && kvs.GetMsgToQueue(0).GetIdMessage() == message.GetIdMessage() {
+	if len(kvs.GetQueue()) > 0 &&
+		kvs.GetMsgToQueue(0).GetClock() == message.GetClock() &&
+		kvs.GetMsgToQueue(0).GetIdMessage() == message.GetIdMessage() {
+
 		// Rimuovi il primo elemento dalla slice
 		kvs.SetQueue(kvs.GetQueue()[1:])
 		//fmt.Println("Rimosso messaggio dalla coda:", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "tsClient", message.GetSendingFIFO(), "lenQ", len(kvs.GetQueue()))
@@ -186,7 +192,6 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS
 			//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
 			kvs.GetMsgToQueue(i).SetNumberAck(kvs.GetMsgToQueue(i).GetNumberAck() + 1)
-			//kvs.Queue[i].NumberAck++
 			return true
 		}
 	}
@@ -305,7 +310,6 @@ func (kvs *KeyValueStoreSequential) isEndKeyMessage(message *commonMsg.MessageS)
 // isAllEndKey controlla se tutti i messaggi rimanenti in coda sono endKey
 // se lo sono, svuota la coda
 func (kvs *KeyValueStoreSequential) isAllEndKey() {
-	//kvs.updateEndKeyTimestamp()
 
 	// Se in coda sono rimasti solamente i Common.Replicas
 	// messaggi di endKey, e il receiveAssumeFIFO è pari a message.args.timestamp -> svuota la coda
