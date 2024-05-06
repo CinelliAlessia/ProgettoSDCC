@@ -10,7 +10,7 @@ import (
 /* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
 
 // executeCall esegue un comando ad un server. Il comando da eseguire viene specificato tramite i parametri inseriti
-// si occupa di eseguire le operazioni di put, get e del, in maniera sync o async
+// si occupa di eseguire le operazioni di put, get e del, in maniera synchronous o async
 func executeCall(index int, rpcName string, args common.Args, opType string, specOrRandom string) (common.Response, error) {
 	response := common.Response{}
 	var err error
@@ -41,7 +41,7 @@ func executeRandomCall(rpcName string, args common.Args, response *common.Respon
 	}
 
 	switch opType {
-	case sync:
+	case synchronous:
 		// Esegui l'operazione in modo sincrono
 		err := syncCall(conn, randomIndex, args, response, rpcName)
 		if err != nil {
@@ -72,7 +72,7 @@ func executeSpecificCall(index int, rpcName string, args common.Args, response *
 	}
 
 	switch opType {
-	case sync:
+	case synchronous:
 		// Esegui l'operazione in modo sincrono
 		err := syncCall(conn, index, args, response, rpcName)
 		if err != nil {
@@ -158,9 +158,7 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 	go func() {
 		<-call.Done // Aspetta che la chiamata RPC sia completata
 
-		//TODO: le ricevi bene da parte del client, prendi la risposta in maniera ordinata !!!
 		waitToAccept(index, args, rpcName, response)
-		//debugPrintResponse(rpcName, args, *response)
 
 		if call.Error != nil {
 			fmt.Printf("asyncCall: errore durante la chiamata RPC in client: %s\n", call.Error)

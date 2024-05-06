@@ -177,7 +177,6 @@ func (kvs *KeyValueStoreSequential) removeMessageToQueue(message *commonMsg.Mess
 
 		// Rimuovi il primo elemento dalla slice
 		kvs.SetQueue(kvs.GetQueue()[1:])
-		//fmt.Println("Rimosso messaggio dalla coda:", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "tsClient", message.GetSendingFIFO(), "lenQ", len(kvs.GetQueue()))
 		return
 	}
 }
@@ -188,7 +187,8 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS
 	defer kvs.mutexQueue.Unlock()
 
 	for i := range kvs.GetQueue() {
-		if kvs.GetMsgToQueue(i).GetClock() == message.GetClock() && kvs.GetMsgToQueue(i).GetIdMessage() == message.GetIdMessage() {
+		if kvs.GetMsgToQueue(i).GetClock() == message.GetClock() &&
+			kvs.GetMsgToQueue(i).GetIdMessage() == message.GetIdMessage() {
 			//fmt.Println("Ricevuto ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
 			kvs.GetMsgToQueue(i).SetNumberAck(kvs.GetMsgToQueue(i).GetNumberAck() + 1)
@@ -214,6 +214,7 @@ func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS, resp
 		return true, nil
 	}
 
+	//fmt.Println("canExecute non rispettata", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), "tsClient", message.GetSendingFIFO())
 	//time.Sleep(1 * time.Second)
 	return false, nil
 }

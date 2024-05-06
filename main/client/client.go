@@ -3,24 +3,23 @@ package main
 import (
 	"fmt"
 	"main/common"
-	_ "main/common"
-	sync2 "sync"
+	"sync"
 	"time"
 )
 
 type ClientState struct {
 	SendIndex    []int
-	MutexSent    []sync2.Mutex
+	MutexSent    []sync.Mutex
 	ReceiveIndex []int
-	MutexReceive []sync2.Mutex
+	MutexReceive []sync.Mutex
 }
 
 // Inizializza lo stato del client
 var clientState = ClientState{
 	SendIndex:    make([]int, common.Replicas),
-	MutexSent:    make([]sync2.Mutex, common.Replicas),
+	MutexSent:    make([]sync.Mutex, common.Replicas),
 	ReceiveIndex: make([]int, common.Replicas),
-	MutexReceive: make([]sync2.Mutex, common.Replicas),
+	MutexReceive: make([]sync.Mutex, common.Replicas),
 }
 
 const (
@@ -30,8 +29,8 @@ const (
 )
 
 const (
-	sync  = "sync"
-	async = "async"
+	synchronous = "synchronous"
+	async       = "async"
 )
 
 const (

@@ -23,7 +23,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 			for _, op := range operation {
 				//args := common.Args{Key: op.Key, Value: op.Value, TimestampClient: serverTimestamps[op.ServerIndex]}
 				args := common.NewArgs(serverTimestamps[op.ServerIndex], op.Key, op.Value)
-				responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, sync, specific)
+				responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, synchronous, specific)
 				serverTimestamps[op.ServerIndex]++ // In caso sincrono? qui?
 
 				if err != nil {
@@ -33,8 +33,6 @@ func testCausal(rpcName string, operations [][]Operation) {
 			}
 		}(operation)
 	}
-
-	// ----- Da qui inseriamo le operazioni di fine ??? ----- //
 }
 
 // In questo basicTestCE vengono inviate in goroutine:

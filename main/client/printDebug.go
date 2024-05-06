@@ -10,23 +10,21 @@ import (
 /* ----- FUNZIONI PER PRINT DI DEBUG ----- */
 
 func debugPrintRun(rpcName string, args common.Args) {
-	if common.GetDebug() {
-		debugName := strings.SplitAfter(rpcName, ".")
-		name := "." + debugName[1]
 
-		switch name {
-		case put:
-			fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue())
-		case get:
-			fmt.Println(color.BlueString("RUN Get"), args.GetKey())
-		case del:
-			fmt.Println(color.BlueString("RUN Delete"), args.GetKey())
-		default:
-			fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
-		}
-	} else {
-		return
+	debugName := strings.SplitAfter(rpcName, ".")
+	name := "." + debugName[1]
+
+	switch name {
+	case put:
+		fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue())
+	case get:
+		fmt.Println(color.BlueString("RUN Get"), args.GetKey())
+	case del:
+		fmt.Println(color.BlueString("RUN Delete"), args.GetKey())
+	default:
+		fmt.Println(color.BlueString("RUN Unknown"), rpcName, args)
 	}
+
 }
 
 func debugPrintResponse(rpcName string, args common.Args, response common.Response) {
