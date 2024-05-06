@@ -86,12 +86,13 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	if message.GetTypeOfMessage() == put { // Scrittura
 		if kvs.isEndKeyMessage(message) {
 			kvs.isAllEndKey()
+			return nil
 		} else {
 			kvs.PutInDatastore(message.GetKey(), message.GetValue())
 		}
 
 	} else if message.GetTypeOfMessage() == del { // Scrittura
-		delete(kvs.GetDatastore(), message.GetValue()) //TODO: controllare se funziona
+		kvs.DeleteFromDatastore(message.GetKey())
 
 	} else if message.GetTypeOfMessage() == get { // Lettura
 		val, ok := kvs.GetDatastore()[message.GetKey()]
@@ -108,15 +109,13 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 		}
 	}
 
-	// Stampa di debug
-	//kvs.GetQueue()
-
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(result)
 		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO())
 		kvs.IncreaseResponseOrderingFIFO()
 	}
 
+	// Stampa di debug
 	printGreen("ESEGUITO", *message, nil, kvs)
 
 	return nil

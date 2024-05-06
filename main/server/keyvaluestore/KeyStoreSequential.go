@@ -55,6 +55,10 @@ func (kvs *KeyValueStoreSequential) SetDatastore(datastore map[string]string) {
 	kvs.Common.Datastore = datastore
 }
 
+func (kvs *KeyValueStoreSequential) DeleteFromDatastore(key string) {
+	delete(kvs.Common.Datastore, key)
+}
+
 func (kvs *KeyValueStoreSequential) GetFromDatastore(key string) (string, error) {
 	if value, ok := kvs.Common.Datastore[key]; ok {
 		return value, nil
