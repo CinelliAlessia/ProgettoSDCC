@@ -5,22 +5,25 @@ import (
 	"main/common"
 )
 
-var firstRequest = true //TODO: implementare
+var (
+	firstRequest     = true                           // firstRequest è una variabile booleana che indica se è la prima richiesta
+	err              error                            // err è una variabile di tipo error
+	responses        [common.Replicas]common.Response // responses è un array di risposte
+	listArgs         [common.Replicas]common.Args     // listArgs è un array di argomenti
+	serverTimestamps = make(map[int]int)              // serverTimestamps è una mappa che associa a ogni server un timestamp
+)
 
 func testSequential(rpcName string, operations []Operation) {
-	//	Inizializzazione
 
-	// serverTimestamps è una mappa che associa a ogni server un timestamp
-	serverTimestamps := make(map[int]int)
-	listArgs := [common.Replicas]common.Args{}
+	if firstRequest { // Inizializzazione
 
-	for i := 0; i < common.Replicas; i++ {
-		serverTimestamps[i] = 0
-		listArgs[i] = common.NewArgs(serverTimestamps[i], "", "")
+		for i := 0; i < common.Replicas; i++ {
+			serverTimestamps[i] = 0
+			listArgs[i] = common.NewArgs(serverTimestamps[i], "", "")
+		}
+
+		firstRequest = false
 	}
-
-	responses := [common.Replicas]common.Response{}
-	var err error
 
 	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
 	endOps := getEndOps()
@@ -44,7 +47,7 @@ func testSequential(rpcName string, operations []Operation) {
 		responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
 		serverTimestamps[op.ServerIndex]++
-		fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", serverTimestamps[op.ServerIndex])
+		//fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", serverTimestamps[op.ServerIndex])
 
 		if err != nil {
 			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
@@ -76,6 +79,9 @@ func basicTestSeq(rpcName string) {
 		{0, put, "x", "1"},
 		{1, put, "x", "2"},
 		{2, put, "x", "3"},
+		{ServerIndex: 0, OperationType: del, Key: "x"},
+		{ServerIndex: 1, OperationType: del, Key: "x"},
+		{ServerIndex: 2, OperationType: del, Key: "x"},
 	}
 
 	testSequential(rpcName, operations)
