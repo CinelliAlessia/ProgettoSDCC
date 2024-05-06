@@ -46,6 +46,10 @@ func (kvc *KeyValueStoreCausale) GetDatastore() map[string]string {
 	return kvc.Common.Datastore
 }
 
+func (kvc *KeyValueStoreCausale) DeleteFromDatastore(key string) {
+	delete(kvc.Common.Datastore, key)
+}
+
 func (kvc *KeyValueStoreCausale) SetVectorClock(index int, value int) {
 	kvc.VectorClock[index] = value
 }

@@ -51,7 +51,7 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 		kvc.GetDatastore()[message.GetKey()] = message.GetValue()
 
 	} else if message.GetTypeOfMessage() == del { // Scrittura
-		delete(kvc.GetDatastore(), message.GetKey())
+		kvc.DeleteFromDatastore(message.GetKey())
 
 	} else if message.GetTypeOfMessage() == get { // Lettura
 
