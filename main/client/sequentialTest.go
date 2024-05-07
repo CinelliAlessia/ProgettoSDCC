@@ -5,25 +5,16 @@ import (
 	"main/common"
 )
 
-var (
-	firstRequestS = true                           // firstRequestS è una variabile booleana che indica se è la prima richiesta
-	firstRequestC = true                           // firstRequestC è una variabile booleana che indica se è la prima richiesta
-	responses     [common.Replicas]common.Response // responses è un array di risposte
-	listArgs      [common.Replicas]common.Args     // listArgs è un array di argomenti ciascuna per un client
-	sendingTS     = make(map[int]int)              // sendingTS è una mappa che associa a ogni server un timestamp di invio,
-	// allegato successivamente a args. Per assunzione FIFO Ordering in andata
-)
-
 func testSequential(rpcName string, operations []Operation) {
 
-	if firstRequestS { // Inizializzazione
+	if clientState.GetFirstRequest() { // Inizializzazione
 
 		for i := 0; i < common.Replicas; i++ {
-			sendingTS[i] = 0
-			listArgs[i] = common.NewArgs(sendingTS[i], "", "")
+			clientState.SendIndex[i] = 0
+			clientState.ListArgs[i] = common.NewArgs(clientState.GetSendingTS(i), "", "")
 		}
 
-		firstRequestS = false
+		clientState.SetFirstRequest(false)
 	}
 
 	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
@@ -41,15 +32,15 @@ func testSequential(rpcName string, operations []Operation) {
 	// e se è indirizzata ad un server specifico o random
 	for _, op := range operations {
 
-		args := listArgs[op.ServerIndex]
+		args := clientState.GetListArgs(op.ServerIndex)
 
-		args.SetSendingFIFO(sendingTS[op.ServerIndex])
+		args.SetSendingFIFO(clientState.GetSendingTS(op.ServerIndex))
 		args.SetKey(op.Key)
 		args.SetValue(op.Value)
 
-		responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
+		_, err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
-		sendingTS[op.ServerIndex]++ // Incremento il contatore di timestamp
+		clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore di timestamp
 
 		//fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", sendingTS[op.ServerIndex])
 
@@ -70,14 +61,14 @@ func getEndOps() []Operation {
 }
 
 // basicTestSeq contatta tutti i server in goroutine con operazioni di put
-// - put x:1 al server1,
-// - put x:2 al server2,
-// - put x:3 al server3.
+// - Server 1: put x:1, get x, del x, get x
+// - Server 2: put x:2, get x, del x, get x
+// - Server 3: put x:3, get x, del x, get x
 func basicTestSeq(rpcName string) {
 	fmt.Println("In questo basicTestSeq vengono inviate in goroutine:\n" +
-		"- put x:1 al server1\n" +
-		"- put x:2 al server2\n" +
-		"- put x:3 al server3")
+		"- put x:1, get x, del x, get x al server1\n" +
+		"- put x:2, get x, del x, get x al server2\n" +
+		"- put x:3, get x, del x, get x al server3")
 
 	operations := []Operation{
 		{0, common.PutRPC, "x", "1"},
@@ -101,14 +92,14 @@ func basicTestSeq(rpcName string) {
 }
 
 // mediumTestSeq contatta tutti i server in goroutine con operazioni di put
-// - put x:1, put y:1, put z:1 al server1,
-// - put x:2, put y:2, put z:2 al server2,
-// - put x:3, put y:3, put z:3 al server3.
+// - put x:1, put y:1, put z:1, get x al server1,
+// - put x:2, put y:2, put z:2, get y al server2,
+// - put x:3, put y:3, put z:3, get z al server3.
 func mediumTestSeq(rpcName string) {
 	fmt.Println("In questo mediumTestSeq vengono inviate in sequenza:\n" +
-		"- put x:1, put y:1, put z:1 al server1\n" +
-		"- put x:2, put y:2, put z:2 al server2\n" +
-		"- put x:3, put y:3, put z:3 al server3")
+		"- put x:1, put y:1, put z:1, get x al server1\n" +
+		"- put x:2, put y:2, put z:2, get y al server2\n" +
+		"- put x:3, put y:3, put z:3, get z al server3")
 
 	operations := []Operation{
 		{0, common.PutRPC, "x", "1"},
@@ -133,12 +124,12 @@ func mediumTestSeq(rpcName string) {
 // In questo complexTestSeqNew vengono inviate in goroutine:
 //   - put x:1, put y:2, get x, put y:1 al server1,
 //   - put x:2, get x, get y, put x:3 al server2,
-//   - put x:3, get x, get y al server3.
+//   - put x:3, del x, get z, put x:4 al server3.
 func complexTestSeq(rpcName string) {
 	fmt.Println("In questo complexTestSeq vengono inviate in sequenza:\n" +
 		"- put x:1, put y:2, get x, put y:1 al server1\n" +
 		"- put x:2, get x, get y, put x:3 al server2\n" +
-		"- put x:3, get x, get y al server3")
+		"- put x:3, del x, get z, put x:4 al server3")
 
 	operations := []Operation{
 		{0, common.PutRPC, "x", "1"},
@@ -147,11 +138,11 @@ func complexTestSeq(rpcName string) {
 
 		{0, common.PutRPC, "y", "2"},
 		{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
-		{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 2, OperationType: common.DelRPC, Key: "x"},
 
 		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
 		{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
-		{ServerIndex: 2, OperationType: common.GetRPC, Key: "y"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "z"},
 
 		{0, common.PutRPC, "y", "1"},
 		{1, common.PutRPC, "x", "3"},
