@@ -55,3 +55,29 @@ func (clientState *ClientState) IncreaseReceiveIndex(index int) {
 func (clientState *ClientState) GetReceiveIndex(index int) int {
 	return clientState.ReceiveIndex[index]
 }
+
+func (clientState *ClientState) SetFirstRequest(firstRequest bool) {
+	clientState.FirstRequest = firstRequest
+}
+
+func (clientState *ClientState) GetFirstRequest() bool {
+	return clientState.FirstRequest
+}
+
+func (clientState *ClientState) SetListArgs(index int, args common.Args) {
+	clientState.ListArgs[index] = args
+}
+
+func (clientState *ClientState) GetListArgs(index int) common.Args {
+	return clientState.ListArgs[index]
+}
+
+// IncreaseSendingTS associa a ogni messaggio un timestamp di invio,
+// ce andrà allegato successivamente ad args. Per assunzione FIFO Ordering in andata
+func (clientState *ClientState) IncreaseSendingTS(index int) {
+	clientState.SendingTS[index]++
+}
+
+func (clientState *ClientState) GetSendingTS(index int) int {
+	return clientState.SendingTS[index]
+}
