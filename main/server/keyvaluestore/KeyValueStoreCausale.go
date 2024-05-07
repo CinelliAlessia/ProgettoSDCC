@@ -59,27 +59,27 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 
 		val, ok := kvc.GetDatastore()[message.GetKey()]
 		if !ok {
+
 			printRed("NON ESEGUITO", *message, kvc, nil)
-			//response.SetResult(false)
-			//return nil
 			if message.GetIdSender() == kvc.GetIdServer() {
 				result = false
 			}
+		} else if message.GetIdSender() == kvc.GetIdServer() {
+			response.SetValue(val)
+			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
-
-		response.SetValue(val)
-		message.SetValue(val) //Fatto solo per DEBUG per il print
 	}
 
+	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetIdSender() == kvc.GetIdServer() {
 		response.SetResult(result)
-		//response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO())
-		//kvc.IncreaseResponseOrderingFIFO()
+		//response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO(message.GetClientID())) // Setto il numero di risposte inviate al determinato client
+		//kvc.IncreaseResponseOrderingFIFO(message.GetClientID())                       // Incrementa il numero di risposte inviate al determinato server
 	}
 
-	if result && message.GetIdSender() == kvc.GetIdServer() {
+	/*if result && message.GetIdSender() == kvc.GetIdServer() {
 		printGreen("ESEGUITO mio", *message, kvc, nil)
-	} else if result {
+	} else */if result {
 		printGreen("ESEGUITO", *message, kvc, nil)
 	}
 
