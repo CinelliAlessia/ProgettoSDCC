@@ -76,6 +76,10 @@ func (msg *MessageC) GetValue() string {
 	return msg.Common.Args.GetValue()
 }
 
+func (msg *MessageC) GetClientID() string {
+	return msg.Common.Args.GetClientID()
+}
+
 func (msg *MessageC) SetSendingFIFO(timestamp int) {
 	msg.Common.Args.SetSendingFIFO(timestamp)
 }

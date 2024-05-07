@@ -37,8 +37,6 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message commonMsg.Mess
 			break
 		}
 		kvc.executeFunctionMutex.Unlock()
-		// La richiesta non può essere ancora eseguita, si attende un breve periodo prima di riprovare
-		// time.Sleep(time.Millisecond * 1000)
 	}
 	return nil
 }
