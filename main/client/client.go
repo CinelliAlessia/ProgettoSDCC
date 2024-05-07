@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"main/common"
 	"sync"
+	_ "sync"
 	"time"
 )
 
 // Inizializza lo stato del client
+//var clientState *ClientState
+
 var clientState = ClientState{
 	SendIndex:    make([]int, common.Replicas),
 	MutexSent:    make([]sync.Mutex, common.Replicas),
@@ -33,6 +36,8 @@ type Operation struct {
 }
 
 func main() {
+
+	//clientState = NewClientState()
 
 	for {
 		// Stampa il menu interattivo

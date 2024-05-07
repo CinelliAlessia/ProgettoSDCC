@@ -65,6 +65,7 @@ Il client effettua le richieste RPC chiamando le `KeyValueStoreSequential.Put`, 
 
 Il Multicast Totalmente Ordinato, per essere realizzato ha bisogno di una assunzione: 
 - I messaggi vengono consegnati al server nello stesso ordine in cui il client lo invia. Assunzione FIFO Ordering
+- Comunicazione affidabile, no perdita di messaggi.
 
 Il server, alla ricezione di qualsiasi delle tre chiamate RPC, per rispettare l'assunzione di FIFO Ordering, esegue la 
 funzione `canReceive()`, controllando se ha ricevuto tutti i messaggi precedenti a quello attuale da parte del client, 

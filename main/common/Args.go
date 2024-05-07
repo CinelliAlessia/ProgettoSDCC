@@ -12,6 +12,7 @@ type Args struct {
 
 func NewArgs(timestamp int, key string, values ...string) Args {
 	args := Args{}
+
 	args.SetSendingFIFO(timestamp)
 	args.SetKey(key)
 	args.SetIDClient(GenerateUniqueID())

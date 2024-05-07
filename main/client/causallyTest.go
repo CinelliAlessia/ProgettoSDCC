@@ -7,13 +7,17 @@ import (
 
 func testCausal(rpcName string, operations [][]Operation) {
 
-	// serverTimestamps è una mappa che associa a ogni server un timestamp
-	serverTimestamps := make(map[int]int)
-	for i := 0; i < common.Replicas; i++ {
-		serverTimestamps[i] = 0
+	if firstRequestC {
+		// sendingTS è una mappa che associa a ogni server un timestamp
+		for i := 0; i < common.Replicas; i++ {
+			sendingTS[i] = 0
+			listArgs[i] = common.NewArgs(sendingTS[i], "", "")
+		}
+
+		firstRequestC = false
 	}
 
-	responses := make([]common.Response, common.Replicas)
+	//responses := make([]common.Response, common.Replicas)
 	var err error
 
 	// Assume operations are sorted in the order they should be executed
@@ -21,10 +25,17 @@ func testCausal(rpcName string, operations [][]Operation) {
 
 		go func(operation []Operation) {
 			for _, op := range operation {
-				//args := common.Args{Key: op.Key, Value: op.Value, TimestampClient: serverTimestamps[op.ServerIndex]}
-				args := common.NewArgs(serverTimestamps[op.ServerIndex], op.Key, op.Value)
-				responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, synchronous, specific)
-				serverTimestamps[op.ServerIndex]++ // In caso sincrono? qui?
+
+				args := listArgs[op.ServerIndex]
+
+				args.SetSendingFIFO(sendingTS[op.ServerIndex])
+				args.SetKey(op.Key)
+				args.SetValue(op.Value)
+
+				//args := common.NewArgs(sendingTS[op.ServerIndex], op.Key, op.Value)
+				_, err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, synchronous, specific)
+
+				sendingTS[op.ServerIndex]++
 
 				if err != nil {
 					fmt.Println("testCausal: Errore durante l'esecuzione di executeCall:", err)

@@ -16,9 +16,9 @@ func debugPrintRun(rpcName string, args common.Args) {
 
 	switch name {
 	case common.Put:
-		if args.GetKey() != common.EndKey {
-			fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue())
-		}
+		//if args.GetKey() != common.EndKey {
+		fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue())
+		//}
 	case common.Get:
 		fmt.Println(color.BlueString("RUN Get"), args.GetKey())
 	case common.Del:
@@ -31,18 +31,14 @@ func debugPrintRun(rpcName string, args common.Args) {
 
 func debugPrintResponse(rpcName string, indexServer string, args common.Args, response common.Response) {
 
-	if args.GetKey() == common.EndKey {
-		return
-	}
-
 	debugName := strings.SplitAfter(rpcName, ".")
 	name := debugName[1]
 
 	switch name {
 	case common.Put:
-		if args.GetKey() != common.EndKey {
-			fmt.Println(color.GreenString("RISPOSTA Put "+indexServer), "key:"+args.GetKey(), "value:"+args.GetValue())
-		}
+		//if args.GetKey() != common.EndKey {
+		fmt.Println(color.GreenString("RISPOSTA Put "+indexServer), "key:"+args.GetKey(), "value:"+args.GetValue())
+		//}
 
 	case common.Get:
 		if response.Result {

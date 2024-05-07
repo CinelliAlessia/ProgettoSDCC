@@ -14,9 +14,6 @@ type KeyValueStore struct {
 type ClientMap struct {
 	MutexRequest sync.Mutex
 	RequestTs    int // TimestampClient della richiesta ricevuta dal client
-
-	MutexExecute sync.Mutex
-	ExecuteTs    int // TimestampClient di esecuzione della richiesta
 }
 
 func (m *ClientMap) SetRequestTs(ts int) {
@@ -27,14 +24,4 @@ func (m *ClientMap) SetRequestTs(ts int) {
 
 func (m *ClientMap) GetRequestTs() int {
 	return m.RequestTs
-}
-
-func (m *ClientMap) SetExecuteTs(ts int) {
-	m.MutexExecute.Lock()
-	defer m.MutexExecute.Unlock()
-	m.ExecuteTs = ts
-}
-
-func (m *ClientMap) GetExecuteTs() int {
-	return m.ExecuteTs
 }

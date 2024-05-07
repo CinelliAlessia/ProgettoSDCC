@@ -77,7 +77,9 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 		//kvc.IncreaseResponseOrderingFIFO()
 	}
 
-	if result {
+	if result && message.GetIdSender() == kvc.GetIdServer() {
+		printGreen("ESEGUITO mio", *message, kvc, nil)
+	} else if result {
 		printGreen("ESEGUITO", *message, kvc, nil)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
+	"strconv"
 )
 
 /* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
@@ -127,8 +128,8 @@ func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Re
 
 	clientState.MutexSent[index].Unlock()
 
-	waitToAccept(index, args, rpcName, response)
-	//debugPrintResponse(rpcName, args, *response)
+	//waitToAccept(index, args, rpcName, response)
+	debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
 
 	err = conn.Close()
 	if err != nil {
@@ -140,7 +141,6 @@ func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Re
 // asyncCall: utilizzato per lsa consistenza sequenziale
 func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.Response, rpcName string) error {
 
-	// TODO: per quanto riguarda la async a me non interessa inviarli in ordine
 	for {
 		if clientState.SendIndex[index] == args.GetSendingFIFO() {
 			clientState.MutexSent[index].Lock()
@@ -162,10 +162,11 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 		if call.Error != nil {
 			fmt.Printf("asyncCall: errore durante la chiamata RPC in client: %s\n", call.Error)
-			response.Done <- false
+			//response.Done <- false
+			response.SetDone(false)
 		} else {
 			//debugPrintResponse(rpcName, args, *response)
-			response.Done <- true
+			response.SetDone(true)
 		}
 
 		err := conn.Close()
@@ -179,12 +180,15 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 func waitToAccept(index int, args common.Args, rpcName string, response *common.Response) {
 	for {
+		// Se ho ricevuto dal server un messaggio che mi aspettavo
 		if clientState.ReceiveIndex[index] == response.GetReceptionFIFO() {
+
 			clientState.MutexReceive[index].Lock()
 			clientState.ReceiveIndex[index]++
-			debugPrintResponse(rpcName, args, *response)
+			debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
 			clientState.MutexReceive[index].Unlock()
 			return
+
 		}
 		//fmt.Println("waitToAccept: server:", index, "clock", response.GetReceptionFIFO(), "client clock", clientState.ReceiveIndex[index])
 		//time.Sleep(1 * time.Second)

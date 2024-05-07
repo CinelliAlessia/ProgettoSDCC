@@ -21,6 +21,8 @@ type KeyValueStoreCausale struct {
 
 // ----- Consistenza causale ----- //
 
+// NewKeyValueStoreCausal crea un nuovo KeyValueStoreCausale, inizializzando l'orologio vettoriale e la coda
+// prende come argomento l'id del server replica, da 0 a common.Replicas-1
 func NewKeyValueStoreCausal(idServer int) *KeyValueStoreCausale {
 	kvc := &KeyValueStoreCausale{
 		Common: KeyValueStore{

@@ -6,23 +6,24 @@ import (
 )
 
 var (
-	firstRequest     = true                           // firstRequest è una variabile booleana che indica se è la prima richiesta
-	err              error                            // err è una variabile di tipo error
-	responses        [common.Replicas]common.Response // responses è un array di risposte
-	listArgs         [common.Replicas]common.Args     // listArgs è un array di argomenti
-	serverTimestamps = make(map[int]int)              // serverTimestamps è una mappa che associa a ogni server un timestamp
+	firstRequestS = true                           // firstRequestS è una variabile booleana che indica se è la prima richiesta
+	firstRequestC = true                           // firstRequestC è una variabile booleana che indica se è la prima richiesta
+	responses     [common.Replicas]common.Response // responses è un array di risposte
+	listArgs      [common.Replicas]common.Args     // listArgs è un array di argomenti ciascuna per un client
+	sendingTS     = make(map[int]int)              // sendingTS è una mappa che associa a ogni server un timestamp di invio,
+	// allegato successivamente a args. Per assunzione FIFO Ordering in andata
 )
 
 func testSequential(rpcName string, operations []Operation) {
 
-	if firstRequest { // Inizializzazione
+	if firstRequestS { // Inizializzazione
 
 		for i := 0; i < common.Replicas; i++ {
-			serverTimestamps[i] = 0
-			listArgs[i] = common.NewArgs(serverTimestamps[i], "", "")
+			sendingTS[i] = 0
+			listArgs[i] = common.NewArgs(sendingTS[i], "", "")
 		}
 
-		firstRequest = false
+		firstRequestS = false
 	}
 
 	// endOps è un array di operazioni di tipo put che vengono eseguite su tutti i server
@@ -32,6 +33,8 @@ func testSequential(rpcName string, operations []Operation) {
 		operations = append(operations, operation)
 	}
 
+	var err error
+
 	// executeCall esegue una chiamata RPC al server specificato e restituisce la risposta
 	// in questo for vengono eseguite tutte le operazioni passate come argomento
 	// async e specific sono due variabili booleane che indicano rispettivamente se la chiamata è sincrona o asincrona
@@ -40,14 +43,15 @@ func testSequential(rpcName string, operations []Operation) {
 
 		args := listArgs[op.ServerIndex]
 
-		args.SetSendingFIFO(serverTimestamps[op.ServerIndex])
+		args.SetSendingFIFO(sendingTS[op.ServerIndex])
 		args.SetKey(op.Key)
 		args.SetValue(op.Value)
 
 		responses[op.ServerIndex], err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
-		serverTimestamps[op.ServerIndex]++
-		//fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", serverTimestamps[op.ServerIndex])
+		sendingTS[op.ServerIndex]++ // Incremento il contatore di timestamp
+
+		//fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", sendingTS[op.ServerIndex])
 
 		if err != nil {
 			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
@@ -60,7 +64,7 @@ func testSequential(rpcName string, operations []Operation) {
 func getEndOps() []Operation {
 	var endOps []Operation
 	for i := 0; i < common.Replicas; i++ {
-		endOps = append(endOps, Operation{i, put, common.EndKey, common.EndValue})
+		endOps = append(endOps, Operation{i, common.PutRPC, common.EndKey, common.EndValue})
 	}
 	return endOps
 }
@@ -76,12 +80,21 @@ func basicTestSeq(rpcName string) {
 		"- put x:3 al server3")
 
 	operations := []Operation{
-		{0, put, "x", "1"},
-		{1, put, "x", "2"},
-		{2, put, "x", "3"},
-		{ServerIndex: 0, OperationType: del, Key: "x"},
-		{ServerIndex: 1, OperationType: del, Key: "x"},
-		{ServerIndex: 2, OperationType: del, Key: "x"},
+		{0, common.PutRPC, "x", "1"},
+		{1, common.PutRPC, "x", "2"},
+		{2, common.PutRPC, "x", "3"},
+
+		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+
+		{ServerIndex: 0, OperationType: common.DelRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.DelRPC, Key: "x"},
+		{ServerIndex: 2, OperationType: common.DelRPC, Key: "x"},
+
+		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
 	}
 
 	testSequential(rpcName, operations)
@@ -98,15 +111,21 @@ func mediumTestSeq(rpcName string) {
 		"- put x:3, put y:3, put z:3 al server3")
 
 	operations := []Operation{
-		{0, put, "x", "1"},
-		{1, put, "x", "2"},
-		{2, put, "x", "3"},
-		{0, put, "y", "1"},
-		{1, put, "y", "2"},
-		{2, put, "y", "3"},
-		{0, put, "z", "1"},
-		{1, put, "z", "2"},
-		{2, put, "z", "3"},
+		{0, common.PutRPC, "x", "1"},
+		{1, common.PutRPC, "x", "2"},
+		{2, common.PutRPC, "x", "3"},
+
+		{0, common.PutRPC, "y", "1"},
+		{1, common.PutRPC, "y", "2"},
+		{2, common.PutRPC, "y", "3"},
+
+		{0, common.PutRPC, "z", "1"},
+		{1, common.PutRPC, "z", "2"},
+		{2, common.PutRPC, "z", "3"},
+
+		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "z"},
 	}
 	testSequential(rpcName, operations)
 }
@@ -122,18 +141,21 @@ func complexTestSeq(rpcName string) {
 		"- put x:3, get x, get y al server3")
 
 	operations := []Operation{
-		{0, put, "x", "1"},
-		{1, put, "x", "2"},
-		{2, put, "x", "3"},
-		{0, put, "y", "2"},
-		{ServerIndex: 1, OperationType: get, Key: "x"},
-		{ServerIndex: 2, OperationType: get, Key: "x"},
-		{ServerIndex: 0, OperationType: get, Key: "x"},
-		{ServerIndex: 1, OperationType: get, Key: "y"},
-		{ServerIndex: 2, OperationType: get, Key: "y"},
-		{0, put, "y", "1"},
-		{1, put, "x", "3"},
-		{2, put, "x", "4"},
+		{0, common.PutRPC, "x", "1"},
+		{1, common.PutRPC, "x", "2"},
+		{2, common.PutRPC, "x", "3"},
+
+		{0, common.PutRPC, "y", "2"},
+		{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+
+		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "y"},
+
+		{0, common.PutRPC, "y", "1"},
+		{1, common.PutRPC, "x", "3"},
+		{2, common.PutRPC, "x", "4"},
 	}
 	testSequential(rpcName, operations)
 }

@@ -117,8 +117,11 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	}
 
 	// Stampa di debug
-	if result && message.GetKey() != common.EndKey {
+	if result && message.GetIdSender() == kvs.GetIdServer() {
+		printGreen("ESEGUITO MIO", *message, nil, kvs)
+	} else if result {
 		printGreen("ESEGUITO", *message, nil, kvs)
+
 	}
 
 	return nil
