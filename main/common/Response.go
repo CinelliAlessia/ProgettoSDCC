@@ -27,8 +27,8 @@ func (response *Response) GetResult() bool {
 	return response.Result
 }
 
-func (response *Response) SetDone(done chan bool) {
-	response.Done = done
+func (response *Response) SetDone(done bool) {
+	response.Done <- done
 }
 
 func (response *Response) GetDone() chan bool {
