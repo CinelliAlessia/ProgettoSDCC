@@ -85,9 +85,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 
 	if message.GetTypeOfMessage() == common.Put { // Scrittura
 
-		if kvs.isEndKeyMessage(message) {
-			kvs.isAllEndKey()
-			return nil
+		if kvs.isEndKeyMessage(message) { // Se è un messaggio di fine chiave
+			//Ignoro il messaggio di fine chiave, non lo inserisco nel datastore
 		} else {
 			kvs.PutInDatastore(message.GetKey(), message.GetValue())
 		}
@@ -96,32 +95,34 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 		kvs.DeleteFromDatastore(message.GetKey())
 
 	} else if message.GetTypeOfMessage() == common.Get { // Lettura
+
 		val, ok := kvs.GetDatastore()[message.GetKey()]
 		if !ok {
+
 			printRed("NON ESEGUITO", *message, nil, kvs)
-			if message.GetIdSender() == kvs.GetIdServer() {
+			if message.GetIdSender() == kvs.GetIdServer() { // Controllo superfluo, non avrò mai messaggi get generati da altri server
 				result = false
 			}
-		} else if message.GetIdSender() == kvs.GetIdServer() {
-			// Solo se io sono il sender imposto la risposta per il client
 
+		} else if message.GetIdSender() == kvs.GetIdServer() {
 			response.SetValue(val)
 			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
 	}
 
+	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(result)
-		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO())
-		kvs.IncreaseResponseOrderingFIFO()
+		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetIDClient())) // Setto il numero di risposte inviate al determinato client
+		kvs.IncreaseResponseOrderingFIFO(message.GetIDClient())                       // Incrementa il numero di risposte inviate al determinato server
 	}
 
 	// Stampa di debug
-	if result && message.GetIdSender() == kvs.GetIdServer() {
+	/* if result && message.GetIdSender() == kvs.GetIdServer() {
 		printGreen("ESEGUITO MIO", *message, nil, kvs)
-	} else if result {
+	} else  */
+	if result {
 		printGreen("ESEGUITO", *message, nil, kvs)
-
 	}
 
 	return nil
@@ -132,6 +133,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 //  2. se il messaggio è di tipo get, il numero di ack è impostato a common.Replicas
 //  3. thread-safe con mutexClock
 func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc string) *commonMsg.MessageS {
+	// Blocco il mutex qui cosi mi assicuro che il clock associato al messaggio sarà corretto
+	// e non modificato da nessun altro
 	kvs.mutexClock.Lock()
 	defer kvs.mutexClock.Unlock()
 
@@ -145,36 +148,32 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 	message := commonMsg.NewMessageSeq(kvs.GetIdServer(), typeFunc, args, kvs.GetClock(), numberAck)
 	printDebugBlue("RICEVUTO da client", *message, nil, kvs)
 
+	// Questo mutex mi permette di evitare scheduling tra il lascia passare di canReceive e la creazione del messaggio
+	kvs.UnlockMutexMessage(message.GetIDClient()) // Mutex chiuso in canReceive
+
 	return message
 }
 
 /* In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered */
 func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
-	//fmt.Println("CanReceive: ", args)
 
 	// Se il client non è nella mappa, lo aggiungo e imposto il timestamp di ricezione a zero
-	if _, ok := kvs.ClientMaps[args.GetIDClient()]; !ok {
-
+	if !kvs.ExistClient(args.GetClientID()) {
 		// Non ho mai ricevuto un messaggio da questo client
-		if args.GetSendingFIFO() == 0 { //  Se è il primo messaggio che avrei dovuto ricevere lo prendo
-			kvs.NewClientMap(args.GetIDClient())
-			kvs.IncreaseRequestTsClient(args) // Incremento il timestamp di ricezione e restituisco true
-			return true
-		} else {
-			//fmt.Println("Ho ricevuto un messaggio da un client che non conosco ma me ne aspetto altri:", "ReceptionFIFO msg client", args.GetSendingFIFO())
-		}
-	} else { // Avevo già ricevuto messaggi da questo client
+		kvs.NewClientMap(args.GetClientID()) // Inserisco il client nella mappa
+	}
 
-		requestTs, err := kvs.GetRequestTsClient(args.GetIDClient())
-		if args.GetSendingFIFO() == requestTs && err == nil {
-			// Se il messaggio che ricevo dal client è il successivo rispetto all'ultimo ricevuto,
-			// lo posso aggiungere alla coda
+	// Il client è sicuramente nella mappa
+	requestTs, err := kvs.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
 
-			kvs.IncreaseRequestTsClient(args)
-			return true
-		} else {
-			//fmt.Println("Ho ricevuto un messaggio da un client ma me ne aspetto altri:", "ReceptionFIFO msg client", args.GetSendingFIFO(), "ts mio", requestTs, "err", err)
-		}
+	if args.GetSendingFIFO() == requestTs && // Se il messaggio che ricevo dal client è quello che mi aspetto
+		err == nil { // Se non ci sono stati errori
+
+		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
+		kvs.LockMutexMessage(args.GetClientID())
+
+		kvs.IncreaseReceiveTsClient(args) // Incremento il timestamp di ricezione del client
+		return true                       // è possibile accettare il messaggio
 	}
 	return false
 }
