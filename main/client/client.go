@@ -3,27 +3,17 @@ package main
 import (
 	"fmt"
 	"main/common"
-	"sync"
 	_ "sync"
 	"time"
 )
 
 // Inizializza lo stato del client
-//var clientState *ClientState
-
-var clientState = ClientState{
-	SendIndex:    make([]int, common.Replicas),
-	MutexSent:    make([]sync.Mutex, common.Replicas),
-	ReceiveIndex: make([]int, common.Replicas),
-	MutexReceive: make([]sync.Mutex, common.Replicas),
-}
+var clientState *ClientState
 
 const (
 	synchronous = "synchronous"
 	async       = "async"
-)
 
-const (
 	random   = "random"
 	specific = "specific"
 )
@@ -37,7 +27,7 @@ type Operation struct {
 
 func main() {
 
-	//clientState = NewClientState()
+	clientState = NewClientState()
 
 	for {
 		// Stampa il menu interattivo
@@ -92,6 +82,7 @@ func sequential(rpcName string) {
 			complexTestSeq(rpcName)
 			break
 		case 4:
+			clientState = NewClientState()
 			fmt.Println()
 			return
 		}
@@ -119,6 +110,7 @@ func causal(rpcName string) {
 			complexTestCE(rpcName)
 			break
 		case 4:
+			clientState = NewClientState()
 			fmt.Println()
 			return
 		}
