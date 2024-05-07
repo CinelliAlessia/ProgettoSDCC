@@ -12,6 +12,7 @@ import (
 
 const layoutTime = "15:04:05.0000"
 
+// Usato per messaggi di ricezione
 func printDebugBlue(blueString string, message interface{}, kvc *KeyValueStoreCausale, kvs *KeyValueStoreSequential) {
 
 	// Ottieni l'orario corrente
