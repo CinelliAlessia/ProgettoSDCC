@@ -16,7 +16,7 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 
 	// Si crea un messaggio con 3 ack "ricevuti" così che, per inviarlo a livello applicativo si controllerà
 	// solamente l'ordinamento del messaggio nella coda.
-	message := kvs.createMessage(args, get)
+	message := kvs.createMessage(args, common.Get)
 
 	//Aggiunge alla coda ordinandolo per timestamp, cosi verrà eseguito esclusivamente se è in testa alla coda
 	kvs.addToSortQueue(message)
@@ -40,13 +40,13 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
 	}
 
-	message := kvs.createMessage(args, put)
+	message := kvs.createMessage(args, common.Put)
 
 	//Aggiunge alla coda ordinandolo per timestamp, cosi da rispettare l'esecuzione esclusivamente se è in testa alla coda
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", *message, response)
+	err := sendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -60,13 +60,13 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
 	}
 
-	message := kvs.createMessage(args, del)
+	message := kvs.createMessage(args, common.Del)
 
 	//Aggiunge alla coda ordinandolo per timestamp, cosi da rispettare l'esecuzione esclusivamente se è in testa alla coda
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := sendToAllServer("KeyValueStoreSequential.TotalOrderedMulticast", *message, response)
+	err := sendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -83,7 +83,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 
 	result := true
 
-	if message.GetTypeOfMessage() == put { // Scrittura
+	if message.GetTypeOfMessage() == common.Put { // Scrittura
+
 		if kvs.isEndKeyMessage(message) {
 			kvs.isAllEndKey()
 			return nil
@@ -91,10 +92,10 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 			kvs.PutInDatastore(message.GetKey(), message.GetValue())
 		}
 
-	} else if message.GetTypeOfMessage() == del { // Scrittura
+	} else if message.GetTypeOfMessage() == common.Del { // Scrittura
 		kvs.DeleteFromDatastore(message.GetKey())
 
-	} else if message.GetTypeOfMessage() == get { // Lettura
+	} else if message.GetTypeOfMessage() == common.Get { // Lettura
 		val, ok := kvs.GetDatastore()[message.GetKey()]
 		if !ok {
 			printRed("NON ESEGUITO", *message, nil, kvs)
@@ -116,7 +117,9 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	}
 
 	// Stampa di debug
-	printGreen("ESEGUITO", *message, nil, kvs)
+	if result && message.GetKey() != common.EndKey {
+		printGreen("ESEGUITO", *message, nil, kvs)
+	}
 
 	return nil
 }
@@ -132,7 +135,7 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 	kvs.SetClock(kvs.GetClock() + 1)
 
 	numberAck := 0
-	if typeFunc == get { // se è una get non serve aspettare ack dato che è un evento interno
+	if typeFunc == common.Get { // se è una get non serve aspettare ack dato che è un evento interno
 		numberAck = common.Replicas
 	}
 
@@ -148,19 +151,22 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 
 	// Se il client non è nella mappa, lo aggiungo e imposto il timestamp di ricezione a zero
 	if _, ok := kvs.ClientMaps[args.GetIDClient()]; !ok {
-		// Non ho mai ricevuto un messaggio da questo client
 
+		// Non ho mai ricevuto un messaggio da questo client
 		if args.GetSendingFIFO() == 0 { //  Se è il primo messaggio che avrei dovuto ricevere lo prendo
 			kvs.NewClientMap(args.GetIDClient())
-			kvs.IncreaseRequestTsClient(args)
+			kvs.IncreaseRequestTsClient(args) // Incremento il timestamp di ricezione e restituisco true
 			return true
 		} else {
 			//fmt.Println("Ho ricevuto un messaggio da un client che non conosco ma me ne aspetto altri:", "ReceptionFIFO msg client", args.GetSendingFIFO())
 		}
 	} else { // Avevo già ricevuto messaggi da questo client
+
 		requestTs, err := kvs.GetRequestTsClient(args.GetIDClient())
 		if args.GetSendingFIFO() == requestTs && err == nil {
-			// Se il messaggio che ricevo dal client è il successivo rispetto all'ultimo ricevuto, lo posso aggiungere alla coda
+			// Se il messaggio che ricevo dal client è il successivo rispetto all'ultimo ricevuto,
+			// lo posso aggiungere alla coda
+
 			kvs.IncreaseRequestTsClient(args)
 			return true
 		} else {
