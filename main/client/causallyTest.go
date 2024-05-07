@@ -5,19 +5,22 @@ import (
 	"main/common"
 )
 
+// testCausal esegue una serie di operazioni passate in argomento
+// Prende come argomento una lista di liste, dove ogni lista rappresenta una sequenza di operazioni
+// Le operazioni vengono eseguite in ordine, in base all'ordine in cui sono state inserite ma in maniera concorrente
+// rispetto agli altri server
 func testCausal(rpcName string, operations [][]Operation) {
 
-	if firstRequestC {
-		// sendingTS è una mappa che associa a ogni server un timestamp
+	if clientState.GetFirstRequest() { // Inizializzazione
+
 		for i := 0; i < common.Replicas; i++ {
-			sendingTS[i] = 0
-			listArgs[i] = common.NewArgs(sendingTS[i], "", "")
+			clientState.SendIndex[i] = 0
+			clientState.ListArgs[i] = common.NewArgs(clientState.GetSendingTS(i), "", "")
 		}
 
-		firstRequestC = false
+		clientState.SetFirstRequest(false)
 	}
 
-	//responses := make([]common.Response, common.Replicas)
 	var err error
 
 	// Assume operations are sorted in the order they should be executed
@@ -26,16 +29,15 @@ func testCausal(rpcName string, operations [][]Operation) {
 		go func(operation []Operation) {
 			for _, op := range operation {
 
-				args := listArgs[op.ServerIndex]
+				args := clientState.GetListArgs(op.ServerIndex)
 
-				args.SetSendingFIFO(sendingTS[op.ServerIndex])
+				args.SetSendingFIFO(clientState.GetSendingTS(op.ServerIndex))
 				args.SetKey(op.Key)
 				args.SetValue(op.Value)
 
-				//args := common.NewArgs(sendingTS[op.ServerIndex], op.Key, op.Value)
 				_, err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, synchronous, specific)
 
-				sendingTS[op.ServerIndex]++
+				clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore di timestamp
 
 				if err != nil {
 					fmt.Println("testCausal: Errore durante l'esecuzione di executeCall:", err)
@@ -76,9 +78,9 @@ func basicTestCE(rpcName string) {
 }
 
 // In questo mediumTestCE vengono inviate in goroutine:
-//   - una richiesta di get y, get y, se leggo y:c -> put x:b e get y al server1,
+//   - una richiesta di get y, put x:b e get y al server1,
 //   - una richiesta di put y:b, get x, get y, get x al server2,
-//   - una richiesta di get x, se leggo x:b -> put x:c, put y:c e get x al server3,
+//   - una richiesta di get x, put y:c e get x al server3,
 func mediumTestCE(rpcName string) {
 	fmt.Println("In questo complexTestCE vengono inviate in goroutine:\n" +
 		"- una richiesta di get y, put x:b e get y al server1\n" +
@@ -107,7 +109,7 @@ func mediumTestCE(rpcName string) {
 	testCausal(rpcName, operations)
 }
 
-// In questo mediumTestCE vengono inviate in goroutine:
+// In questo complexTestCE vengono inviate in goroutine:
 //   - una richiesta di put x:a, put x:b, get x, put x:d al server1,
 //   - una richiesta di get x, pu x:c, get x al server2,
 //   - una richiesta di put x:a, get x, get x al server3,
