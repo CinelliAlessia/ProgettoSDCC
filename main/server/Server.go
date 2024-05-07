@@ -50,12 +50,12 @@ func main() {
 
 	// ----- REGISTRAZIONE DEI SERVIZI RPC -----
 	// Registrazione dei servizi RPC
-	err = rpc.RegisterName("KeyValueStoreCausale", kvCausale)
+	err = rpc.RegisterName(common.Causal, kvCausale)
 	if err != nil {
 		fmt.Println("SERVER: Errore durante la registrazione di KeyValueStoreCausale", err)
 		return
 	}
-	err = rpc.RegisterName("KeyValueStoreSequential", kvSequential)
+	err = rpc.RegisterName(common.Sequential, kvSequential)
 	if err != nil {
 		fmt.Println("SERVER: Errore durante la registrazione di KeyValueStoreSequential", err)
 		return
@@ -89,12 +89,5 @@ func main() {
 				}
 			}()
 		}(conn)
-	}
-}
-
-func ifError(err error) {
-	if err != nil {
-		fmt.Println("Errore:", err)
-		os.Exit(1)
 	}
 }

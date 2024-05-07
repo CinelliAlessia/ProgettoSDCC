@@ -65,11 +65,11 @@ func main() {
 		var rpcName string
 		switch choice {
 		case 1:
-			rpcName = "KeyValueStoreCausale"
+			rpcName = common.Causal
 			causal(rpcName)
 			break
 		case 2:
-			rpcName = "KeyValueStoreSequential"
+			rpcName = common.Sequential
 			sequential(rpcName)
 			break
 		default:

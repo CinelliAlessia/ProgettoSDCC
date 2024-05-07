@@ -3,7 +3,6 @@ package keyvaluestore
 import (
 	"fmt"
 	"main/common"
-
 	"main/server/message"
 )
 
@@ -79,7 +78,7 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 		result = true
 	}
 
-	if message.GetTypeOfMessage() == get && result {
+	if message.GetTypeOfMessage() == common.Get && result {
 		// Se è un evento di lettura, controllo se la chiave è presente nel mio datastore
 		// Se non c'è aspetterò fin quando non verrà inserita
 		_, result = kvc.GetDatastore()[message.GetKey()]

@@ -18,6 +18,17 @@ const (
 const (
 	EndKey   = "endKey"
 	EndValue = "endValue"
+
+	Sequential = "KeyValueStoreSequential"
+	Causal     = "KeyValueStoreCausale"
+
+	PutRPC = ".Put"
+	GetRPC = ".Get"
+	DelRPC = ".Delete"
+
+	Put = "Put"
+	Get = "Get"
+	Del = "Delete"
 )
 
 // ReplicaPorts Lista delle porte su cui le repliche possono essere contattate

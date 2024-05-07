@@ -48,16 +48,16 @@ func basicTestCE(rpcName string) {
 
 	operations := [][]Operation{
 		{
-			{ServerIndex: 0, OperationType: put, Key: "x", Value: "a"},
-			{ServerIndex: 0, OperationType: put, Key: "y", Value: "b"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "a"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "y", Value: "b"},
 		},
 		{
-			{ServerIndex: 1, OperationType: get, Key: "x"},
-			{ServerIndex: 1, OperationType: put, Key: "x", Value: "b"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "b"},
 		},
 		{
-			{ServerIndex: 2, OperationType: get, Key: "y"},
-			{ServerIndex: 2, OperationType: put, Key: "y", Value: "a"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "a"},
 		},
 	}
 
@@ -76,20 +76,20 @@ func mediumTestCE(rpcName string) {
 
 	operations := [][]Operation{
 		{
-			{ServerIndex: 0, OperationType: get, Key: "y"},
-			{ServerIndex: 0, OperationType: put, Key: "x", Value: "b"},
-			{ServerIndex: 0, OperationType: get, Key: "y"},
+			{ServerIndex: 0, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "b"},
+			{ServerIndex: 0, OperationType: common.GetRPC, Key: "y"},
 		},
 		{
-			{ServerIndex: 1, OperationType: put, Key: "y", Value: "b"},
-			{ServerIndex: 1, OperationType: get, Key: "x"},
-			{ServerIndex: 1, OperationType: get, Key: "y"},
-			{ServerIndex: 1, OperationType: get, Key: "x"},
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "y", Value: "b"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 		},
 		{
-			{ServerIndex: 2, OperationType: get, Key: "x"},
-			{ServerIndex: 2, OperationType: put, Key: "y", Value: "c"},
-			{ServerIndex: 2, OperationType: get, Key: "x"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "c"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
 		},
 	}
 
@@ -108,20 +108,20 @@ func complexTestCE(rpcName string) {
 
 	operations := [][]Operation{
 		{
-			{ServerIndex: 0, OperationType: put, Key: "x", Value: "a"},
-			{ServerIndex: 0, OperationType: put, Key: "x", Value: "b"},
-			{ServerIndex: 0, OperationType: get, Key: "x"},
-			{ServerIndex: 0, OperationType: put, Key: "x", Value: "d"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "a"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "b"},
+			{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "d"},
 		},
 		{
-			{ServerIndex: 1, OperationType: get, Key: "x"},
-			{ServerIndex: 1, OperationType: put, Key: "x", Value: "c"},
-			{ServerIndex: 1, OperationType: get, Key: "x"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "c"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 		},
 		{
-			{ServerIndex: 2, OperationType: put, Key: "x", Value: "a"},
-			{ServerIndex: 2, OperationType: get, Key: "x"},
-			{ServerIndex: 2, OperationType: get, Key: "x"},
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "x", Value: "a"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
 		},
 	}
 

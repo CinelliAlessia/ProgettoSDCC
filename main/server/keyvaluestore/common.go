@@ -7,12 +7,6 @@ import (
 	"net/rpc"
 )
 
-const (
-	put = "Put"
-	get = "Get"
-	del = "Delete"
-)
-
 func sendToAllServer(rpcName string, message interface{}, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
@@ -41,13 +35,14 @@ func callRPC(rpcName string, message interface{}, response *common.Response, res
 	}
 
 	common.RandomDelay()
+
 	switch msg := message.(type) {
 	case message2.MessageC:
 		err = conn.Call(rpcName, msg, response)
 	case message2.MessageS:
 		err = conn.Call(rpcName, msg, response)
 	default:
-		resultChan <- fmt.Errorf("unsupported message type: %T", msg)
+		resultChan <- fmt.Errorf("tipo di messaggio non supportato: %T", msg)
 		return
 	}
 

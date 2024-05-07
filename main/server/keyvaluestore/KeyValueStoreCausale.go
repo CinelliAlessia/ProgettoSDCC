@@ -1,7 +1,6 @@
 package keyvaluestore
 
 import (
-	"fmt"
 	"main/common"
 	"main/server/message"
 )
@@ -9,9 +8,9 @@ import (
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
 
-	message := kvc.createMessage(args, get)
+	message := kvc.createMessage(args, common.Get)
 
-	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
+	err := sendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -22,9 +21,9 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response) error {
 
-	message := kvc.createMessage(args, put)
+	message := kvc.createMessage(args, common.Put)
 
-	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
+	err := sendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -35,9 +34,9 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Response) error {
 
-	message := kvc.createMessage(args, del)
+	message := kvc.createMessage(args, common.Del)
 
-	err := sendToAllServer("KeyValueStoreCausale.CausallyOrderedMulticast", *message, response)
+	err := sendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -47,29 +46,41 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 // RealFunction esegue l'operazione di put e di delete realmente
 func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, response *common.Response) error {
-	if message.GetTypeOfMessage() == put { // Scrittura
+
+	result := true
+
+	if message.GetTypeOfMessage() == common.Put { // Scrittura
 		kvc.GetDatastore()[message.GetKey()] = message.GetValue()
 
-	} else if message.GetTypeOfMessage() == del { // Scrittura
+	} else if message.GetTypeOfMessage() == common.Del { // Scrittura
 		kvc.DeleteFromDatastore(message.GetKey())
 
-	} else if message.GetTypeOfMessage() == get { // Lettura
+	} else if message.GetTypeOfMessage() == common.Get { // Lettura
 
 		val, ok := kvc.GetDatastore()[message.GetKey()]
 		if !ok {
 			printRed("NON ESEGUITO", *message, kvc, nil)
-			response.SetResult(false)
-			return nil
+			//response.SetResult(false)
+			//return nil
+			if message.GetIdSender() == kvc.GetIdServer() {
+				result = false
+			}
 		}
 
 		response.SetValue(val)
 		message.SetValue(val) //Fatto solo per DEBUG per il print
-	} else {
-		return fmt.Errorf("command not found")
 	}
 
-	printGreen("ESEGUITO", *message, kvc, nil)
-	response.SetResult(true)
+	if message.GetIdSender() == kvc.GetIdServer() {
+		response.SetResult(result)
+		//response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO())
+		//kvc.IncreaseResponseOrderingFIFO()
+	}
+
+	if result {
+		printGreen("ESEGUITO", *message, kvc, nil)
+	}
+
 	return nil
 }
 
