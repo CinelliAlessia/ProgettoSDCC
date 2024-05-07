@@ -8,6 +8,8 @@ import (
 	"sync"
 )
 
+// ----- CONSISTENZA SEQUENZIALE ----- //
+
 // KeyValueStoreSequential rappresenta il servizio di memorizzazione chiave-valore specializzato nel sequenziale
 type KeyValueStoreSequential struct {
 	Common KeyValueStore
@@ -19,26 +21,18 @@ type KeyValueStoreSequential struct {
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
 	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
-
-	ClientMaps map[string]*ClientMap // Mappa -> struttura dati che associa chiavi a valori
-	mutexMaps  sync.Mutex            // Mutex per proteggere l'accesso concorrente alla mappa
-
-	ResponseOrderingFIFO      int
-	mutexResponseOrderingFIFO sync.Mutex
 }
-
-// ----- CONSISTENZA SEQUENZIALE ----- //
 
 // NewKeyValueStoreSequential crea un nuovo KeyValueStoreSequential, inizializzando l'orologio logico scalare e la coda
 // prende come argomento l'id del server replica, da 0 a common.Replicas-1
 func NewKeyValueStoreSequential(idServer int) *KeyValueStoreSequential {
 	kvSequential := &KeyValueStoreSequential{
 		Common: KeyValueStore{
-			Datastore: make(map[string]string),
+			Datastore:  make(map[string]string),
+			ClientMaps: make(map[string]*ClientMap),
 		},
 	}
 
-	kvSequential.ClientMaps = make(map[string]*ClientMap)
 	kvSequential.SetClock(0)                             // Inizializzazione dell'orologio logico scalare
 	kvSequential.SetQueue(make([]commonMsg.MessageS, 0)) // Inizializzazione della coda
 	kvSequential.SetIdServer(idServer)
@@ -123,45 +117,66 @@ func (kvs *KeyValueStoreSequential) GetIdServer() int {
 
 // NewClientMap crea una nuova mappa client per tenere conto dell'assunzione FIFO Ordering dei messaggi
 func (kvs *KeyValueStoreSequential) NewClientMap(idClient string) {
-	kvs.mutexMaps.Lock()
-	defer kvs.mutexMaps.Unlock()
+	kvs.Common.mutexMaps.Lock()
+	defer kvs.Common.mutexMaps.Unlock()
 
-	kvs.ClientMaps[idClient] = &ClientMap{RequestTs: 0}
+	kvs.Common.ClientMaps[idClient] = &ClientMap{
+		ReceiveOrderingFIFO:  0,
+		ResponseOrderingFIFO: 0,
+	}
+}
+
+func (kvs *KeyValueStoreSequential) ExistClient(idClient string) bool {
+	_, ok := kvs.Common.ClientMaps[idClient]
+	return ok
 }
 
 // GetClientMap restituisce la mappa client associata a un client, identificato da un id univoco preso come argomento
 func (kvs *KeyValueStoreSequential) GetClientMap(id string) (*ClientMap, bool) {
-	val, ok := kvs.ClientMaps[id]
+	val, ok := kvs.Common.ClientMaps[id]
 	return val, ok
 }
 
 // SetRequestClient imposta il timestamp di richiesta di un client
 func (kvs *KeyValueStoreSequential) SetRequestClient(id string, ts int) {
 	val, _ := kvs.GetClientMap(id)
-	val.SetRequestTs(ts)
+	val.SetReceiveOrderingFIFO(ts)
 }
 
-func (kvs *KeyValueStoreSequential) IncreaseRequestTsClient(args common.Args) {
-	kvs.SetRequestClient(args.GetIDClient(), args.GetSendingFIFO()+1)
+func (kvs *KeyValueStoreSequential) IncreaseReceiveTsClient(args common.Args) {
+	kvs.SetRequestClient(args.GetClientID(), args.GetSendingFIFO()+1)
 }
 
-func (kvs *KeyValueStoreSequential) GetRequestTsClient(id string) (int, error) {
+func (kvs *KeyValueStoreSequential) GetReceiveTsFromClient(id string) (int, error) {
 	if clientMap, ok := kvs.GetClientMap(id); ok {
-		return clientMap.GetRequestTs(), nil
+		return clientMap.GetReceiveOrderingFIFO(), nil
 	}
 	// Gestisci l'errore qui. Potresti restituire un valore predefinito o generare un errore.
 	return -1, fmt.Errorf("key non presente")
 }
 
-func (kvs *KeyValueStoreSequential) IncreaseResponseOrderingFIFO() {
-	kvs.mutexResponseOrderingFIFO.Lock()
-	defer kvs.mutexResponseOrderingFIFO.Unlock()
-	kvs.ResponseOrderingFIFO += 1
+func (kvs *KeyValueStoreSequential) SetResponseOrderingFIFO(id string, ts int) {
+	val, _ := kvs.GetClientMap(id)
+	val.SetResponseOrderingFIFO(ts)
 }
 
-func (kvs *KeyValueStoreSequential) GetResponseOrderingFIFO() int {
-	kvs.mutexResponseOrderingFIFO.Lock()
-	defer kvs.mutexResponseOrderingFIFO.Unlock()
+func (kvs *KeyValueStoreSequential) IncreaseResponseOrderingFIFO(ClientID string) {
+	kvs.SetResponseOrderingFIFO(ClientID, kvs.GetResponseOrderingFIFO(ClientID)+1)
+}
 
-	return kvs.ResponseOrderingFIFO
+func (kvs *KeyValueStoreSequential) GetResponseOrderingFIFO(ClientID string) int {
+	val, _ := kvs.GetClientMap(ClientID)
+	return val.GetResponseOrderingFIFO()
+}
+
+// ----- Mutex ----- //
+
+func (kvs *KeyValueStoreSequential) LockMutexMessage(ClientID string) {
+	val, _ := kvs.GetClientMap(ClientID)
+	val.LockMutexMessage()
+}
+
+func (kvs *KeyValueStoreSequential) UnlockMutexMessage(ClientID string) {
+	val, _ := kvs.GetClientMap(ClientID)
+	val.UnlockMutexMessage()
 }
