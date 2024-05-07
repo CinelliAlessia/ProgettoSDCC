@@ -7,13 +7,6 @@ import (
 	"time"
 )
 
-type ClientState struct {
-	SendIndex    []int
-	MutexSent    []sync.Mutex
-	ReceiveIndex []int
-	MutexReceive []sync.Mutex
-}
-
 // Inizializza lo stato del client
 var clientState = ClientState{
 	SendIndex:    make([]int, common.Replicas),
@@ -21,12 +14,6 @@ var clientState = ClientState{
 	ReceiveIndex: make([]int, common.Replicas),
 	MutexReceive: make([]sync.Mutex, common.Replicas),
 }
-
-const (
-	put = ".Put"
-	get = ".Get"
-	del = ".Delete"
-)
 
 const (
 	synchronous = "synchronous"
