@@ -18,7 +18,7 @@ func NewMessageSeq(idSender int, typeOfMessage string, args common.Args, logical
 
 	msg.setIdMessage()
 	msg.SetIdSender(idSender)
-	msg.SetClientID(args.GetIDClient())
+	msg.SetClientID(args.GetClientID())
 
 	msg.SetTypeOfMessage(typeOfMessage)
 	msg.SetKey(args.GetKey())
@@ -96,11 +96,11 @@ func (msg *MessageS) GetValue() string {
 }
 
 func (msg *MessageS) SetClientID(client string) {
-	msg.Common.Args.SetIDClient(client)
+	msg.Common.Args.SetClientID(client)
 }
 
-func (msg *MessageS) GetIdClient() string {
-	return msg.Common.Args.GetIDClient()
+func (msg *MessageS) GetIDClient() string {
+	return msg.Common.Args.GetClientID()
 }
 
 // ----- Assunzione FIFO Ordering -----
