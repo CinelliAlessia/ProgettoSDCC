@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	Replicas = 3    // Numero di repliche del server -> almeno 3
-	TIMER    = 1000 // Ritardo di rete max espresso in Millisecondi
+	Replicas       = 3 // Numero di repliche del server -> almeno 3
+	ClientReplicas = 3
+	TIMER          = 1000 // Ritardo di rete max espresso in Millisecondi
 )
 
 const (
