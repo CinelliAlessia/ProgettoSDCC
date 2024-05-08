@@ -1,7 +1,8 @@
-package keyvaluestore
+package causal
 
 import (
 	"main/common"
+	"main/server/algorithms"
 	"main/server/message"
 )
 
@@ -10,7 +11,7 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 	message := kvc.createMessage(args, common.Get)
 
-	err := sendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -23,7 +24,7 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 	message := kvc.createMessage(args, common.Put)
 
-	err := sendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -36,7 +37,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 	message := kvc.createMessage(args, common.Del)
 
-	err := sendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -60,14 +61,14 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 		val, ok := kvc.GetDatastore()[message.GetKey()]
 		if !ok {
 
-			printRed("NON ESEGUITO", *message, kvc, nil)
+			printRed("NON ESEGUITO", *message, kvc)
 			if message.GetIdSender() == kvc.GetIdServer() {
 				result = false
 			}
-		} else if message.GetIdSender() == kvc.GetIdServer() {
-			response.SetValue(val)
-			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
+
+		response.SetValue(val)
+		message.SetValue(val) //Fatto solo per DEBUG per il print
 	}
 
 	// A prescindere da result, verrà inviata una risposta al client
@@ -80,7 +81,7 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 	/*if result && message.GetIdSender() == kvc.GetIdServer() {
 		printGreen("ESEGUITO mio", *message, kvc, nil)
 	} else */if result {
-		printGreen("ESEGUITO", *message, kvc, nil)
+		printGreen("ESEGUITO", *message, kvc)
 	}
 
 	return nil
@@ -94,6 +95,6 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 
 	message := commonMsg.NewMessageC(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
 
-	printDebugBlue("RICEVUTO da client", *message, kvc, nil)
+	printDebugBlue("RICEVUTO da client", *message, kvc)
 	return message
 }

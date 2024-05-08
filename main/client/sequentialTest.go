@@ -9,7 +9,7 @@ func testSequential(rpcName string, operations []Operation) {
 
 	if clientState.GetFirstRequest() { // Inizializzazione
 
-		for i := 0; i < common.Replicas; i++ {
+		for i := 0; i < common.ClientReplicas; i++ {
 			clientState.SendIndex[i] = 0
 			clientState.ListArgs[i] = common.NewArgs(clientState.GetSendingTS(i), "", "")
 		}

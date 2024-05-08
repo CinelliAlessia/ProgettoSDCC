@@ -1,7 +1,8 @@
-package keyvaluestore
+package sequential
 
 import (
 	"main/common"
+	"main/server/algorithms"
 	"main/server/message"
 )
 
@@ -46,7 +47,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := sendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -66,7 +67,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := sendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -75,7 +76,6 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 }
 
 // realFunction esegue l'operazione di get, put e di delete realmente,
-//
 // inserendo la risposta adeguata nella struttura common.Response
 // Se l'operazione è andata a buon fine, restituisce true, altrimenti restituisce false,
 // sarà la risposta che leggerà il client
@@ -99,7 +99,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 		val, ok := kvs.GetDatastore()[message.GetKey()]
 		if !ok {
 
-			printRed("NON ESEGUITO", *message, nil, kvs)
+			printRed("NON ESEGUITO", *message, kvs)
 			if message.GetIdSender() == kvs.GetIdServer() { // Controllo superfluo, non avrò mai messaggi get generati da altri server
 				result = false
 			}
@@ -114,7 +114,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(result)
 		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetIDClient())) // Setto il numero di risposte inviate al determinato client
-		kvs.IncreaseResponseOrderingFIFO(message.GetIDClient())                       // Incrementa il numero di risposte inviate al determinato server
+
+		kvs.SetResponseOrderingFIFO(message.GetIDClient(), kvs.GetResponseOrderingFIFO(message.GetIDClient())+1) // Incremento il numero di risposte inviate al determinato client
 	}
 
 	// Stampa di debug
@@ -122,7 +123,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 		printGreen("ESEGUITO MIO", *message, nil, kvs)
 	} else  */
 	if result {
-		printGreen("ESEGUITO", *message, nil, kvs)
+		printGreen("ESEGUITO", *message, kvs)
 	}
 
 	return nil
@@ -146,7 +147,7 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 	}
 
 	message := commonMsg.NewMessageSeq(kvs.GetIdServer(), typeFunc, args, kvs.GetClock(), numberAck)
-	printDebugBlue("RICEVUTO da client", *message, nil, kvs)
+	printDebugBlue("RICEVUTO da client", *message, kvs)
 
 	// Questo mutex mi permette di evitare scheduling tra il lascia passare di canReceive e la creazione del messaggio
 	kvs.UnlockMutexMessage(message.GetIDClient()) // Mutex chiuso in canReceive
@@ -171,9 +172,8 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 
 		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
 		kvs.LockMutexMessage(args.GetClientID())
-
-		kvs.IncreaseReceiveTsClient(args) // Incremento il timestamp di ricezione del client
-		return true                       // è possibile accettare il messaggio
+		kvs.SetRequestClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
+		return true                                                       // è possibile accettare il messaggio
 	}
 	return false
 }

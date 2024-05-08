@@ -1,15 +1,16 @@
-package keyvaluestore
+package causal
 
 import (
 	"fmt"
 	"main/common"
+	"main/server/algorithms"
 	"main/server/message"
 	"sync"
 )
 
 // KeyValueStoreCausale rappresenta la struttura di memorizzazione chiave-valore per garantire consistenza causale
 type KeyValueStoreCausale struct {
-	Common KeyValueStore
+	Common algorithms.KeyValueStore
 
 	VectorClock [common.Replicas]int // Orologio vettoriale
 	mutexClock  sync.Mutex
@@ -26,9 +27,9 @@ type KeyValueStoreCausale struct {
 // prende come argomento l'id del server replica, da 0 a common.Replicas-1
 func NewKeyValueStoreCausal(idServer int) *KeyValueStoreCausale {
 	kvc := &KeyValueStoreCausale{
-		Common: KeyValueStore{
+		Common: algorithms.KeyValueStore{
 			Datastore:  make(map[string]string),
-			ClientMaps: make(map[string]*ClientMap),
+			ClientMaps: make(map[string]*algorithms.ClientMap),
 		},
 	}
 
@@ -87,10 +88,10 @@ func (kvc *KeyValueStoreCausale) GetIdServer() int {
 
 // NewClientMap crea una nuova mappa client per tenere conto dell'assunzione FIFO Ordering dei messaggi
 func (kvc *KeyValueStoreCausale) NewClientMap(idClient string) {
-	kvc.Common.mutexMaps.Lock()
-	defer kvc.Common.mutexMaps.Unlock()
+	kvc.Common.MutexMaps.Lock()
+	defer kvc.Common.MutexMaps.Unlock()
 
-	kvc.Common.ClientMaps[idClient] = &ClientMap{
+	kvc.Common.ClientMaps[idClient] = &algorithms.ClientMap{
 		ReceiveOrderingFIFO:  0,
 		ResponseOrderingFIFO: 0,
 	}
@@ -102,7 +103,7 @@ func (kvc *KeyValueStoreCausale) ExistClient(idClient string) bool {
 }
 
 // GetClientMap restituisce la mappa client associata a un client, identificato da un id univoco preso come argomento
-func (kvc *KeyValueStoreCausale) GetClientMap(id string) (*ClientMap, bool) {
+func (kvc *KeyValueStoreCausale) GetClientMap(id string) (*algorithms.ClientMap, bool) {
 	val, ok := kvc.Common.ClientMaps[id]
 	return val, ok
 }

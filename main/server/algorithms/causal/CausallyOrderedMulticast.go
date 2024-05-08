@@ -1,4 +1,4 @@
-package keyvaluestore
+package causal
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"main/server/message"
 )
 
-// CausallyOrderedMulticast esegue l'keyvaluestore multicast causalmente ordinato sul messaggio ricevuto.
+// CausallyOrderedMulticast esegue l'algorithms multicast causalmente ordinato sul messaggio ricevuto.
 // Aggiunge il messaggio alla coda dei messaggi in attesa di essere eseguiti e cicla finché il controlSendToApplication
 // non restituisce true, indicando che la richiesta può essere eseguita a livello applicativo. Quando ciò accade,
 // la funzione esegue effettivamente l'operazione a livello applicativo tramite la chiamata a RealFunction e rimuove
@@ -17,7 +17,7 @@ func (kvc *KeyValueStoreCausale) CausallyOrderedMulticast(message commonMsg.Mess
 
 	// Solo per DEBUG
 	if kvc.GetIdServer() != message.GetIdSender() {
-		printDebugBlue("RICEVUTO da server", message, kvc, nil)
+		printDebugBlue("RICEVUTO da server", message, kvc)
 	}
 
 	// Ciclo finché controlSendToApplication restituisce true

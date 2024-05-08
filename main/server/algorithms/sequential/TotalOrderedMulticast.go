@@ -1,4 +1,4 @@
-package keyvaluestore
+package sequential
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message commonMsg.Mess
 	// Solo per debug
 	kvs.mutexClock.Lock()
 	if kvs.GetIdServer() != message.GetIdSender() {
-		printDebugBlue("RICEVUTO da server", message, nil, kvs)
+		printDebugBlue("RICEVUTO da server", message, kvs)
 	}
 	kvs.mutexClock.Unlock()
 

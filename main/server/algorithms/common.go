@@ -1,13 +1,13 @@
-package keyvaluestore
+package algorithms
 
 import (
 	"fmt"
 	"main/common"
-	message2 "main/server/message"
+	commonMsg "main/server/message"
 	"net/rpc"
 )
 
-func sendToAllServer(rpcName string, message interface{}, response *common.Response) error {
+func SendToAllServer(rpcName string, message interface{}, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
 
@@ -37,9 +37,9 @@ func callRPC(rpcName string, message interface{}, response *common.Response, res
 	common.RandomDelay()
 
 	switch msg := message.(type) {
-	case message2.MessageC:
+	case commonMsg.MessageC:
 		err = conn.Call(rpcName, msg, response)
-	case message2.MessageS:
+	case commonMsg.MessageS:
 		err = conn.Call(rpcName, msg, response)
 	default:
 		resultChan <- fmt.Errorf("tipo di messaggio non supportato: %T", msg)

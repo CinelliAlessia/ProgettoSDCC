@@ -13,7 +13,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 
 	if clientState.GetFirstRequest() { // Inizializzazione
 
-		for i := 0; i < common.Replicas; i++ {
+		for i := 0; i < common.ClientReplicas; i++ {
 			clientState.SendIndex[i] = 0
 			clientState.ListArgs[i] = common.NewArgs(clientState.GetSendingTS(i), "", "")
 		}
@@ -79,13 +79,13 @@ func basicTestCE(rpcName string) {
 
 // In questo mediumTestCE vengono inviate in goroutine:
 //   - una richiesta di get y, put x:b e get y al server1,
-//   - una richiesta di put y:b, get x, get y, get x al server2,
-//   - una richiesta di get x, put y:c e get x al server3,
+//   - una richiesta di put y:b, get y, put x:c, get x al server2,
+//   - una richiesta di get x, put y:c e get y al server3,
 func mediumTestCE(rpcName string) {
 	fmt.Println("In questo complexTestCE vengono inviate in goroutine:\n" +
 		"- una richiesta di get y, put x:b e get y al server1\n" +
-		"- una richiesta di put y:b, get x, get y, get x al server2\n" +
-		"- una richiesta di get x, put y:c e get x al server3")
+		"- una richiesta di put y:b, get y, put x:c, get x al server2\n" +
+		"- una richiesta di get x, put y:c e get y al server3")
 
 	operations := [][]Operation{
 		{
@@ -95,14 +95,14 @@ func mediumTestCE(rpcName string) {
 		},
 		{
 			{ServerIndex: 1, OperationType: common.PutRPC, Key: "y", Value: "b"},
-			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 			{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "c"},
 			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 		},
 		{
 			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
 			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "c"},
-			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "y"},
 		},
 	}
 

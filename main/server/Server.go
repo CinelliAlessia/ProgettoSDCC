@@ -4,7 +4,8 @@ package main
 import (
 	"fmt"
 	"main/common"
-	"main/server/keyvaluestore"
+	"main/server/algorithms/causal"
+	"main/server/algorithms/sequential"
 	"net"
 	"net/rpc"
 	"os"
@@ -43,10 +44,10 @@ func main() {
 	// Inizializzazione delle strutture
 
 	// ----- CONSISTENZA CAUSALE -----
-	kvCausale := keyvaluestore.NewKeyValueStoreCausal(id)
+	kvCausale := causal.NewKeyValueStoreCausal(id)
 
 	// ----- CONSISTENZA SEQUENZIALE -----
-	kvSequential := keyvaluestore.NewKeyValueStoreSequential(id)
+	kvSequential := sequential.NewKeyValueStoreSequential(id)
 
 	// ----- REGISTRAZIONE DEI SERVIZI RPC -----
 	// Registrazione dei servizi RPC
