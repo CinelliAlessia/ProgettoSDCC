@@ -14,8 +14,8 @@ func testCausal(rpcName string, operations [][]Operation) {
 	if clientState.GetFirstRequest() { // Inizializzazione
 
 		for i := 0; i < common.ClientReplicas; i++ {
-			clientState.SendIndex[i] = 0
-			clientState.ListArgs[i] = common.NewArgs(clientState.GetSendingTS(i), "", "")
+			clientState.SetSendIndex(i, 0)
+			clientState.SetListArgs(i, common.NewArgs(clientState.GetSendingTS(i), "", ""))
 		}
 
 		clientState.SetFirstRequest(false)

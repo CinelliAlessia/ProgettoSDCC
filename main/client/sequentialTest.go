@@ -10,8 +10,8 @@ func testSequential(rpcName string, operations []Operation) {
 	if clientState.GetFirstRequest() { // Inizializzazione
 
 		for i := 0; i < common.ClientReplicas; i++ {
-			clientState.SendIndex[i] = 0
-			clientState.ListArgs[i] = common.NewArgs(clientState.GetSendingTS(i), "", "")
+			clientState.SetSendIndex(i, 0)
+			clientState.SetListArgs(i, common.NewArgs(clientState.GetSendingTS(i), "", ""))
 		}
 
 		clientState.SetFirstRequest(false)
@@ -41,8 +41,6 @@ func testSequential(rpcName string, operations []Operation) {
 		_, err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
 		clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore di timestamp
-
-		//fmt.Println("Richiesta effettuata con ts", args.GetSendingFIFO(), "al server", op.ServerIndex, "nuovo ts", sendingTS[op.ServerIndex])
 
 		if err != nil {
 			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)

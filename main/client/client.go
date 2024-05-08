@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"main/common"
-	_ "sync"
 	"time"
 )
 

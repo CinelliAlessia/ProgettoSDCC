@@ -36,6 +36,10 @@ func NewClientState() *ClientState {
 	}
 }
 
+func (clientState *ClientState) SetSendIndex(index int, value int) {
+	clientState.SendIndex[index] = value
+}
+
 func (clientState *ClientState) IncreaseSendIndex(index int) {
 	clientState.MutexSent[index].Lock()
 	clientState.SendIndex[index]++
