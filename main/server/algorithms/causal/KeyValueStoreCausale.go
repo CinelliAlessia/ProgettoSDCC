@@ -8,7 +8,9 @@ import (
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
-
+	for !kvc.canReceive(args) {
+		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
+	}
 	message := kvc.createMessage(args, common.Get)
 
 	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
@@ -21,7 +23,9 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response) error {
-
+	for !kvc.canReceive(args) {
+		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
+	}
 	message := kvc.createMessage(args, common.Put)
 
 	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
@@ -34,6 +38,9 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Response) error {
+	for !kvc.canReceive(args) {
+		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
+	}
 
 	message := kvc.createMessage(args, common.Del)
 
@@ -74,13 +81,15 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetIdSender() == kvc.GetIdServer() {
 		response.SetResult(result)
-		//response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO(message.GetClientID())) // Setto il numero di risposte inviate al determinato client
-		//kvc.IncreaseResponseOrderingFIFO(message.GetClientID())                       // Incrementa il numero di risposte inviate al determinato server
+		response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO(message.GetClientID())) // Setto il numero di risposte inviate al determinato client
+
+		kvc.SetResponseOrderingFIFO(message.GetClientID(), kvc.GetResponseOrderingFIFO(message.GetClientID())+1) // Incremento il numero di risposte inviate al determinato client
 	}
 
 	/*if result && message.GetIdSender() == kvc.GetIdServer() {
 		printGreen("ESEGUITO mio", *message, kvc, nil)
-	} else */if result {
+	} else */
+	if result {
 		printGreen("ESEGUITO", *message, kvc)
 	}
 
@@ -94,7 +103,33 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
 
 	message := commonMsg.NewMessageC(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
-
 	printDebugBlue("RICEVUTO da client", *message, kvc)
+
+	// Questo mutex mi permette di evitare scheduling tra il lascia passare di canReceive e la creazione del messaggio
+	kvc.UnlockMutexMessage(message.GetClientID()) // Mutex chiuso in canReceive
+
 	return message
+}
+
+/* In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered */
+func (kvc *KeyValueStoreCausale) canReceive(args common.Args) bool {
+
+	// Se il client non è nella mappa, lo aggiungo e imposto il timestamp di ricezione a zero
+	if !kvc.ExistClient(args.GetClientID()) {
+		// Non ho mai ricevuto un messaggio da questo client
+		kvc.NewClientMap(args.GetClientID()) // Inserisco il client nella mappa
+	}
+
+	// Il client è sicuramente nella mappa
+	requestTs, err := kvc.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
+
+	if args.GetSendingFIFO() == requestTs && // Se il messaggio che ricevo dal client è quello che mi aspetto
+		err == nil { // Se non ci sono stati errori
+
+		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
+		kvc.LockMutexMessage(args.GetClientID())
+		kvc.SetRequestClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
+		return true                                                       // è possibile accettare il messaggio
+	}
+	return false
 }

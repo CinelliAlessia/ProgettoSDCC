@@ -89,7 +89,6 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 			kvc.mutexClock.Lock()
 
 			kvc.SetVectorClock(message.GetIdSender(), kvc.GetClock()[message.GetIdSender()]+1)
-			//kvc.VectorClock[message.GetIdSender()] += 1
 			kvc.mutexClock.Unlock()
 		}
 

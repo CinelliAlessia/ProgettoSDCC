@@ -99,7 +99,7 @@ func (msg *MessageS) SetClientID(client string) {
 	msg.Common.Args.SetClientID(client)
 }
 
-func (msg *MessageS) GetIDClient() string {
+func (msg *MessageS) GetClientID() string {
 	return msg.Common.Args.GetClientID()
 }
 

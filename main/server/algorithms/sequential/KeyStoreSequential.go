@@ -26,18 +26,18 @@ type KeyValueStoreSequential struct {
 // NewKeyValueStoreSequential crea un nuovo KeyValueStoreSequential, inizializzando l'orologio logico scalare e la coda
 // prende come argomento l'id del server replica, da 0 a common.Replicas-1
 func NewKeyValueStoreSequential(idServer int) *KeyValueStoreSequential {
-	kvSequential := &KeyValueStoreSequential{
+	kvs := &KeyValueStoreSequential{
 		Common: algorithms.KeyValueStore{
 			Datastore:  make(map[string]string),
 			ClientMaps: make(map[string]*algorithms.ClientMap),
 		},
 	}
 
-	kvSequential.SetClock(0)                             // Inizializzazione dell'orologio logico scalare
-	kvSequential.SetQueue(make([]commonMsg.MessageS, 0)) // Inizializzazione della coda
-	kvSequential.SetIdServer(idServer)
+	kvs.SetClock(0)                             // Inizializzazione dell'orologio logico scalare
+	kvs.SetQueue(make([]commonMsg.MessageS, 0)) // Inizializzazione della coda
+	kvs.SetIdServer(idServer)
 
-	return kvSequential
+	return kvs
 }
 
 // ----- Operazioni Datastore ----- //

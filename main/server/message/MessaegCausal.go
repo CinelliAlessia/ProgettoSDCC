@@ -16,10 +16,14 @@ func NewMessageC(idSender int, typeOfMessage string, args common.Args, vectorClo
 
 	msg.setIdMessage()
 	msg.SetIdSender(idSender)
+	msg.SetClientID(args.GetClientID())
+
 	msg.SetTypeOfMessage(typeOfMessage)
 	msg.SetKey(args.GetKey())
 	msg.SetValue(args.GetValue())
+
 	msg.SetSendingFIFO(args.GetSendingFIFO())
+
 	msg.SetClock(vectorClock)
 	return msg
 }
@@ -74,6 +78,10 @@ func (msg *MessageC) SetValue(value string) {
 
 func (msg *MessageC) GetValue() string {
 	return msg.Common.Args.GetValue()
+}
+
+func (msg *MessageC) SetClientID(client string) {
+	msg.Common.Args.SetClientID(client)
 }
 
 func (msg *MessageC) GetClientID() string {

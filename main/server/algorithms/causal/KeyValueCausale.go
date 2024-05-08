@@ -43,22 +43,31 @@ func NewKeyValueStoreCausal(idServer int) *KeyValueStoreCausale {
 	return kvc
 }
 
-func (kvc *KeyValueStoreCausale) SetDatastore(key string, value string) {
+// ----- Operazioni Datastore ----- //
+
+// PutInDatastore inserisce una coppia chiave-valore nel datastore del server
+// prende come argomenti la chiave e il valore da inserire
+func (kvc *KeyValueStoreCausale) PutInDatastore(key string, value string) {
 	kvc.Common.Datastore[key] = value
 }
 
+// DeleteFromDatastore elimina una coppia chiave-valore dal datastore del server
+func (kvc *KeyValueStoreCausale) DeleteFromDatastore(key string) {
+	delete(kvc.Common.Datastore, key)
+}
+
+// GetDatastore restituisce il datastore del server
 func (kvc *KeyValueStoreCausale) GetDatastore() map[string]string {
 	return kvc.Common.Datastore
 }
 
-func (kvc *KeyValueStoreCausale) DeleteFromDatastore(key string) {
-	delete(kvc.Common.Datastore, key)
-}
+// ----- Orologio Logico Vettoriale ----- //
 
 func (kvc *KeyValueStoreCausale) SetVectorClock(index int, value int) {
 	kvc.VectorClock[index] = value
 }
 
+// GetClock restituisce l'orologio logico scalare del server
 func (kvc *KeyValueStoreCausale) GetClock() [common.Replicas]int {
 	return kvc.VectorClock
 }
@@ -67,13 +76,19 @@ func (kvc *KeyValueStoreCausale) GetClockIDServer(id int) int {
 	return kvc.VectorClock[id]
 }
 
+// ----- Coda ----- //
+
+// SetQueue imposta la coda del server
 func (kvc *KeyValueStoreCausale) SetQueue(queue []commonMsg.MessageC) {
 	kvc.Queue = queue
 }
 
+// GetQueue restituisce la coda del server
 func (kvc *KeyValueStoreCausale) GetQueue() []commonMsg.MessageC {
 	return kvc.Queue
 }
+
+// ----- ID Server ----- //
 
 func (kvc *KeyValueStoreCausale) SetIdServer(id int) {
 	kvc.Common.Id = id
@@ -83,7 +98,6 @@ func (kvc *KeyValueStoreCausale) GetIdServer() int {
 	return kvc.Common.Id
 }
 
-// ----- Operazioni Mappa Client ----- //
 // ----- Client Map ----- //
 
 // NewClientMap crea una nuova mappa client per tenere conto dell'assunzione FIFO Ordering dei messaggi
@@ -98,12 +112,15 @@ func (kvc *KeyValueStoreCausale) NewClientMap(idClient string) {
 }
 
 func (kvc *KeyValueStoreCausale) ExistClient(idClient string) bool {
-	_, ok := kvc.Common.ClientMaps[idClient]
+	_, ok := kvc.GetClientMap(idClient)
 	return ok
 }
 
 // GetClientMap restituisce la mappa client associata a un client, identificato da un id univoco preso come argomento
 func (kvc *KeyValueStoreCausale) GetClientMap(id string) (*algorithms.ClientMap, bool) {
+	kvc.Common.MutexMaps.Lock()
+	defer kvc.Common.MutexMaps.Unlock()
+
 	val, ok := kvc.Common.ClientMaps[id]
 	return val, ok
 }
@@ -112,10 +129,6 @@ func (kvc *KeyValueStoreCausale) GetClientMap(id string) (*algorithms.ClientMap,
 func (kvc *KeyValueStoreCausale) SetRequestClient(id string, ts int) {
 	val, _ := kvc.GetClientMap(id)
 	val.SetReceiveOrderingFIFO(ts)
-}
-
-func (kvc *KeyValueStoreCausale) IncreaseReceiveTsClient(args common.Args) {
-	kvc.SetRequestClient(args.GetClientID(), args.GetSendingFIFO()+1)
 }
 
 func (kvc *KeyValueStoreCausale) GetReceiveTsFromClient(id string) (int, error) {
@@ -129,10 +142,6 @@ func (kvc *KeyValueStoreCausale) GetReceiveTsFromClient(id string) (int, error) 
 func (kvc *KeyValueStoreCausale) SetResponseOrderingFIFO(id string, ts int) {
 	val, _ := kvc.GetClientMap(id)
 	val.SetResponseOrderingFIFO(ts)
-}
-
-func (kvc *KeyValueStoreCausale) IncreaseResponseOrderingFIFO(ClientID string) {
-	kvc.SetResponseOrderingFIFO(ClientID, kvc.GetResponseOrderingFIFO(ClientID)+1)
 }
 
 func (kvc *KeyValueStoreCausale) GetResponseOrderingFIFO(ClientID string) int {
@@ -149,5 +158,16 @@ func (kvc *KeyValueStoreCausale) LockMutexMessage(ClientID string) {
 
 func (kvc *KeyValueStoreCausale) UnlockMutexMessage(ClientID string) {
 	val, _ := kvc.GetClientMap(ClientID)
+	if val == nil {
+		fmt.Println("Errore: clientMap nil")
+	}
 	val.UnlockMutexMessage()
+}
+
+func (kvc *KeyValueStoreCausale) LockMutexMaps() {
+	kvc.Common.MutexMaps.Lock()
+}
+
+func (kvc *KeyValueStoreCausale) UnlockMutexMaps() {
+	kvc.Common.MutexMaps.Unlock()
 }

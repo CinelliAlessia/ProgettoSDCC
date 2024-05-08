@@ -113,9 +113,9 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(result)
-		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetIDClient())) // Setto il numero di risposte inviate al determinato client
+		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetClientID())) // Setto il numero di risposte inviate al determinato client
 
-		kvs.SetResponseOrderingFIFO(message.GetIDClient(), kvs.GetResponseOrderingFIFO(message.GetIDClient())+1) // Incremento il numero di risposte inviate al determinato client
+		kvs.SetResponseOrderingFIFO(message.GetClientID(), kvs.GetResponseOrderingFIFO(message.GetClientID())+1) // Incremento il numero di risposte inviate al determinato client
 	}
 
 	// Stampa di debug
@@ -150,7 +150,7 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 	printDebugBlue("RICEVUTO da client", *message, kvs)
 
 	// Questo mutex mi permette di evitare scheduling tra il lascia passare di canReceive e la creazione del messaggio
-	kvs.UnlockMutexMessage(message.GetIDClient()) // Mutex chiuso in canReceive
+	kvs.UnlockMutexMessage(message.GetClientID()) // Mutex chiuso in canReceive
 
 	return message
 }

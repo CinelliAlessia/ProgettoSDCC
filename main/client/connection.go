@@ -113,23 +113,24 @@ func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Re
 
 	for {
 		if clientState.GetSendIndex(index) == args.GetSendingFIFO() {
-			clientState.MutexSent[index].Lock()
-			clientState.SendIndex[index]++
+			clientState.MutexSendLock(index)
+			clientState.IncreaseSendIndex(index)
 			break
 		}
 	}
 
 	// Effettua la chiamata RPC
 	debugPrintRun(rpcName, args)
+
 	err := conn.Call(rpcName, args, response)
 	if err != nil {
 		return fmt.Errorf("syncCall: errore durante la chiamata RPC in client.call: %s\n", err)
 	}
 
-	clientState.MutexSent[index].Unlock()
+	clientState.MutexSendUnlock(index)
 
-	//waitToAccept(index, args, rpcName, response)
-	debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
+	waitToAccept(index, args, rpcName, response)
+	//debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
 
 	err = conn.Close()
 	if err != nil {
@@ -143,17 +144,18 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 	for {
 		if clientState.GetSendIndex(index) == args.GetSendingFIFO() {
-			clientState.MutexSent[index].Lock()
-			clientState.SendIndex[index]++
+			clientState.MutexSendLock(index)
+			clientState.IncreaseSendIndex(index)
 			break
 		}
 	}
 
 	// Effettua la chiamata RPC
 	call := conn.Go(rpcName, args, response, nil)
+
 	debugPrintRun(rpcName, args)
 
-	clientState.MutexSent[index].Unlock()
+	clientState.MutexSendUnlock(index)
 
 	go func() {
 		<-call.Done // Aspetta che la chiamata RPC sia completata
@@ -176,15 +178,16 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 	return nil
 }
 
+// waitToAccept: aspetta che il client abbia ricevuto il messaggio che si aspettava, controllando ReceiveIndex
 func waitToAccept(index int, args common.Args, rpcName string, response *common.Response) {
 	for {
 		// Se ho ricevuto dal server un messaggio che mi aspettavo
 		if clientState.GetReceiveIndex(index) == response.GetReceptionFIFO() {
 
-			clientState.MutexReceive[index].Lock()
-			clientState.ReceiveIndex[index]++
+			clientState.MutexReceiveLock(index)
+			clientState.IncreaseReceiveIndex(index)
 			debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
-			clientState.MutexReceive[index].Unlock()
+			clientState.MutexReceiveUnlock(index)
 			return
 
 		}
