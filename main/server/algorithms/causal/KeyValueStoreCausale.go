@@ -67,11 +67,8 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 
 		val, ok := kvc.GetDatastore()[message.GetKey()]
 		if !ok {
-
 			printRed("NON ESEGUITO", *message, kvc)
-			if message.GetIdSender() == kvc.GetIdServer() {
-				result = false
-			}
+			result = false
 		}
 
 		response.SetValue(val)
@@ -81,9 +78,12 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetIdSender() == kvc.GetIdServer() {
 		response.SetResult(result)
-		response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO(message.GetClientID())) // Setto il numero di risposte inviate al determinato client
 
-		kvc.SetResponseOrderingFIFO(message.GetClientID(), kvc.GetResponseOrderingFIFO(message.GetClientID())+1) // Incremento il numero di risposte inviate al determinato client
+		// ----- FIFO ORDERED ----- //
+		// Imposto il numero di risposte inviate al determinato client
+		response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO(message.GetClientID()))
+		// Incremento il numero di risposte inviate al determinato client
+		kvc.SetResponseOrderingFIFO(message.GetClientID(), kvc.GetResponseOrderingFIFO(message.GetClientID())+1)
 	}
 
 	if result {

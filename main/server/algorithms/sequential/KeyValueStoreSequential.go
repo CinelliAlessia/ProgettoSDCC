@@ -43,9 +43,6 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 
 	message := kvs.createMessage(args, common.Put)
 
-	//Aggiunge alla coda ordinandolo per timestamp, cosi da rispettare l'esecuzione esclusivamente se è in testa alla coda
-	kvs.addToSortQueue(message)
-
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := algorithms.SendToAllServer(common.Sequential+".Update", *message, response)
 	if err != nil {
@@ -62,9 +59,6 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	}
 
 	message := kvs.createMessage(args, common.Del)
-
-	//Aggiunge alla coda ordinandolo per timestamp, cosi da rispettare l'esecuzione esclusivamente se è in testa alla coda
-	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := algorithms.SendToAllServer(common.Sequential+".Update", *message, response)

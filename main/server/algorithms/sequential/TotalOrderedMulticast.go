@@ -20,6 +20,9 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 	}
 	kvs.mutexClock.Unlock()
 
+	//Aggiunta del messaggio alla coda ordinata per timestamp
+	kvs.addToSortQueue(&message)
+
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
 	sendAck(&message)
 
