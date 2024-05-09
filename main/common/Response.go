@@ -4,40 +4,39 @@ package common
 type Response struct {
 	Value         string
 	Result        bool
-	Done          chan bool // lo setto ma non viene mai letto da nessuno
-	ReceptionFIFO int       // Timestamp per come il client dovrebbe leggere la risposta processata dal server
+	ReceptionFIFO int // Timestamp per come il client dovrebbe leggere la risposta processata dal server
 }
 
-/* RESPONDE STRUCT */
-
+// SetValue imposta il valore della risposta passata in argomento nella struttura Response
 func (response *Response) SetValue(value string) {
 	response.Value = value
 }
 
+// GetValue restituisce il valore della risposta memorizzato nella struttura Response
 func (response *Response) GetValue() string {
 	return response.Value
 }
 
+// SetResult imposta il risultato della risposta passata in argomento nella struttura Response
+// la risposta può essere true o false, per indicare se la chiamata RPC è andata a buon fine o meno
 func (response *Response) SetResult(result bool) {
 	response.Result = result
 }
 
+// GetResult restituisce il risultato della risposta memorizzato nella struttura Response
+// la risposta può essere true o false, per indicare se la chiamata RPC è andata a buon fine o meno
 func (response *Response) GetResult() bool {
 	return response.Result
 }
 
-func (response *Response) SetDone(done bool) {
-	response.Done <- done
-}
-
-func (response *Response) GetDone() chan bool {
-	return response.Done
-}
-
+// SetReceptionFIFO imposta il timestamp di ricezione della risposta passata in argomento nella struttura Response
+// il timestamp è utilizzato per indicare come il client dovrebbe leggere la risposta processata dal server
 func (response *Response) SetReceptionFIFO(timestamp int) {
 	response.ReceptionFIFO = timestamp
 }
 
+// GetReceptionFIFO restituisce il timestamp di ricezione della risposta memorizzato nella struttura Response
+// il timestamp è utilizzato per indicare come il client dovrebbe leggere la risposta processata dal server
 func (response *Response) GetReceptionFIFO() int {
 	return response.ReceptionFIFO
 }
