@@ -54,7 +54,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 //   - una richiesta di get y e put y:a al server3,
 func basicTestCE(rpcName string) {
 
-	fmt.Println("In mediumTestCE vengono inviate in goroutine:\n" +
+	fmt.Println("Il test basico sulla consistenza causale invia in goroutine:\n" +
 		"- una richiesta di put x:a e put y:b al server1\n" +
 		"- una richiesta di get x e put x:b al server2\n" +
 		"- una richiesta di get y e put y:a al server3")

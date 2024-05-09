@@ -90,14 +90,14 @@ func basicTestSeq(rpcName string) {
 }
 
 // mediumTestSeq contatta tutti i server in goroutine con operazioni di put
-// - put x:1, put y:1, put z:1, get x al server1,
-// - put x:2, put y:2, put z:2, get y al server2,
-// - put x:3, put y:3, put z:3, get z al server3.
+// - put x:1, put y:1, put z:1, get x, del x, get x al server1,
+// - put x:2, put y:2, put z:2, get y, del y, get y al server2,
+// - put x:3, put y:3, put z:3, get z, del z, get z al server3.
 func mediumTestSeq(rpcName string) {
 	fmt.Println("In questo mediumTestSeq vengono inviate in sequenza:\n" +
-		"- put x:1, put y:1, put z:1, get x al server1\n" +
-		"- put x:2, put y:2, put z:2, get y al server2\n" +
-		"- put x:3, put y:3, put z:3, get z al server3")
+		"- put x:1, put y:1, put z:1, get x, del x, get x al server1\n" +
+		"- put x:2, put y:2, put z:2, get y, del y, get y al server2\n" +
+		"- put x:3, put y:3, put z:3, get z, del z, get z al server3")
 
 	operations := []Operation{
 		{0, common.PutRPC, "x", "1"},
@@ -111,6 +111,14 @@ func mediumTestSeq(rpcName string) {
 		{0, common.PutRPC, "z", "1"},
 		{1, common.PutRPC, "z", "2"},
 		{2, common.PutRPC, "z", "3"},
+
+		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
+		{ServerIndex: 2, OperationType: common.GetRPC, Key: "z"},
+
+		{ServerIndex: 0, OperationType: common.DelRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.DelRPC, Key: "y"},
+		{ServerIndex: 2, OperationType: common.DelRPC, Key: "z"},
 
 		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
 		{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},

@@ -63,7 +63,7 @@ func main() {
 	}
 
 	// Avvio del listener RPC sulla porta specificata
-	fmt.Println("LA MIA PORTA", port)
+	fmt.Println("Server:", id+1)
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		fmt.Println("SERVER: Errore nell'avvio del listener RPC:", err)

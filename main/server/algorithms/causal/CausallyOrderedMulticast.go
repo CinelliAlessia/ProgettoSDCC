@@ -62,12 +62,11 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 		(message.GetClock()[message.GetIdSender()] == (kvc.GetClock()[message.GetIdSender()] + 1)) {
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
-		for index := range message.GetClock() {
-			if (index != message.GetIdSender()) &&
-				(index != kvc.GetIdServer()) &&
-				(message.GetClock()[index] > kvc.GetClock()[index]) {
+		for index := range message.GetClock() { // Per ogni indice del vettore dei clock logici
+			if (index != message.GetIdSender()) && // Se l'indice non è quello del mittente del messaggio
+				(index != kvc.GetIdServer()) && // e non è quello del server stesso che sta processando il messaggio
+				(message.GetClock()[index] > kvc.GetClock()[index]) { // e pj non ha visto almeno gli stessi messaggi di pk visti da pi
 				// pj non ha visto almeno gli stessi messaggi di pk visti da pi
-				//fmt.Println("non ho ancora visto dei messaggi", "msg", message.VectorClock, "mio", kvc.VectorClock)
 				result = false
 			}
 		}
@@ -95,9 +94,6 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 		kvc.removeMessageToQueue(message)
 		return true
 	}
-
-	//fmt.Println("Messaggio", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value, "non può essere ancora eseguito da", kvc.Id)
-	//fmt.Println("VectorClock messaggio", message.VectorClock, "VectorClock mio", kvc.VectorClock)
 	return false
 }
 
