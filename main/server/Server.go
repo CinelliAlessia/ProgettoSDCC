@@ -86,7 +86,6 @@ func main() {
 			defer func() {
 				err := conn.Close()
 				if err != nil {
-					//fmt.Println("Errore nella chiusura della connessione:", err)
 				}
 			}()
 		}(conn)

@@ -164,11 +164,7 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 
 		if call.Error != nil {
 			fmt.Printf("asyncCall: errore durante la chiamata RPC in client: %s\n", call.Error)
-			response.SetDone(false)
-		} else {
-			response.SetDone(true)
 		}
-
 		err := conn.Close()
 		if err != nil {
 			fmt.Printf("asyncCall: errore durante la chiusura della connessione in client: %s\n", err)
