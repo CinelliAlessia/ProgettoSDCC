@@ -163,11 +163,3 @@ func (kvc *KeyValueStoreCausale) UnlockMutexMessage(ClientID string) {
 	}
 	val.UnlockMutexMessage()
 }
-
-func (kvc *KeyValueStoreCausale) LockMutexMaps() {
-	kvc.Common.MutexMaps.Lock()
-}
-
-func (kvc *KeyValueStoreCausale) UnlockMutexMaps() {
-	kvc.Common.MutexMaps.Unlock()
-}

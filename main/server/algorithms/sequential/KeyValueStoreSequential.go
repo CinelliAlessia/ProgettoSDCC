@@ -47,7 +47,7 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := algorithms.SendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Sequential+".Update", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -67,7 +67,7 @@ func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Re
 	kvs.addToSortQueue(message)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := algorithms.SendToAllServer(common.Sequential+".TotalOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Sequential+".Update", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err

@@ -8,10 +8,10 @@ import (
 	"sort"
 )
 
-// TotalOrderedMulticast gestione dell'evento esterno ricevuto da un server
+// Update gestione dell'evento esterno ricevuto da un server
 // Implementazione del multicast totalmente ordinato
 // Il server ha inviato in multicast il messaggio di update per msg
-func (kvs *KeyValueStoreSequential) TotalOrderedMulticast(message commonMsg.MessageS, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response *common.Response) error {
 
 	// Solo per debug
 	kvs.mutexClock.Lock()
@@ -54,7 +54,6 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message commonMsg.MessageS, reply
 // sendAck invia con una goroutine a ciascun server un ack del messaggio ricevuto
 func sendAck(message *commonMsg.MessageS) {
 	canSend := 0 // Contatore del numero di ack inviati che sono stati ricevuti (ho avuto una risposta alla chiamata RPC)
-	//fmt.Println("sendAck", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
 	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi
 	//stavo riferendo.
 	for i := 0; i < common.Replicas; i++ {
@@ -82,7 +81,7 @@ func sendAck(message *commonMsg.MessageS) {
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
 			err = conn.Close()
 			if err != nil {
-				fmt.Println("sendAck: Errore durante la chiusura della connessione in TotalOrderedMulticast.sendAckRPC: ", err)
+				fmt.Println("sendAck: Errore durante la chiusura della connessione in Update.sendAckRPC: ", err)
 				return
 			}
 
@@ -172,8 +171,8 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS
 	defer kvs.mutexQueue.Unlock()
 
 	for i := range kvs.GetQueue() {
-		if kvs.GetMsgFromQueue(i).GetClock() == message.GetClock() && // Se il messaggio in coda ha lo stesso timestamp
-			kvs.GetMsgFromQueue(i).GetIdMessage() == message.GetIdMessage() { // Se il messaggio in coda ha lo stesso id
+		if kvs.GetMsgFromQueue(i).GetIdMessage() == message.GetIdMessage() && // Se il messaggio in coda ha lo stesso id
+			kvs.GetMsgFromQueue(i).GetClock() == message.GetClock() { // Se il messaggio in coda ha lo stesso timestamp
 
 			// Aggiorna il messaggio nella coda incrementando il numero di ack ricevuti
 			kvs.GetMsgFromQueue(i).SetNumberAck(kvs.GetMsgFromQueue(i).GetNumberAck() + 1)
@@ -197,6 +196,7 @@ func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS, resp
 
 		err := kvs.realFunction(message, response) // Invio a livello applicativo
 		if err != nil {
+			response.SetResult(false)
 			return false, err
 		}
 		return true, nil
@@ -205,7 +205,8 @@ func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS, resp
 	return false, nil
 }
 
-// controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo, Pj consegna msg_i all’applicazione se:
+// controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo,
+// Pj consegna msg_i all’applicazione se:
 //   - msg_i è in testa a queue_j
 //   - tutti gli ack relativi a msg_i sono stati ricevuti da Pj
 //   - per ogni processo Pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
@@ -214,23 +215,25 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message *commonMsg.
 	defer kvs.mutexQueue.Unlock()
 
 	if len(kvs.GetQueue()) > 0 && // Se ci sono elementi in coda
-		kvs.GetMsgFromQueue(0).GetIdMessage() == message.GetIdMessage() && // Se il messaggio in testa alla coda è il messaggio in argomento
+		kvs.GetMsgFromQueue(0).GetIdMessage() == message.GetIdMessage() && // Se il messaggio è in testa alla coda
 		kvs.GetMsgFromQueue(0).GetNumberAck() == common.Replicas && // Se ha ricevuto tutti gli ack
-		kvs.secondCondition(message) { // Se la seconda condizione è rispettata
+		kvs.secondCondition(message) { // Se per ogni processo pk, c’è un messaggio msg_k in queue con
+		//timestamp maggiore del messaggio passato come argomento
 
 		// Tutte le condizioni sono soddisfatte
 		kvs.removeMessageToQueue()
 
-		// Aggiornamento del clock -> Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
+		// Aggiornamento del clock del server:
+		// - Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
+		// - Lo incremento di uno
 		kvs.updateLogicalClock(message)
 		return true
 
-	} else if kvs.isAllEndKey() {
+	} else if kvs.isAllEndKey() { // Chiave specifica per non ignorare le ultime richieste del client
 		// Se tutti i messaggi rimanenti in coda sono endKey, elimino il messaggio dalla coda
 		kvs.removeMessageToQueue()
 		return true
 	}
-
 	return false
 }
 

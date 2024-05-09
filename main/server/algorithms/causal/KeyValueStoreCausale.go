@@ -86,9 +86,6 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 		kvc.SetResponseOrderingFIFO(message.GetClientID(), kvc.GetResponseOrderingFIFO(message.GetClientID())+1) // Incremento il numero di risposte inviate al determinato client
 	}
 
-	/*if result && message.GetIdSender() == kvc.GetIdServer() {
-		printGreen("ESEGUITO mio", *message, kvc, nil)
-	} else */
 	if result {
 		printGreen("ESEGUITO", *message, kvc)
 	}
@@ -100,6 +97,7 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 	kvc.mutexClock.Lock()
 	defer kvc.mutexClock.Unlock()
 
+	// Incremento di uno l'indice del clock del server che ha ricevuto la richiesta
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
 
 	message := commonMsg.NewMessageC(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
@@ -111,7 +109,7 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 	return message
 }
 
-/* In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered */
+// In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered
 func (kvc *KeyValueStoreCausale) canReceive(args common.Args) bool {
 
 	// Se il client non è nella mappa, lo aggiungo e imposto il timestamp di ricezione a zero
