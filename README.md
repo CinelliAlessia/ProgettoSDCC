@@ -79,7 +79,7 @@ e non c'è bisogno che tutti i datastore replica ne siano a conoscenza.
 - Per le richieste di tipo `PUT` e `DELETE` viene generato un messaggio da inviare in multicast, tramite 
 `sendToAllServer()`, essendo essi eventi esterni, che vanno a modificare tutti i datastore replica.
 
-Ciascun server che riceve un messaggio di multicast (da una richiesta di `PUT` o `DELETE`), in `TotalOrderedMulticast()`:
+Ciascun server che riceve un messaggio di multicast (da una richiesta di `PUT` o `DELETE`), in `Update()`:
 - Invia un ack a tutti i server per indicare che lui ha letto quel messaggio, tramite `sendAck()`.
 - Controlla se può essere eseguita a livello applicativo, tramite `canExecute()`.
 
@@ -114,11 +114,15 @@ Per connettersi ad un istanza EC2 via SSH, è necessario utilizzare il comando:
 `ssh -i "SDCC2324.pem" ec2-user@ec2-35-153-131-38.compute-1.amazonaws.com`
 
 *Installare docker*
+
 `sudo yum update -y`
+
 `sudo yum install -y docker`
 
 *Installare docker-compose*
+
 `sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose`
+
 `sudo chmod +x /usr/local/bin/docker-compose`
 
 *Run docker demon*
@@ -128,8 +132,11 @@ Per connettersi ad un istanza EC2 via SSH, è necessario utilizzare il comando:
 *Installa git e clona repository*
 
 `sudo yum install git -y`
-`git clone https://github.com/CinelliAlessia/ProgettoSDCC/`
+
+`git clone https://github.com/CinelliAlessia/ProgettoSDCC.git`
 
 *Run docker compose:*
+
+`cd ProgettoSDCC/main/`
 
 `sudo docker-compose -f compose.yml up`
