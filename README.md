@@ -105,3 +105,31 @@ In sendAck() viene controllato il valore della risposta, se è false, viene invi
 **Test**
 L'output del client mostra in blu, con il termine `RUN operation` le richieste ai server replica secondo l'ordine in cui
 vengono eseguite. 
+
+
+**Start**
+
+Per connettersi ad un istanza EC2 via SSH, è necessario utilizzare il comando:
+
+`ssh -i "SDCC2324.pem" ec2-user@ec2-35-153-131-38.compute-1.amazonaws.com`
+
+*Installare docker*
+`sudo yum update -y`
+`sudo yum install -y docker`
+
+*Installare docker-compose*
+`sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose`
+`sudo chmod +x /usr/local/bin/docker-compose`
+
+*Run docker demon*
+
+`sudo service docker start`
+
+*Installa git e clona repository*
+
+`sudo yum install git -y`
+`git clone https://github.com/CinelliAlessia/ProgettoSDCC/`
+
+*Run docker compose:*
+
+`sudo docker-compose -f compose.yml up`
