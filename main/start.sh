@@ -7,10 +7,10 @@ export CONFIG=2
 # 1=true 0=false
 export DEBUG=0
 
-pkill gnome-terminal
 
 if [ "$CONFIG" -eq 1 ]; then
 
+pkill gnome-terminal
   # Percorsi dei file Go
   server_file="server/"
   client_file="client/"
@@ -28,7 +28,8 @@ if [ "$CONFIG" -eq 1 ]; then
 
 elif [ "$CONFIG" -eq 2 ]; then
   # Esecuzione con Docker Compose
-  docker-compose up --build
+  #docker-compose up --build
+  docker-compose -f compose.yml up --build -d
 else
   echo "Configurazione non supportata, inserire 1, 2 o 3."
 fi
