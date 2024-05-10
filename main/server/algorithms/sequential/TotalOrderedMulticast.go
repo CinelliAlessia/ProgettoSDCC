@@ -8,7 +8,7 @@ import (
 	"sort"
 )
 
-// Update gestione dell'evento esterno ricevuto da un server
+// Update gestisce l'evento esterno ricevuto da un server
 // Implementazione del multicast totalmente ordinato
 // Il server ha inviato in multicast il messaggio di update per msg
 func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response *common.Response) error {
@@ -24,7 +24,10 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 	kvs.addToSortQueue(&message)
 
 	// Invio ack a tutti i server per notificare la ricezione della richiesta
-	sendAck(&message)
+	err := sendAck(&message)
+	if err != nil {
+		return err
+	}
 
 	// Ciclo fin quando canExecute restituisce true, in quel caso
 	// la richiesta può essere eseguita a livello applicativo
@@ -55,31 +58,30 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message commonMsg.MessageS, reply
 }
 
 // sendAck invia con una goroutine a ciascun server un ack del messaggio ricevuto
-func sendAck(message *commonMsg.MessageS) {
-	canSend := 0 // Contatore del numero di ack inviati che sono stati ricevuti (ho avuto una risposta alla chiamata RPC)
-	//Invio in una goroutine controllando se il server a cui ho inviato l'ACK fosse a conoscenza del messaggio a cui mi
-	//stavo riferendo.
+func sendAck(message *commonMsg.MessageS) error {
+
+	ackChannel := make(chan error, common.Replicas)
+
 	for i := 0; i < common.Replicas; i++ {
 		// Invio ack in una goroutine
 		go func(replicaPort string, index int) {
-
-			reply := false
 
 			serverName := common.GetServerName(replicaPort, index)
 			conn, err := rpc.Dial("tcp", serverName)
 			if err != nil {
 				fmt.Printf("sendAck: Errore durante la connessione al server %s: %v\n", replicaPort, err)
+				ackChannel <- err
 				return
 			}
 
-			//fmt.Println("Inviato ack di:", message.TypeOfMessage, message.Args.Key+":"+message.Args.Value)
-			err = sendAckRPC(conn, message, &reply)
+			err = sendAckRPC(conn, message)
 			if err != nil {
 				fmt.Printf("sendAck: Errore durante la chiamata RPC receiveAck %v\n", err)
+				ackChannel <- err
 				return
 			}
 
-			canSend++ // Incremento il numero di ack inviati che sono stati ricevuti
+			ackChannel <- err
 
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
 			err = conn.Close()
@@ -92,23 +94,28 @@ func sendAck(message *commonMsg.MessageS) {
 	}
 
 	// Controllo e attendo che tutti i miei ack siano arrivati a destinazione
-	for {
-		if canSend == common.Replicas {
-			break
+	for i := 0; i < common.Replicas; i++ {
+		err := <-ackChannel
+		if err != nil {
+			return fmt.Errorf("sendAck: Errore durante l'invio dell'ack al server %d: %v", i, err)
 		}
 	}
+
+	return nil
 }
 
 // sendAckRPC invia l'ack tramite RPC, applicando un ritardo random
-func sendAckRPC(conn *rpc.Client, message *commonMsg.MessageS, reply *bool) error {
+func sendAckRPC(conn *rpc.Client, message *commonMsg.MessageS) error {
+	reply := false
+
 	common.RandomDelay()
 
-	err := conn.Call(common.Sequential+".ReceiveAck", &message, reply)
+	err := conn.Call(common.Sequential+".ReceiveAck", &message, &reply)
 	if err != nil {
 		return err
 	}
 
-	if !*reply {
+	if !reply {
 		return fmt.Errorf("sendAckRPC: Errore ReceiveAck ha risposto false, non dovrebbe accadere %v\n", &message)
 	}
 	return nil
