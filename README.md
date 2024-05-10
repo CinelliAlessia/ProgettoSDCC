@@ -115,28 +115,48 @@ Per connettersi ad un istanza EC2 via SSH, è necessario utilizzare il comando:
 
 *Installare docker*
 
-`sudo yum update -y`
+sudo yum update -y
 
-`sudo yum install -y docker`
+sudo yum install -y docker
 
 *Installare docker-compose*
 
-`sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose`
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 
-`sudo chmod +x /usr/local/bin/docker-compose`
+sudo chmod +x /usr/local/bin/docker-compose
 
 *Run docker demon*
 
-`sudo service docker start`
+sudo service docker start
 
 *Installa git e clona repository*
 
-`sudo yum install git -y`
+sudo yum install git -y
 
-`git clone https://github.com/CinelliAlessia/ProgettoSDCC.git`
+git clone https://github.com/CinelliAlessia/ProgettoSDCC.git
 
 *Run docker compose:*
 
-`cd ProgettoSDCC/main/`
+cd ProgettoSDCC/main/
 
-`sudo docker-compose -f compose.yml up`
+sudo docker-compose -f compose.yml up
+
+*per eseguire in background*
+
+docker-compose up --build -d 
+
+*per vedere i container attivi*
+
+docker ps
+
+*per entrare in un container*
+
+docker exec -it main-server-1 /bin/bash
+
+*Per uscire da un container Docker senza interromperlo:*
+
+Utilizzare la combinazione di tasti Ctrl + P seguita da Ctrl + Q
+
+*Per arrestare i container:*
+
+sudo docker-compose down
