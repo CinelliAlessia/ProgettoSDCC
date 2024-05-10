@@ -14,7 +14,9 @@ COPY go.work .
 COPY common common
 COPY client client
 
+WORKDIR /main/client
+
 # Avvia il tuo client Go
-CMD ["bash", "-c", "cd client && go run ."]
+#CMD ["bash", "-c", "cd client && go run ."]
 #CMD ["bash", "-c", "cd client"]
 #CMD ["go", "run", "client/."]
