@@ -14,11 +14,11 @@ import (
 func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response *common.Response) error {
 
 	// Solo per debug
-	kvs.mutexClock.Lock()
+	kvs.LockMutexClock()
 	if kvs.GetIdServer() != message.GetIdSender() {
 		printDebugBlue("RICEVUTO da server", message, kvs)
 	}
-	kvs.mutexClock.Unlock()
+	kvs.UnlockMutexClock()
 
 	//Aggiunta del messaggio alla coda ordinata per timestamp
 	kvs.addToSortQueue(&message)
@@ -86,7 +86,7 @@ func sendAck(message *commonMsg.MessageS) error {
 			// Chiudo la connessione dopo essere sicuro che l'ack è stato inviato
 			err = conn.Close()
 			if err != nil {
-				fmt.Println("sendAck: Errore durante la chiusura della connessione in Update.sendAckRPC: ", err)
+				fmt.Println("sendAck: Errore durante la chiusura della connessione in sendAckRPC: ", err)
 				return
 			}
 
@@ -129,8 +129,8 @@ func sendAckRPC(conn *rpc.Client, message *commonMsg.MessageS) error {
 // La funzione è threadSafe per l'utilizzo della coda kvs.queue tramite kvs.mutexQueue
 // Prima di aggiungere il messaggio alla coda, verifica che non sia già presente.
 func (kvs *KeyValueStoreSequential) addToSortQueue(message *commonMsg.MessageS) {
-	kvs.mutexQueue.Lock()
-	defer kvs.mutexQueue.Unlock()
+	kvs.LockMutexQueue()
+	defer kvs.UnlockMutexQueue()
 
 	// Verifica se il messaggio è già presente nella coda se è già presente non fare nulla
 	// Controllo effettuato perché è possibile che una richiesta venga aggiunta in coda sia alla ricezione della
@@ -177,8 +177,8 @@ func (kvs *KeyValueStoreSequential) removeMessageToQueue() {
 
 // updateAckMessage aggiorna, incrementando il numero di ack ricevuti, il messaggio in coda corrispondente all'id del messaggio passato come argomento
 func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS) bool {
-	kvs.mutexQueue.Lock()
-	defer kvs.mutexQueue.Unlock()
+	kvs.LockMutexQueue()
+	defer kvs.UnlockMutexQueue()
 
 	for i := range kvs.GetQueue() {
 		if kvs.GetMsgFromQueue(i).GetIdMessage() == message.GetIdMessage() && // Se il messaggio in coda ha lo stesso id
@@ -221,8 +221,8 @@ func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS, resp
 //   - tutti gli ack relativi a msg_i sono stati ricevuti da Pj
 //   - per ogni processo Pk, c’è un messaggio msg_k in queue_j con timestamp maggiore di quello di msg_i
 func (kvs *KeyValueStoreSequential) controlSendToApplication(message *commonMsg.MessageS) bool {
-	kvs.mutexQueue.Lock()
-	defer kvs.mutexQueue.Unlock()
+	kvs.LockMutexQueue()
+	defer kvs.UnlockMutexQueue()
 
 	if len(kvs.GetQueue()) > 0 && // Se ci sono elementi in coda
 		kvs.GetMsgFromQueue(0).GetIdMessage() == message.GetIdMessage() && // Se il messaggio è in testa alla coda
@@ -230,17 +230,25 @@ func (kvs *KeyValueStoreSequential) controlSendToApplication(message *commonMsg.
 		kvs.secondCondition(message) { // Se per ogni processo pk, c’è un messaggio msg_k in queue con
 		//timestamp maggiore del messaggio passato come argomento
 
+		if kvs.GetIdServer() == message.GetIdSender() { // Se il messaggio è stato inviato dal server stesso
+			if kvs.GetMsgSent()+1 == message.GetClock() { // Ho già inviato tutti i messaggi precedenti
+				kvs.SetMsgSent(kvs.GetMsgSent() + 1)
+			} else {
+				return false
+			}
+		}
+
 		// Tutte le condizioni sono soddisfatte
 		kvs.removeMessageToQueue()
 
 		// Aggiornamento del clock del server:
-		// - Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto
-		// - Lo incremento di uno
+		// - Prendo il max timestamp tra il mio e quello allegato al messaggio ricevuto e lo si incrementa di uno
 		kvs.updateLogicalClock(message)
 		return true
 
 	} else if kvs.isAllEndKey() { // Chiave specifica per non ignorare le ultime richieste del client
 		// Se tutti i messaggi rimanenti in coda sono endKey, elimino il messaggio dalla coda
+		kvs.updateLogicalClock(message)
 		kvs.removeMessageToQueue()
 		return true
 	}
@@ -276,8 +284,8 @@ func (kvs *KeyValueStoreSequential) secondCondition(message *commonMsg.MessageS)
 // messaggio eseguibile a livello applicativo e incrementando il LogicalClock di uno
 // se il messaggio ricevuto non è stato inviato in multicast dal server stesso
 func (kvs *KeyValueStoreSequential) updateLogicalClock(message *commonMsg.MessageS) {
-	kvs.mutexClock.Lock()
-	defer kvs.mutexClock.Unlock()
+	kvs.LockMutexClock()
+	defer kvs.UnlockMutexClock()
 
 	kvs.SetClock(common.Max(message.GetClock(), kvs.GetClock()))
 	if kvs.GetIdServer() != message.GetIdSender() {
@@ -317,6 +325,5 @@ func (kvs *KeyValueStoreSequential) isAllEndKey() bool {
 			}
 		}
 	}
-
 	return allEndKey
 }

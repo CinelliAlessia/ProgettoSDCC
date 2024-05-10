@@ -1,6 +1,7 @@
 package sequential
 
 import (
+	"fmt"
 	"main/common"
 	"main/server/algorithms"
 	"main/server/message"
@@ -107,15 +108,11 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetIdSender() == kvs.GetIdServer() {
 		response.SetResult(result)
-		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetClientID())) // Setto il numero di risposte inviate al determinato client
-
+		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetClientID()))                            // Setto il numero di risposte inviate al determinato client
 		kvs.SetResponseOrderingFIFO(message.GetClientID(), kvs.GetResponseOrderingFIFO(message.GetClientID())+1) // Incremento il numero di risposte inviate al determinato client
 	}
 
 	// Stampa di debug
-	/* if result && message.GetIdSender() == kvs.GetIdServer() {
-		printGreen("ESEGUITO MIO", *message, nil, kvs)
-	} else  */
 	if result {
 		printGreen("ESEGUITO", *message, kvs)
 	}
@@ -130,8 +127,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc string) *commonMsg.MessageS {
 	// Blocco il mutex qui cosi mi assicuro che il clock associato al messaggio sarà corretto
 	// e non modificato da nessun altro
-	kvs.mutexClock.Lock()
-	defer kvs.mutexClock.Unlock()
+	kvs.LockMutexClock()
+	defer kvs.UnlockMutexClock()
 
 	kvs.SetClock(kvs.GetClock() + 1)
 
@@ -149,7 +146,7 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 	return message
 }
 
-/* In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered */
+// In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered //
 func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 
 	// Se il client non è nella mappa, lo aggiungo e imposto il timestamp di ricezione a zero
@@ -160,9 +157,12 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 
 	// Il client è sicuramente nella mappa
 	requestTs, err := kvs.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
+	if err != nil {
+		fmt.Println("Errore nella ricezione del timestamp del client", args.GetClientID())
+		return false
+	}
 
-	if args.GetSendingFIFO() == requestTs && // Se il messaggio che ricevo dal client è quello che mi aspetto
-		err == nil { // Se non ci sono stati errori
+	if args.GetSendingFIFO() == requestTs { // Se il messaggio che ricevo dal client è quello che mi aspetto
 
 		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
 		kvs.LockMutexMessage(args.GetClientID())
