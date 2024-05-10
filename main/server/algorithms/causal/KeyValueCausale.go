@@ -163,3 +163,19 @@ func (kvc *KeyValueStoreCausale) UnlockMutexMessage(ClientID string) {
 	}
 	val.UnlockMutexMessage()
 }
+
+func (kvc *KeyValueStoreCausale) LockMutexClock() {
+	kvc.mutexClock.Lock()
+}
+
+func (kvc *KeyValueStoreCausale) UnlockMutexClock() {
+	kvc.mutexClock.Unlock()
+}
+
+func (kvc *KeyValueStoreCausale) LockMutexQueue() {
+	kvc.mutexQueue.Lock()
+}
+
+func (kvc *KeyValueStoreCausale) UnlockMutexQueue() {
+	kvc.mutexQueue.Unlock()
+}

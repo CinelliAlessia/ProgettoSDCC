@@ -1,6 +1,7 @@
 package causal
 
 import (
+	"fmt"
 	"main/common"
 	"main/server/algorithms"
 	"main/server/message"
@@ -13,7 +14,7 @@ func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response
 	}
 	message := kvc.createMessage(args, common.Get)
 
-	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -28,7 +29,7 @@ func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response
 	}
 	message := kvc.createMessage(args, common.Put)
 
-	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -44,7 +45,7 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 
 	message := kvc.createMessage(args, common.Del)
 
-	err := algorithms.SendToAllServer(common.Causal+".CausallyOrderedMulticast", *message, response)
+	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
 	if err != nil {
 		response.SetResult(false)
 		return err
@@ -94,8 +95,8 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 }
 
 func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string) *commonMsg.MessageC {
-	kvc.mutexClock.Lock()
-	defer kvc.mutexClock.Unlock()
+	kvc.LockMutexClock()
+	defer kvc.UnlockMutexClock()
 
 	// Incremento di uno l'indice del clock del server che ha ricevuto la richiesta
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
@@ -120,9 +121,11 @@ func (kvc *KeyValueStoreCausale) canReceive(args common.Args) bool {
 
 	// Il client è sicuramente nella mappa
 	requestTs, err := kvc.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
-
-	if args.GetSendingFIFO() == requestTs && // Se il messaggio che ricevo dal client è quello che mi aspetto
-		err == nil { // Se non ci sono stati errori
+	if err != nil {
+		fmt.Println("Errore nella ricezione del timestamp del client", args.GetClientID())
+		return false
+	}
+	if args.GetSendingFIFO() == requestTs { // Se il messaggio che ricevo dal client è quello che mi aspetto
 
 		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
 		kvc.LockMutexMessage(args.GetClientID())
