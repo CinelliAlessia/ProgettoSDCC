@@ -7,6 +7,10 @@ import (
 	"net/rpc"
 )
 
+// SendToAllServer Invia un messaggio a tutte le repliche del server in goroutine
+//   - rpcName: nome della procedura remota da chiamare
+//   - message: messaggio da inviare (argomento della procedura remota)
+//   - response: risposta della procedura remota
 func SendToAllServer(rpcName string, message interface{}, response *common.Response) error {
 	// Canale per ricevere i risultati delle chiamate RPC
 	resultChan := make(chan error, common.Replicas)
@@ -25,6 +29,7 @@ func SendToAllServer(rpcName string, message interface{}, response *common.Respo
 	return nil
 }
 
+// callRPC Esegue una chiamata RPC a una replica del server in modo sincrono
 func callRPC(rpcName string, message interface{}, response *common.Response, resultChan chan<- error, replicaIndex int) {
 	serverName := common.GetServerName(common.ReplicaPorts[replicaIndex], replicaIndex)
 

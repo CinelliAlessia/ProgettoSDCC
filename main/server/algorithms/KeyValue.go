@@ -15,7 +15,7 @@ type KeyValueStore struct {
 // ClientMap rappresenta la struttura dati per memorizzare i timestamp delle richieste dei client, cosi da realizzare
 // le assunzioni di comunicazione FIFO
 type ClientMap struct {
-	ReceiveOrderingFIFO int // Contatore del server, di messaggi (da processare) ricevuti da un singolo client
+	ReceiveOrderingFIFO int // Contatore del server, di messaggi ricevuti da un singolo client
 	MutexReceive        sync.Mutex
 
 	ResponseOrderingFIFO int // Contatore di messaggi inviati a un singolo client
@@ -24,13 +24,14 @@ type ClientMap struct {
 	MutexClientMessage sync.Mutex // Mutex che protegge la creazione del messaggio
 }
 
-// SetReceiveOrderingFIFO imposta il timestamp della richiesta del client
+// SetReceiveOrderingFIFO imposta il numero di messaggi ricevuti da un singolo client
 func (m *ClientMap) SetReceiveOrderingFIFO(ts int) {
 	m.MutexReceive.Lock()
 	defer m.MutexReceive.Unlock()
 	m.ReceiveOrderingFIFO = ts
 }
 
+// GetReceiveOrderingFIFO restituisce il contatore di messaggi ricevuti allo specifico client
 func (m *ClientMap) GetReceiveOrderingFIFO() int {
 	m.MutexReceive.Lock()
 	defer m.MutexReceive.Unlock()
@@ -48,6 +49,8 @@ func (m *ClientMap) SetResponseOrderingFIFO(ordering int) {
 
 // GetResponseOrderingFIFO restituisce il contatore di messaggi inviati a un singolo client
 func (m *ClientMap) GetResponseOrderingFIFO() int {
+	m.mutexResponse.Lock()
+	defer m.mutexResponse.Unlock()
 	return m.ResponseOrderingFIFO
 }
 
