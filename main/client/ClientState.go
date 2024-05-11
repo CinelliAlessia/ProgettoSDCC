@@ -5,19 +5,17 @@ import (
 	"sync"
 )
 
-// ClientState Rappresenta lo stato del client, tutte le variabili sono vettori perché ciascun indice rappresenta il singolo client
-type ClientState struct {
-	MutexSend []sync.Mutex
-	SendIndex []int // SendIndex rappresenta l'indice dei messaggi inviati al server,
-	// usato in syncCall e asyncCall
+// ClientsState Rappresenta lo stato dei clients, tutte le variabili sono vettori perché ciascun indice rappresenta il singolo client
+type ClientsState struct {
+	MutexSentMsgCounter []sync.Mutex
+	SentMsgCounter      []int // SentMsgCounter rappresenta l'indice dei messaggi inviati al server, usato in syncCall e asyncCall
 
-	MutexReceive []sync.Mutex
-	ReceiveIndex []int // ReceiveIndex rappresenta l'ordinamento con cui i messaggi sono stati eseguiti
-	// dal server per un corretto print
+	MutexReceiveMsgCounter []sync.Mutex
+	ReceiveMsgCounter      []int // ReceiveMsgCounter rappresenta l'ordinamento con cui i messaggi sono stati eseguiti dal server
 
 	MutexFirstRequest sync.Mutex
 	FirstRequest      bool // FirstRequest è una variabile booleana che indica se è la prima richiesta o meno,
-	// cosi da resettare i campi
+	// cosi da resettare i campi al cambio di consistenza scelta
 
 	ListArgs []common.Args // ListArgs è un array di argomenti ciascuna per un client
 
@@ -27,84 +25,88 @@ type ClientState struct {
 }
 
 // NewClientState Stiamo assumendo che avrò tanti client quanti server common.Replicas
-func NewClientState() *ClientState {
-	return &ClientState{
-		SendIndex: make([]int, common.Replicas), // Tanti quanti sono i server
-		MutexSend: make([]sync.Mutex, common.Replicas),
+func NewClientState() *ClientsState {
+	return &ClientsState{
+		SentMsgCounter:      make([]int, common.Replicas), // Tanti quanti sono i server
+		MutexSentMsgCounter: make([]sync.Mutex, common.Replicas),
 
-		ReceiveIndex: make([]int, common.Replicas), // Tanti quanti sono i server
-		MutexReceive: make([]sync.Mutex, common.Replicas),
+		ReceiveMsgCounter:      make([]int, common.Replicas), // Tanti quanti sono i server
+		MutexReceiveMsgCounter: make([]sync.Mutex, common.Replicas),
 
 		FirstRequest: true,
 		ListArgs:     make([]common.Args, common.Replicas), // Tanti quanti sono i client
-		SendingTS:    make([]int, common.Replicas),         // Tanti quanti sono i client
+
+		MutexSendingTS: make([]sync.Mutex, common.Replicas),
+		SendingTS:      make([]int, common.Replicas), // Tanti quanti sono i client
 	}
 }
 
-// ----- SendIndex ----- // Indice dei messaggi inviati al server
+// ----- SentMsgCounter ----- // Indice dei messaggi inviati al server
 
-// SetSendIndex imposta l'indice dei messaggi inviati al server, protetto da mutexSend
-func (clientState *ClientState) SetSendIndex(index int, value int) {
-	clientState.MutexSend[index].Lock()
-	clientState.SendIndex[index] = value
-	clientState.MutexSend[index].Unlock()
+// SetSentMsgCounter imposta l'indice dei messaggi inviati al server, protetto da mutexSentMsgCounter
+func (clientState *ClientsState) SetSentMsgCounter(index int, value int) {
+	clientState.LockMutexSentMsg(index)
+	defer clientState.UnlockMutexSentMsg(index)
+	clientState.SentMsgCounter[index] = value
 }
 
-// IncreaseSendIndex incrementa l'indice dei messaggi inviati al server, non protetto da mutexSend
-func (clientState *ClientState) IncreaseSendIndex(index int) {
-	clientState.SendIndex[index]++
+// IncreaseSentMsg incrementa l'indice dei messaggi inviati al server, non protetto da mutexSentMsgCounter
+func (clientState *ClientsState) IncreaseSentMsg(index int) {
+	clientState.SentMsgCounter[index]++
 }
 
-// GetSendIndex restituisce l'indice dei messaggi inviati al server, protetto da mutexSend
-func (clientState *ClientState) GetSendIndex(index int) int {
-	clientState.MutexSendLock(index)
-	defer clientState.MutexSendUnlock(index)
+// GetSentMsgCounter restituisce l'indice dei messaggi inviati al server, protetto da mutexSentMsgCounter
+func (clientState *ClientsState) GetSentMsgCounter(index int) int {
+	clientState.LockMutexSentMsg(index)
+	defer clientState.UnlockMutexSentMsg(index)
 
-	return clientState.SendIndex[index]
+	return clientState.SentMsgCounter[index]
 }
 
-func (clientState *ClientState) MutexSendLock(index int) {
-	clientState.MutexSend[index].Lock()
+func (clientState *ClientsState) LockMutexSentMsg(index int) {
+	clientState.MutexSentMsgCounter[index].Lock()
 }
 
-func (clientState *ClientState) MutexSendUnlock(index int) {
-	clientState.MutexSend[index].Unlock()
+func (clientState *ClientsState) UnlockMutexSentMsg(index int) {
+	clientState.MutexSentMsgCounter[index].Unlock()
 }
 
-// ----- ReceiveIndex ----- // Ordinamento con cui i messaggi sono stati eseguiti dal server
+// ----- ReceiveMsgCounter ----- // Ordinamento con cui i messaggi sono stati eseguiti dal server, come il client
+// Dovrebbe leggerli (e mostrarli a schermo)
 
-// IncreaseReceiveIndex Incrementa l'indice dei messaggi ricevuti dal client, non protetto da mutexReceive
-func (clientState *ClientState) IncreaseReceiveIndex(index int) {
-	clientState.ReceiveIndex[index]++
+// IncreaseReceiveMsg Incrementa l'indice dei messaggi ricevuti dal client, non protetto da mutexReceive
+func (clientState *ClientsState) IncreaseReceiveMsg(index int) {
+	clientState.ReceiveMsgCounter[index]++
 }
 
-// GetReceiveIndex restituisce l'indice dei messaggi ricevuti dal client, protetto da mutexReceive
-func (clientState *ClientState) GetReceiveIndex(index int) int {
+// GetReceiveMsgCounter restituisce l'indice dei messaggi ricevuti dal client, protetto da mutexReceive
+func (clientState *ClientsState) GetReceiveMsgCounter(index int) int {
 	clientState.MutexReceiveLock(index)
 	defer clientState.MutexReceiveUnlock(index)
 
-	return clientState.ReceiveIndex[index]
+	return clientState.ReceiveMsgCounter[index]
 }
 
-func (clientState *ClientState) MutexReceiveLock(index int) {
-	clientState.MutexReceive[index].Lock()
+func (clientState *ClientsState) MutexReceiveLock(index int) {
+	clientState.MutexReceiveMsgCounter[index].Lock()
 }
 
-func (clientState *ClientState) MutexReceiveUnlock(index int) {
-	clientState.MutexReceive[index].Unlock()
+func (clientState *ClientsState) MutexReceiveUnlock(index int) {
+	clientState.MutexReceiveMsgCounter[index].Unlock()
 }
 
 // ----- FirstRequest ----- // Indica se è la prima richiesta o meno, cosi da resettare i campi
 
 // SetFirstRequest imposta la variabile booleana FirstRequest, protetta da mutexFirstRequest
-func (clientState *ClientState) SetFirstRequest(firstRequest bool) {
+func (clientState *ClientsState) SetFirstRequest(firstRequest bool) {
 	clientState.MutexFirstRequest.Lock()
+	defer clientState.MutexFirstRequest.Unlock()
+
 	clientState.FirstRequest = firstRequest
-	clientState.MutexFirstRequest.Unlock()
 }
 
 // GetFirstRequest restituisce la variabile booleana FirstRequest, protetta da mutexFirstRequest
-func (clientState *ClientState) GetFirstRequest() bool {
+func (clientState *ClientsState) GetFirstRequest() bool {
 	clientState.MutexFirstRequest.Lock()
 	defer clientState.MutexFirstRequest.Unlock()
 	return clientState.FirstRequest
@@ -112,23 +114,30 @@ func (clientState *ClientState) GetFirstRequest() bool {
 
 // ----- ListArgs ----- // Array di argomenti ciascuna per un client
 
-func (clientState *ClientState) SetListArgs(index int, args common.Args) {
+func (clientState *ClientsState) SetListArgs(index int, args common.Args) {
 	clientState.ListArgs[index] = args
 }
 
-func (clientState *ClientState) GetListArgs(index int) common.Args {
+func (clientState *ClientsState) GetListArgs(index int) common.Args {
 	return clientState.ListArgs[index]
 }
 
-// ----- SendingTS ----- // Timestamp di invio associato dal client alla creazione dell'operazione
+// ----- SendingTS ----- // Timestamp di invio associato dal client alla creazione dell'operazione,
+// come i messaggi verranno inviati dal client al server
 
-// IncreaseSendingTS associa a ogni messaggio un timestamp di invio,
-// ce andrà allegato successivamente ad args. Per assunzione FIFO Ordering in andata
-// Non protetto da mutex
-func (clientState *ClientState) IncreaseSendingTS(index int) {
+// IncreaseSendingTS incrementa di uno, il contatore dei messaggi da inviare al server.
+//
+//	SendingTS indica l'ordinamento con cui il client invia le operazioni al server.
+//	Andrà allegato successivamente ad args, per assunzione FIFO Ordering in andata
+//	Non protetto da mutex
+func (clientState *ClientsState) IncreaseSendingTS(index int) {
 	clientState.SendingTS[index]++
 }
 
-func (clientState *ClientState) GetSendingTS(index int) int {
+// GetSendingTS restituisce il contatore dei messaggi da inviare al server.
+//
+//	SendingTS indica l'ordinamento con cui il client invia le operazioni al server.
+//	Non protetto da mutex
+func (clientState *ClientsState) GetSendingTS(index int) int {
 	return clientState.SendingTS[index]
 }
