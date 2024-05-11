@@ -63,10 +63,9 @@ func (kvc *KeyValueStoreCausale) canExecute(message *commonMsg.MessageC, respons
 // controlSendToApplication :
 //
 //	Quando il processo corrente `pj` riceve il messaggio `m` da `pi`, lo mette in una coda d'attesa e ritarda la consegna
-//
-// a livello applicativo finché non si verificano entrambe le seguenti condizioni:
-//   - `t(m)[i] = Vj[i] + 1` (il messaggio `m` è il successivo che `pj` si aspetta da `pi`).
-//   - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
+//	a livello applicativo finché non si verificano entrambe le seguenti condizioni:
+//	  - `t(m)[i] = Vj[i] + 1` (il messaggio `m` è il successivo che `pj` si aspetta da `pi`).
+//	  - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
 func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.MessageC) bool {
 	result := false
 

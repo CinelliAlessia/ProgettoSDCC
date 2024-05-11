@@ -103,7 +103,7 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	// A prescindere da result, verrà inviata una risposta al client
 	if message.GetSenderID() == kvs.GetServerID() {
 		response.SetResult(result)
-		// Setto il numero di risposte inviate al determinato client
+		// Imposto il numero di risposte inviate al determinato client
 		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetClientID()))
 	}
 	// Stampa di debug
