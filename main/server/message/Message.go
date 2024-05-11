@@ -6,7 +6,7 @@ import (
 
 type Message interface {
 	GetIdMessage() string
-	GetIdSender() int
+	GetSenderID() int
 
 	GetTypeOfMessage() string
 
@@ -16,9 +16,10 @@ type Message interface {
 	GetSendingFIFO() int
 }
 
+// MessageCommon rappresenta la struttura dati comune a tutti i messaggi
 type MessageCommon struct {
 	Id       string // Id del messaggio stesso
-	IdSender int    // IdSender rappresenta l'indice del server che invia il messaggio
+	SenderID int    // SenderID rappresenta l'indice del server che invia il messaggio
 
 	TypeOfMessage string
 	Args          common.Args
