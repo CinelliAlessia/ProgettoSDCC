@@ -38,8 +38,8 @@ func NewKeyValueStoreSequential(idServer int) *KeyValueStoreSequential {
 
 	kvs.SetClock(0)                             // Inizializzazione dell'orologio logico scalare
 	kvs.SetQueue(make([]commonMsg.MessageS, 0)) // Inizializzazione della coda
-	kvs.SetIdServer(idServer)
-	kvs.SetMsgSent(0)
+	kvs.SetIdServer(idServer)                   // Inizializzazione dell'id del server
+	kvs.SetMsgSent(0)                           // Inizializzazione del contatore dei messaggi inviati
 
 	return kvs
 }
@@ -99,6 +99,15 @@ func (kvs *KeyValueStoreSequential) GetQueue() []commonMsg.MessageS {
 	return kvs.Queue
 }
 
+func (kvs *KeyValueStoreSequential) PrintQueue() {
+	for _, msg := range kvs.GetQueue() {
+		fmt.Println(msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue(), "ack", msg.GetNumberAck(), "clock", msg.GetClock(), "orderClient", msg.GetSendingFIFO())
+	}
+	if len(kvs.GetQueue()) == 0 {
+		fmt.Println("Coda vuota")
+	}
+}
+
 // GetMsgFromQueue restituisce un messaggio dalla coda del server
 // prende come argomento l'indice del messaggio da restituire
 func (kvs *KeyValueStoreSequential) GetMsgFromQueue(index int) *commonMsg.MessageS {
@@ -112,8 +121,8 @@ func (kvs *KeyValueStoreSequential) SetIdServer(id int) {
 	kvs.Common.Id = id
 }
 
-// GetIdServer restituisce l'id del server
-func (kvs *KeyValueStoreSequential) GetIdServer() int {
+// GetServerID restituisce l'id del server
+func (kvs *KeyValueStoreSequential) GetServerID() int {
 	return kvs.Common.Id
 }
 
@@ -130,6 +139,7 @@ func (kvs *KeyValueStoreSequential) NewClientMap(idClient string) {
 	}
 }
 
+// ExistClient verifica se un client è presente nella mappa client
 func (kvs *KeyValueStoreSequential) ExistClient(idClient string) bool {
 	_, ok := kvs.GetClientMap(idClient)
 	return ok
@@ -144,27 +154,35 @@ func (kvs *KeyValueStoreSequential) GetClientMap(id string) (*algorithms.ClientM
 	return val, ok
 }
 
-// SetRequestClient imposta il timestamp di richiesta di un client
-func (kvs *KeyValueStoreSequential) SetRequestClient(id string, ts int) {
+// SetReceiveTsFromClient imposta il timestamp di richiesta di un client
+func (kvs *KeyValueStoreSequential) SetReceiveTsFromClient(id string, ts int) {
 	val, _ := kvs.GetClientMap(id)
 	val.SetReceiveOrderingFIFO(ts)
 }
 
-func (kvs *KeyValueStoreSequential) GetReceiveTsFromClient(id string) (int, error) {
+// GetReceiveTsFromClient restituisce il contatore di messaggi ricevuti allo specifico client
+func (kvs *KeyValueStoreSequential) GetReceiveTsFromClient(id string) int {
 	if clientMap, ok := kvs.GetClientMap(id); ok {
-		return clientMap.GetReceiveOrderingFIFO(), nil
+		return clientMap.GetReceiveOrderingFIFO()
 	}
-	// Gestisci l'errore qui. Potresti restituire un valore predefinito o generare un errore.
-	return -1, fmt.Errorf("key non presente")
+	return -1
 }
 
+// SetResponseOrderingFIFO Incrementa il numero di risposte inviate al client
 func (kvs *KeyValueStoreSequential) SetResponseOrderingFIFO(id string, ts int) {
 	val, _ := kvs.GetClientMap(id)
-	val.SetResponseOrderingFIFO(ts)
+	i := val.GetResponseOrderingFIFO()
+	val.SetResponseOrderingFIFO(i + ts)
 }
 
+// GetResponseOrderingFIFO Restituisce il contatore di messaggi inviati da me al singolo client
+// protetto da mutexMaps (all)
 func (kvs *KeyValueStoreSequential) GetResponseOrderingFIFO(ClientID string) int {
-	val, _ := kvs.GetClientMap(ClientID)
+	val, ok := kvs.GetClientMap(ClientID)
+	if !ok {
+		fmt.Println("Client non esistente", val, kvs.Common.ClientMaps)
+		return -1
+	}
 	return val.GetResponseOrderingFIFO()
 }
 
@@ -194,14 +212,6 @@ func (kvs *KeyValueStoreSequential) LockMutexMessage(ClientID string) {
 func (kvs *KeyValueStoreSequential) UnlockMutexMessage(ClientID string) {
 	val, _ := kvs.GetClientMap(ClientID)
 	val.UnlockMutexMessage()
-}
-
-func (kvs *KeyValueStoreSequential) LockMutexMaps() {
-	kvs.Common.MutexMaps.Lock()
-}
-
-func (kvs *KeyValueStoreSequential) UnlockMutexMaps() {
-	kvs.Common.MutexMaps.Unlock()
 }
 
 func (kvs *KeyValueStoreSequential) LockMutexClock() {

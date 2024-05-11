@@ -1,7 +1,6 @@
 package sequential
 
 import (
-	"fmt"
 	"main/common"
 	"main/server/algorithms"
 	"main/server/message"
@@ -80,9 +79,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 
 	if message.GetTypeOfMessage() == common.Put { // Scrittura
 
-		if kvs.isEndKeyMessage(message) { // Se è un messaggio di fine chiave
+		if message.GetKey() != common.EndKey { // Se è un messaggio di fine chiave
 			//Ignoro il messaggio di fine chiave, non lo inserisco nel datastore
-		} else {
 			kvs.PutInDatastore(message.GetKey(), message.GetValue())
 		}
 
@@ -92,31 +90,26 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	} else if message.GetTypeOfMessage() == common.Get { // Lettura
 
 		val, ok := kvs.GetDatastore()[message.GetKey()]
-		if !ok {
+		if !ok { // Se la chiave non è presente nel datastore
 
 			printRed("NON ESEGUITO", *message, kvs)
-			if message.GetIdSender() == kvs.GetIdServer() { // Controllo superfluo, non avrò mai messaggi get generati da altri server
-				result = false
-			}
+			result = false
 
-		} else if message.GetIdSender() == kvs.GetIdServer() {
+		} else if message.GetSenderID() == kvs.GetServerID() {
 			response.SetValue(val)
 			message.SetValue(val) //Fatto solo per DEBUG per il print
 		}
 	}
-
 	// A prescindere da result, verrà inviata una risposta al client
-	if message.GetIdSender() == kvs.GetIdServer() {
+	if message.GetSenderID() == kvs.GetServerID() {
 		response.SetResult(result)
-		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetClientID()))                            // Setto il numero di risposte inviate al determinato client
-		kvs.SetResponseOrderingFIFO(message.GetClientID(), kvs.GetResponseOrderingFIFO(message.GetClientID())+1) // Incremento il numero di risposte inviate al determinato client
+		// Setto il numero di risposte inviate al determinato client
+		response.SetReceptionFIFO(kvs.GetResponseOrderingFIFO(message.GetClientID()))
 	}
-
 	// Stampa di debug
 	if result {
 		printGreen("ESEGUITO", *message, kvs)
 	}
-
 	return nil
 }
 
@@ -137,7 +130,7 @@ func (kvs *KeyValueStoreSequential) createMessage(args common.Args, typeFunc str
 		numberAck = common.Replicas
 	}
 
-	message := commonMsg.NewMessageSeq(kvs.GetIdServer(), typeFunc, args, kvs.GetClock(), numberAck)
+	message := commonMsg.NewMessageSeq(kvs.GetServerID(), typeFunc, args, kvs.GetClock(), numberAck)
 	printDebugBlue("RICEVUTO da client", *message, kvs)
 
 	// Questo mutex mi permette di evitare scheduling tra il lascia passare di canReceive e la creazione del messaggio
@@ -156,18 +149,15 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 	}
 
 	// Il client è sicuramente nella mappa
-	requestTs, err := kvs.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
-	if err != nil {
-		fmt.Println("Errore nella ricezione del timestamp del client", args.GetClientID())
-		return false
-	}
+	requestTs := kvs.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
 
 	if args.GetSendingFIFO() == requestTs { // Se il messaggio che ricevo dal client è quello che mi aspetto
 
 		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
 		kvs.LockMutexMessage(args.GetClientID())
-		kvs.SetRequestClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
-		return true                                                       // è possibile accettare il messaggio
+		kvs.SetReceiveTsFromClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
+
+		return true // è possibile accettare il messaggio
 	}
 	return false
 }
