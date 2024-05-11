@@ -5,13 +5,18 @@ import (
 	"main/common"
 	"math/rand"
 	"net/rpc"
-	"strconv"
 )
 
 /* ----- FUNZIONI UTILIZZATE PER LA CONNESSIONE -----*/
 
-// executeCall esegue un comando ad un server. Il comando da eseguire viene specificato tramite i parametri inseriti
-// si occupa di eseguire le operazioni di put, get e del, in maniera synchronous o async
+// executeCall, esegue una chiamata RPC:
+//   - index rappresenta l'indice del server a cui inviare la richiesta (da 0 a common.Replicas-1)
+//   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+//   - opType rappresenta il tipo di operazione da eseguire (synchronous o async)
+//   - specOrRandom rappresenta se la chiamata deve essere effettuata ad un server specifico o ad un server casuale
+//
+// Ritorna la risposta ricevuta dal server e un eventuale errore
 func executeCall(index int, rpcName string, args common.Args, opType string, specOrRandom string) (common.Response, error) {
 	response := common.Response{}
 	var err error
@@ -30,11 +35,16 @@ func executeCall(index int, rpcName string, args common.Args, opType string, spe
 	return response, nil
 }
 
-// executeRandomCall:
+// executeRandomCall, esegue una chiamata RPC ad un server randomico:
 //   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+//   - response rappresenta la risposta ricevuta dal server
+//   - opType rappresenta il tipo di operazione da eseguire (synchronous o async)
+//
+// Ritorna un eventuale errore
 func executeRandomCall(rpcName string, args common.Args, response *common.Response, opType string) error {
-	randomIndex := rand.Intn(common.Replicas)
 
+	randomIndex := rand.Intn(common.Replicas) // Genera un indice casuale tra 0 e common.Replicas-1
 	conn, err := connect(randomIndex)
 	if conn == nil || err != nil {
 		return fmt.Errorf("executeRandomCall: Errore durante la connessione con il server specifico %d, %v\n",
@@ -64,6 +74,11 @@ func executeRandomCall(rpcName string, args common.Args, response *common.Respon
 // executeSpecificCall:
 //   - index rappresenta l'indice relativo al server da contattare, da 0 a (common.Replicas-1)
 //   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+//   - response rappresenta la risposta ricevuta dal server
+//   - opType rappresenta il tipo di operazione da eseguire (synchronous o async)
+//
+// Ritorna un eventuale errore
 func executeSpecificCall(index int, rpcName string, args common.Args, response *common.Response, opType string) error {
 
 	conn, err := connect(index)
@@ -91,6 +106,8 @@ func executeSpecificCall(index int, rpcName string, args common.Args, response *
 	return nil
 }
 
+// connect: si connette al server con l'indice specificato
+// Ritorna un client RPC e un eventuale errore
 func connect(index int) (*rpc.Client, error) {
 	if index > common.Replicas {
 		return nil, fmt.Errorf("connect: index out of range")
@@ -107,17 +124,17 @@ func connect(index int) (*rpc.Client, error) {
 	return conn, err
 }
 
-// syncCall esegue una chiamata RPC ritardata utilizzando il client RPC fornito.
-// Prima di effettuare la chiamata, applica un ritardo casuale per simulare condizioni reali di rete.
+// syncCall esegue una chiamata RPC utilizzando il client RPC fornito.
+//   - conn rappresenta il client RPC connesso al server
+//   - index rappresenta l'indice del server a cui inviare la richiesta (da 0 a common.Replicas-1)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+//   - response rappresenta la risposta ricevuta dal server
+//   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+//
+// Ritorna un eventuale errore
 func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Response, rpcName string) error {
 
-	for {
-		if clientState.GetSendIndex(index) == args.GetSendingFIFO() {
-			clientState.MutexSendLock(index)
-			clientState.IncreaseSendIndex(index)
-			break
-		}
-	}
+	waitToSend(index, args)
 
 	// Effettua la chiamata RPC
 	debugPrintRun(rpcName, args)
@@ -127,10 +144,9 @@ func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Re
 		return fmt.Errorf("syncCall: errore durante la chiamata RPC in client.call: %s\n", err)
 	}
 
-	clientState.MutexSendUnlock(index)
+	clientState.UnlockMutexSentMsg(index)
 
-	waitToAccept(index, args, rpcName, response)
-	//debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
+	waitToAcceptResponse(index, args, rpcName, response)
 
 	err = conn.Close()
 	if err != nil {
@@ -139,28 +155,28 @@ func syncCall(conn *rpc.Client, index int, args common.Args, response *common.Re
 	return nil
 }
 
-// asyncCall: utilizzato per lsa consistenza sequenziale
+// asyncCall esegue una chiamata RPC in modo asincrono utilizzando il client RPC fornito.
+//   - conn rappresenta il client RPC connesso al server
+//   - index rappresenta l'indice del server a cui inviare la richiesta (da 0 a common.Replicas-1)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+//   - response rappresenta la risposta ricevuta dal server
+//   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+//
+// Ritorna un eventuale errore
 func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.Response, rpcName string) error {
 
-	for {
-		if clientState.GetSendIndex(index) == args.GetSendingFIFO() {
-			clientState.MutexSendLock(index)
-			clientState.IncreaseSendIndex(index)
-			break
-		}
-	}
+	waitToSend(index, args)
 
 	// Effettua la chiamata RPC
 	call := conn.Go(rpcName, args, response, nil)
-
 	debugPrintRun(rpcName, args)
 
-	clientState.MutexSendUnlock(index)
+	clientState.UnlockMutexSentMsg(index)
 
 	go func() {
 		<-call.Done // Aspetta che la chiamata RPC sia completata
 
-		waitToAccept(index, args, rpcName, response)
+		waitToAcceptResponse(index, args, rpcName, response)
 
 		if call.Error != nil {
 			fmt.Printf("asyncCall: errore durante la chiamata RPC in client: %s\n", call.Error)
@@ -174,18 +190,35 @@ func asyncCall(conn *rpc.Client, index int, args common.Args, response *common.R
 	return nil
 }
 
-// waitToAccept: aspetta che il client abbia ricevuto il messaggio che si aspettava, controllando ReceiveIndex
-func waitToAccept(index int, args common.Args, rpcName string, response *common.Response) {
+// waitToAcceptResponse: aspetta che il client abbia ricevuto il messaggio che si aspettava, controllando ReceiveMsgCounter
+//   - index rappresenta l'indice del server a cui inviare la richiesta (da 0 a common.Replicas-1)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+//   - rpcName rappresenta il nome della funzione RPC da chiamare + il tipo di operazione (put, get, delete)
+//   - response rappresenta la risposta ricevuta dal server
+func waitToAcceptResponse(index int, args common.Args, rpcName string, response *common.Response) {
 	for {
 		// Se ho ricevuto dal server un messaggio che mi aspettavo
-		if clientState.GetReceiveIndex(index) == response.GetReceptionFIFO() {
+		if clientState.GetReceiveMsgCounter(index)+1 == response.GetReceptionFIFO() {
 
 			clientState.MutexReceiveLock(index)
-			clientState.IncreaseReceiveIndex(index)
-			debugPrintResponse(rpcName, strconv.Itoa(index), args, *response)
+			clientState.IncreaseReceiveMsg(index)
+			debugPrintResponse(rpcName, index, args, *response)
 			clientState.MutexReceiveUnlock(index)
 			return
 
+		}
+	}
+}
+
+// waitToSend: attende fin quando il client può inviare il messaggio che si aspettava, controllando SentMsgCounter
+//   - index rappresenta l'indice del server a cui inviare la richiesta (da 0 a common.Replicas-1)
+//   - args rappresenta gli argomenti da passare alla funzione RPC
+func waitToSend(index int, args common.Args) {
+	for {
+		if clientState.GetSentMsgCounter(index) == args.GetSendingFIFO() {
+			clientState.LockMutexSentMsg(index)
+			clientState.IncreaseSentMsg(index)
+			break
 		}
 	}
 }
