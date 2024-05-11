@@ -7,9 +7,10 @@ import (
 // ----- Consistenza Sequenziale ----- //
 
 type MessageS struct {
-	Common       MessageCommon
-	LogicalClock int
-	NumberAck    int
+	Common               MessageCommon
+	LogicalClock         int
+	NumberAck            int
+	sentToSpecificClient int
 }
 
 // NewMessageSeq crea un nuovo messaggio sequenziale, fa le veci di un costruttore
@@ -44,12 +45,12 @@ func (msg *MessageS) GetIdMessage() string {
 
 // SetIdSender Assegna l'id tra 0 e common.Replicas-1 del server che ha inviato il messaggio
 func (msg *MessageS) SetIdSender(idSender int) {
-	msg.Common.IdSender = idSender
+	msg.Common.SenderID = idSender
 }
 
-// GetIdSender Restituisce l'id tra 0 e common.Replicas-1 del server che ha inviato il messaggio
-func (msg *MessageS) GetIdSender() int {
-	return msg.Common.IdSender
+// GetSenderID GetIdSender Restituisce l'id tra 0 e common.Replicas-1 del server che ha inviato il messaggio
+func (msg *MessageS) GetSenderID() int {
+	return msg.Common.SenderID
 }
 
 // SetTypeOfMessage Associa il tipo di messaggio al messaggio (put, get, delete)
@@ -128,6 +129,8 @@ func (msg *MessageS) SetSendingFIFO(timestamp int) {
 }
 
 // GetSendingFIFO Restituisce il timestamp logico del client associato al messaggio
+//
+//	L'ordine con cui la richiesta deve essere processata dal server
 func (msg *MessageS) GetSendingFIFO() int {
 	args := msg.GetArgs()
 	return args.GetSendingFIFO()
