@@ -47,24 +47,23 @@ func printGreen(greenString string, message commonMsg.MessageS, kvs *KeyValueSto
 
 	if common.GetDebug() {
 		switch message.GetTypeOfMessage() {
-		case common.Del:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey(),
+		case common.Put:
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 		default:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 		}
 
 	} else {
 		switch message.GetTypeOfMessage() {
-		case common.Del:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey())
-		default:
+		case common.Put:
 			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
+
+		default:
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey())
 		}
 	}
-
-	kvs.PrintQueue()
 }
 
 func printRed(redString string, message commonMsg.MessageS, kvs *KeyValueStoreSequential) {
@@ -76,8 +75,8 @@ func printRed(redString string, message commonMsg.MessageS, kvs *KeyValueStoreSe
 
 	if common.GetDebug() {
 		fmt.Println(color.RedString(redString), message.GetTypeOfMessage(), message.GetKey(), "datastore:", kvs.GetDatastore(),
-			"clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
+			"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 	} else {
-		fmt.Println(color.RedString(redString), message.GetTypeOfMessage(), message.GetKey(), "clock", message.GetClock())
+		fmt.Println(color.RedString(redString), message.GetTypeOfMessage(), message.GetKey())
 	}
 }
