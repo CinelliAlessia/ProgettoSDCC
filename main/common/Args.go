@@ -45,13 +45,15 @@ func (args *Args) GetValue() string {
 }
 
 // SetSendingFIFO imposta il timestamp di invio della richiesta
-// Rappresenta l'ordine con cui la richiesta deve essere processata
+//
+//	Rappresenta l'ordine con cui la richiesta deve essere processata dal server
 func (args *Args) SetSendingFIFO(timestamp int) {
 	args.SendingFIFO = timestamp
 }
 
 // GetSendingFIFO restituisce il timestamp di invio della richiesta
-// Rappresenta l'ordine con cui la richiesta deve essere processata
+//
+//	Rappresenta l'ordine con cui la richiesta deve essere processata dal server
 func (args *Args) GetSendingFIFO() int {
 	return args.SendingFIFO
 }
