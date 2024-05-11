@@ -18,7 +18,7 @@ func main() {
 	var idStr string
 
 	// CONFIG è una variabile d'ambiente utilizzata per identificare se il programma verrà eseguito in locale oppure su docker.
-	if os.Getenv("CONFIG") == "1" { /*---LOCALE---*/
+	if os.Getenv("CONFIG") == "0" { /*---LOCALE---*/
 
 		if len(os.Args) < 2 { // Controllo se è stato passato per argomento l'id del server
 			fmt.Println("Usare: ", os.Args[0], "<ID_Server>")
