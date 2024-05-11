@@ -37,7 +37,7 @@ associato al server (protetto da un mutex) per conteggiare l'evento di receive.
 Associa il proprio clock vettoriale alla richiesta ricevuta e genera un messaggio da inviare 
 in multicast, tramite `sendToAllServer()`.
 
-Ciascun server che riceve un messaggio di multicast, in `CausallyOrderedMulticast()`, aggiunge la richiesta alla coda e
+Ciascun server che riceve un messaggio di multicast, in `Update()`, aggiunge la richiesta alla coda e
 controllerà ripetutamente se può essere eseguita a livello applicativo.
 
 Il controllo avviene in `controlSendToApplication()`, quando il processo `pj` riceve il messaggio `m` da `pi`, dove per
@@ -160,3 +160,8 @@ Utilizzare la combinazione di tasti Ctrl + P seguita da Ctrl + Q
 *Per arrestare i container:*
 
 sudo docker-compose down
+
+
+L'implementazione con endKey che ho creato, funziona univocamente se su ciascun server vengono eseguite pari operazioni di lettura
+altrimenti i clock dei server non sarebbero più sincronizzati e da una a tre operazioni "vere" non verrebbero eseguite, o meglio, verrebbero
+eseguite alla prossima iterazione. 
