@@ -10,7 +10,7 @@ func testSequential(rpcName string, operations []Operation) {
 	if clientState.GetFirstRequest() { // Inizializzazione
 
 		for i := 0; i < common.Replicas; i++ {
-			clientState.SetSendIndex(i, 0)
+			clientState.SetSentMsgCounter(i, 0)
 			clientState.SetListArgs(i, common.NewArgs(clientState.GetSendingTS(i), "", ""))
 		}
 
@@ -40,7 +40,7 @@ func testSequential(rpcName string, operations []Operation) {
 
 		_, err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, async, specific)
 
-		clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore di timestamp
+		clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore di richieste inviate al singolo server
 
 		if err != nil {
 			fmt.Println("testSequential: Errore durante l'esecuzione di executeCall", err)
@@ -51,6 +51,9 @@ func testSequential(rpcName string, operations []Operation) {
 
 // getEndOps restituisce un array di operazioni di tipo put che vengono eseguite su tutti i server
 func getEndOps() []Operation {
+	if !common.UseEndKey() {
+		return nil
+	}
 	var endOps []Operation
 	for i := 0; i < common.Replicas; i++ {
 		endOps = append(endOps, Operation{i, common.PutRPC, common.EndKey, common.EndValue})
@@ -134,7 +137,7 @@ func mediumTestSeq(rpcName string) {
 func complexTestSeq(rpcName string) {
 	fmt.Println("In questo complexTestSeq vengono inviate in sequenza:\n" +
 		"- put x:1, put y:2, get x, put y:1 al server1\n" +
-		"- put x:2, get x, get y, put x:3 al server2\n" +
+		"- put x:2, put z:1, get y, put x:3 al server2\n" +
 		"- put x:3, del x, get z, put x:4 al server3")
 
 	operations := []Operation{
@@ -143,7 +146,7 @@ func complexTestSeq(rpcName string) {
 		{2, common.PutRPC, "x", "3"},
 
 		{0, common.PutRPC, "y", "2"},
-		{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+		{ServerIndex: 1, OperationType: common.PutRPC, Key: "z", Value: "1"},
 		{ServerIndex: 2, OperationType: common.DelRPC, Key: "x"},
 
 		{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},

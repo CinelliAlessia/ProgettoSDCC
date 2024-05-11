@@ -53,9 +53,9 @@ func Max(clock int, clock2 int) int {
 // GetServerName Restituisce il nome del server in base alla configurazione scelta, tra locale e remota (docker)
 // L'indice id parte da 0 fino a (Replicas-1)
 func GetServerName(replicaPort string, id int) string {
-	if os.Getenv("CONFIG") == "1" {
+	if os.Getenv("CONFIG") == "0" {
 		return ":" + replicaPort // Locale
-	} else if os.Getenv("CONFIG") == "2" {
+	} else if os.Getenv("CONFIG") == "1" {
 		return "server" + strconv.Itoa(id+1) + ":" + replicaPort // Docker
 	} else {
 		fmt.Println("VARIABILE DI AMBIENTE ERRATA, CONFIG:", os.Getenv("CONFIG"))
@@ -83,4 +83,16 @@ func RandomDelay() {
 
 	// Introduce un ritardo casuale
 	time.Sleep(time.Millisecond * time.Duration(delay))
+}
+
+// Utilizzo della chiave speciale "endKey" per terminare le operazioni
+func UseEndKey() bool {
+	if os.Getenv("USEENDKEY") == "1" {
+		return true
+	} else if os.Getenv("USEENDKEY") == "0" {
+		return false
+	} else {
+		fmt.Println("VARIABILE DI AMBIENTE ERRATA DEBUG:", os.Getenv("DEBUG"))
+		return true
+	}
 }
