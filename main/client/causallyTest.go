@@ -14,7 +14,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 	if clientState.GetFirstRequest() { // Inizializzazione
 
 		for i := 0; i < common.Replicas; i++ {
-			clientState.SetSendIndex(i, 0)
+			clientState.SetSentMsgCounter(i, 0)
 			clientState.SetListArgs(i, common.NewArgs(clientState.GetSendingTS(i), "", ""))
 		}
 
@@ -23,7 +23,6 @@ func testCausal(rpcName string, operations [][]Operation) {
 
 	var err error
 
-	// Assume operations are sorted in the order they should be executed
 	for _, operation := range operations {
 
 		go func(operation []Operation) {
@@ -37,7 +36,7 @@ func testCausal(rpcName string, operations [][]Operation) {
 
 				_, err = executeCall(op.ServerIndex, rpcName+op.OperationType, args, synchronous, specific)
 
-				clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore di timestamp
+				clientState.IncreaseSendingTS(op.ServerIndex) // Incremento il contatore dei messaggi inviati
 
 				if err != nil {
 					fmt.Println("testCausal: Errore durante l'esecuzione di executeCall:", err)

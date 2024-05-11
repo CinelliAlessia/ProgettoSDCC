@@ -26,7 +26,8 @@ func printDebugBlue(blueString string, message commonMsg.MessageS, kvs *KeyValue
 			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 		default:
-			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey())
+			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey(),
+				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 		}
 	} else {
 		switch message.GetTypeOfMessage() {
@@ -62,6 +63,8 @@ func printGreen(greenString string, message commonMsg.MessageS, kvs *KeyValueSto
 			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
 		}
 	}
+
+	kvs.PrintQueue()
 }
 
 func printRed(redString string, message commonMsg.MessageS, kvs *KeyValueStoreSequential) {
@@ -75,6 +78,6 @@ func printRed(redString string, message commonMsg.MessageS, kvs *KeyValueStoreSe
 		fmt.Println(color.RedString(redString), message.GetTypeOfMessage(), message.GetKey(), "datastore:", kvs.GetDatastore(),
 			"clockMsg:", message.GetClock(), "clockServer:", kvs.GetClock(), formattedTime)
 	} else {
-		fmt.Println(color.RedString(redString), message.GetTypeOfMessage(), message.GetKey())
+		fmt.Println(color.RedString(redString), message.GetTypeOfMessage(), message.GetKey(), "clock", message.GetClock())
 	}
 }

@@ -85,7 +85,7 @@ func RandomDelay() {
 	time.Sleep(time.Millisecond * time.Duration(delay))
 }
 
-// Utilizzo della chiave speciale "endKey" per terminare le operazioni
+// UseEndKey Utilizzo della chiave speciale "endKey" per terminare le operazioni
 func UseEndKey() bool {
 	if os.Getenv("USEENDKEY") == "1" {
 		return true

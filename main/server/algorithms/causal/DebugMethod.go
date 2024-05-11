@@ -26,7 +26,8 @@ func printDebugBlue(blueString string, message commonMsg.MessageC, kvc *KeyValue
 			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 		default:
-			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey())
+			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey(),
+				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 		}
 	} else {
 		switch message.GetTypeOfMessage() {
@@ -39,6 +40,7 @@ func printDebugBlue(blueString string, message commonMsg.MessageC, kvc *KeyValue
 
 }
 
+// PrintGreen Usato per messaggi di invio
 func printGreen(greenString string, message commonMsg.MessageC, kvc *KeyValueStoreCausale) {
 	// Ottieni l'orario corrente
 	now := time.Now()
@@ -47,24 +49,26 @@ func printGreen(greenString string, message commonMsg.MessageC, kvc *KeyValueSto
 
 	if common.GetDebug() {
 		switch message.GetTypeOfMessage() {
-		case common.Del:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey(),
-				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
-		default:
+		case common.Put:
 			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
+				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
+
+		default:
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 		}
 
 	} else {
 		switch message.GetTypeOfMessage() {
-		case common.Del:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey())
-		default:
+		case common.Put:
 			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
+		default:
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey())
 		}
 	}
 }
 
+// PrintRed Usato per messaggi di errore
 func printRed(redString string, message commonMsg.MessageC, kvc *KeyValueStoreCausale) {
 
 	// Ottieni l'orario corrente

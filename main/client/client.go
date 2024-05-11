@@ -7,7 +7,7 @@ import (
 )
 
 // Inizializza lo stato del client
-var clientState *ClientState
+var clientState *ClientsState
 
 const (
 	synchronous = "synchronous"
@@ -18,10 +18,10 @@ const (
 )
 
 type Operation struct {
-	ServerIndex   int
-	OperationType string
-	Key           string
-	Value         string
+	ServerIndex   int    // Indice del server a cui inviare la richiesta
+	OperationType string // Tipo di operazione da eseguire, Put, Get o Delete
+	Key           string // Chiave dell'operazione
+	Value         string // Valore dell'operazione
 }
 
 func main() {
@@ -82,7 +82,6 @@ func sequential(rpcName string) {
 			break
 		case 4:
 			clientState = NewClientState()
-			fmt.Println()
 			return
 		}
 		time.Sleep(5000 * time.Millisecond) // Aggiungo un ritardo per evitare che le stampe si sovrappongano
@@ -110,7 +109,6 @@ func causal(rpcName string) {
 			break
 		case 4:
 			clientState = NewClientState()
-			fmt.Println()
 			return
 		}
 
@@ -124,14 +122,24 @@ func chooseFuncTest() (int, bool) {
 	fmt.Println("3. Complex Test")
 	fmt.Println("4. Esci")
 
-	// Leggi l'input dell'utente per l'operazione
-	fmt.Print("Inserisci il numero dell'operazione desiderata: ")
 	var choice int
-	_, err := fmt.Scan(&choice)
-	if err != nil {
-		fmt.Println("Errore durante la lettura dell'input:", err)
-		return 0, true
+
+	for {
+		// Leggi l'input dell'utente per l'operazione
+		fmt.Print("Inserisci il numero del test desiderato: ")
+		_, err := fmt.Scan(&choice)
+		if err != nil {
+			fmt.Println("Errore durante la lettura dell'input:", err)
+			return 0, true
+		}
+
+		if choice >= 1 && choice <= 4 {
+			break
+		} else {
+			fmt.Println("Scelta non valida. Riprova.")
+		}
 	}
+
 	fmt.Println()
 	return choice, false
 }
