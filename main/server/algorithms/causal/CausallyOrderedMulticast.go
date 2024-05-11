@@ -15,7 +15,7 @@ func (kvc *KeyValueStoreCausale) Update(message commonMsg.MessageC, response *co
 	kvc.addToQueue(&message)
 
 	// Solo per DEBUG
-	if kvc.GetIdServer() != message.GetIdSender() {
+	if kvc.GetIdServer() != message.GetSenderID() {
 		printDebugBlue("RICEVUTO da server", message, kvc)
 	}
 
@@ -60,28 +60,32 @@ func (kvc *KeyValueStoreCausale) canExecute(message *commonMsg.MessageC, respons
 	return false, nil
 }
 
-// controlSendToApplication realizza questo controllo:
-// Quando il processo `pj` riceve il messaggio `m` da `pi`, lo mette in una coda d'attesa e ritarda la consegna al
-// livello applicativo finché non si verificano entrambe le seguenti condizioni:
+// controlSendToApplication :
+//
+//	Quando il processo corrente `pj` riceve il messaggio `m` da `pi`, lo mette in una coda d'attesa e ritarda la consegna
+//
+// a livello applicativo finché non si verificano entrambe le seguenti condizioni:
 //   - `t(m)[i] = Vj[i] + 1` (il messaggio `m` è il successivo che `pj` si aspetta da `pi`).
 //   - `t(m)[k] ≤ Vj[k]` per ogni processo `pk` diverso da `i` (ovvero `pj` ha visto almeno gli stessi messaggi di `pk` visti da `pi`).
 func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.MessageC) bool {
 	result := false
 
 	// Verifica se il messaggio m è il successivo che pj si aspetta da pi
-	if (message.GetIdSender() != kvc.GetIdServer()) &&
-		(message.GetClock()[message.GetIdSender()] == (kvc.GetClock()[message.GetIdSender()] + 1)) {
+	if (message.GetSenderID() != kvc.GetIdServer()) &&
+		(message.GetClock()[message.GetSenderID()] == (kvc.GetClock()[message.GetSenderID()] + 1)) {
+
+		result = true
 
 		// Verifica se pj ha visto almeno gli stessi messaggi di pk visti da pi per ogni processo pk diverso da i
 		for index := range message.GetClock() { // Per ogni indice del vettore dei clock logici
-			if (index != message.GetIdSender()) && // Se l'indice non è quello del mittente del messaggio
+			if (index != message.GetSenderID()) && // Se l'indice non è quello del mittente del messaggio
 				(index != kvc.GetIdServer()) && // e non è quello del server stesso che sta processando il messaggio
 				(message.GetClock()[index] > kvc.GetClock()[index]) { // e pj non ha visto almeno gli stessi messaggi di pk visti da pi
 				result = false
 			}
 		}
-		result = true
-	} else if message.GetIdSender() == kvc.GetIdServer() { //Ho ricevuto una mia richiesta -> è possibile processarla
+
+	} else if message.GetSenderID() == kvc.GetIdServer() { //Ho ricevuto una mia richiesta -> è possibile processarla
 		result = true
 	}
 
@@ -94,13 +98,16 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 	if result {
 		// Entrambe le condizioni soddisfatte, il messaggio può essere consegnato al livello applicativo
 		// Aggiorno il mio orologio vettoriale
-		if message.GetIdSender() != kvc.GetIdServer() {
+		if message.GetSenderID() != kvc.GetIdServer() {
 			kvc.LockMutexClock()
-			kvc.SetVectorClock(message.GetIdSender(), kvc.GetClock()[message.GetIdSender()]+1)
+			kvc.SetVectorClock(message.GetSenderID(), kvc.GetClock()[message.GetSenderID()]+1)
 			kvc.UnlockMutexClock()
+		} else {
+			// Incremento il numero di risposte inviate al determinato client
+			kvc.SetResponseOrderingFIFO(message.GetClientID(), 1)
 		}
 
-		kvc.removeMessageToQueue(message)
+		kvc.removeMessageToQueue(message) // Rimuovo il messaggio dalla coda
 		return true
 	}
 	return false

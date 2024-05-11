@@ -111,6 +111,7 @@ func (kvc *KeyValueStoreCausale) NewClientMap(idClient string) {
 	}
 }
 
+// ExistClient verifica se un client è presente nella mappa client
 func (kvc *KeyValueStoreCausale) ExistClient(idClient string) bool {
 	_, ok := kvc.GetClientMap(idClient)
 	return ok
@@ -125,25 +126,34 @@ func (kvc *KeyValueStoreCausale) GetClientMap(id string) (*algorithms.ClientMap,
 	return val, ok
 }
 
-// SetRequestClient imposta il timestamp di richiesta di un client
-func (kvc *KeyValueStoreCausale) SetRequestClient(id string, ts int) {
+// SetReceiveTsFromClient imposta il numero di messaggi ricevuti da un singolo client
+//   - id: id del client
+//   - ts: timestamp del messaggio ricevuto
+func (kvc *KeyValueStoreCausale) SetReceiveTsFromClient(id string, ts int) {
 	val, _ := kvc.GetClientMap(id)
 	val.SetReceiveOrderingFIFO(ts)
 }
 
-func (kvc *KeyValueStoreCausale) GetReceiveTsFromClient(id string) (int, error) {
+// GetReceiveTsFromClient restituisce il contatore di messaggi ricevuti allo specifico client
+//   - id: id del client
+func (kvc *KeyValueStoreCausale) GetReceiveTsFromClient(id string) int {
 	if clientMap, ok := kvc.GetClientMap(id); ok {
-		return clientMap.GetReceiveOrderingFIFO(), nil
+		return clientMap.GetReceiveOrderingFIFO()
 	}
-	// Gestisci l'errore qui. Potresti restituire un valore predefinito o generare un errore.
-	return -1, fmt.Errorf("key non presente")
+	return -1
 }
 
+// SetResponseOrderingFIFO Incrementa il numero di risposte inviate al client
+//   - id: id del client
+//   - ts: timestamp del messaggio inviato
 func (kvc *KeyValueStoreCausale) SetResponseOrderingFIFO(id string, ts int) {
 	val, _ := kvc.GetClientMap(id)
-	val.SetResponseOrderingFIFO(ts)
+	i := val.GetResponseOrderingFIFO()
+	val.SetResponseOrderingFIFO(i + ts)
 }
 
+// GetResponseOrderingFIFO Restituisce il contatore di messaggi inviati da me al singolo client
+//   - id: id del client
 func (kvc *KeyValueStoreCausale) GetResponseOrderingFIFO(ClientID string) int {
 	val, _ := kvc.GetClientMap(ClientID)
 	return val.GetResponseOrderingFIFO()

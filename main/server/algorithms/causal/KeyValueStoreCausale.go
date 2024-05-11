@@ -1,7 +1,6 @@
 package causal
 
 import (
-	"fmt"
 	"main/common"
 	"main/server/algorithms"
 	"main/server/message"
@@ -77,14 +76,12 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 	}
 
 	// A prescindere da result, verrà inviata una risposta al client
-	if message.GetIdSender() == kvc.GetIdServer() {
+	if message.GetSenderID() == kvc.GetIdServer() {
 		response.SetResult(result)
 
 		// ----- FIFO ORDERED ----- //
 		// Imposto il numero di risposte inviate al determinato client
 		response.SetReceptionFIFO(kvc.GetResponseOrderingFIFO(message.GetClientID()))
-		// Incremento il numero di risposte inviate al determinato client
-		kvc.SetResponseOrderingFIFO(message.GetClientID(), kvc.GetResponseOrderingFIFO(message.GetClientID())+1)
 	}
 
 	if result {
@@ -120,17 +117,13 @@ func (kvc *KeyValueStoreCausale) canReceive(args common.Args) bool {
 	}
 
 	// Il client è sicuramente nella mappa
-	requestTs, err := kvc.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
-	if err != nil {
-		fmt.Println("Errore nella ricezione del timestamp del client", args.GetClientID())
-		return false
-	}
-	if args.GetSendingFIFO() == requestTs { // Se il messaggio che ricevo dal client è quello che mi aspetto
+	requestTs := kvc.GetReceiveTsFromClient(args.GetClientID()) // Ottengo il timestamp di ricezione del client
 
+	if args.GetSendingFIFO() == requestTs { // Se il messaggio che ricevo dal client è quello che mi aspetto
 		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
 		kvc.LockMutexMessage(args.GetClientID())
-		kvc.SetRequestClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
-		return true                                                       // è possibile accettare il messaggio
+		kvc.SetReceiveTsFromClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
+		return true                                                             // è possibile accettare il messaggio
 	}
 	return false
 }
