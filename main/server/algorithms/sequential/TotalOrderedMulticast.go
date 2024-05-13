@@ -20,8 +20,6 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 	}
 	kvs.UnlockMutexClock()
 
-	message.ConfigureSafeBool()
-
 	//Aggiunta del messaggio alla coda ordinata per timestamp
 	kvs.addToSortQueue(&message)
 
@@ -31,23 +29,11 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 		return err
 	}
 
-	executeMessage := make(chan bool, 1)
+	kvs.canExecute(&message)             // Posso eseguire il mio messaggio
+	kvs.realFunction(&message, response) // Eseguo la funzione reale
 
-	// Eseguo la funzione reale solo se la condizione è true
-	go func() {
-		// Attendo che il canale sia true impostato da canExecute
-		(&message).WaitCondition() // Aspetta che la condizione sia true
-		err := kvs.realFunction(&message, response)
-		if err != nil {
-			return
-		} // Invio a livello applicativo
-		executeMessage <- true
-	}()
+	go kvs.canHandleOtherResponse() // Controllo se posso gestire altri messaggi
 
-	// Controllo se è possibile eseguire il messaggio a livello applicativo
-	go kvs.canExecute(&message)
-
-	<-executeMessage
 	return nil
 }
 
@@ -200,20 +186,26 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS
 // canExecute controlla se è possibile eseguire il messaggio a livello applicativo, se è possibile lo esegue
 // e restituisce true, altrimenti restituisce false
 func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS) {
-	//kvs.executeFunctionMutex.Lock()
-	//defer kvs.executeFunctionMutex.Unlock()
+	message.ConfigureSafeBool()
 
-	canSend := kvs.controlSendToApplication(message) // Controllo se le due condizioni del M.T.O sono soddisfatte
+	executeMessage := make(chan bool, 1)
+	go func() {
+		// Attendo che il canale sia true impostato da canExecute
+		message.WaitCondition() // Aspetta che la condizione sia true, verrà impostato in canExecute se è possibile eseguire il messaggio a livello applicativo
+		executeMessage <- true
+	}()
+
+	canSend := kvs.controlSendToApplication(message) // Controllo se le due condizioni del M.C.O sono soddisfatte
 
 	if canSend {
 		message.SetCondition(true) // Imposto la condizione a true
-		fmt.Println("canSend true", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
-
 	} else {
 		// Bufferizzo il messaggio
-		fmt.Println("Bufferizzo il messaggio", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
 		kvs.AddBufferedMessage(*message)
 	}
+	<-executeMessage // Attendo che la condizione sia true
+	// è stata eseguita real function nella goroutine, la risposta è stata popolata.
+
 }
 
 // controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo,
