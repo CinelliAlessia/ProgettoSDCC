@@ -138,16 +138,11 @@ git clone https://github.com/CinelliAlessia/ProgettoSDCC.git
 *Run docker compose:*
 
 cd ProgettoSDCC/main/
-
-sudo docker-compose -f compose.yml up
-
-*per eseguire in background*
-
-docker-compose up --build -d 
+sudo docker-compose up --build -d 
 
 *per vedere i container attivi*
 
-docker ps
+sudo docker ps
 
 *per entrare in un container*
 

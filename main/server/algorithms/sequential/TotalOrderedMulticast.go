@@ -29,7 +29,9 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 		return err
 	}
 
-	kvs.canExecute(&message)             // Posso eseguire il mio messaggio
+	// canExecute è bloccante fin quando è possibile inviare a livello applicativo il messaggio
+	kvs.canExecute(&message) // Posso eseguire il mio messaggio
+	// Posso eseguire il mio messaggio
 	kvs.realFunction(&message, response) // Eseguo la funzione reale
 
 	go kvs.canHandleOtherResponse() // Controllo se posso gestire altri messaggi

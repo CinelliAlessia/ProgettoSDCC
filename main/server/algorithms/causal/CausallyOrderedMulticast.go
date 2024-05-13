@@ -95,7 +95,9 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 	// Se non c'è aspetterò fin quando non verrà inserita
 	if message.GetTypeOfMessage() == common.Get && result {
 		_, result = kvc.GetDatastore()[message.GetKey()]
-		fmt.Println("Get: variabile non presente nel datastore")
+		if common.GetDebug() {
+			fmt.Println("Get: variabile non presente nel datastore")
+		}
 	}
 
 	if result {
@@ -111,8 +113,6 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 		kvc.removeMessageToQueue(message) // Rimuovo il messaggio dalla coda
 		return true
 	}
-
-	fmt.Println("Non è possibile eseguire", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
 	return false
 }
 

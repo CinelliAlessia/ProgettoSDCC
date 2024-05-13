@@ -21,12 +21,12 @@ func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Respo
 
 	//Aggiunge alla coda ordinandolo per timestamp, cosi verrà eseguito esclusivamente se è in testa alla coda
 	kvs.addToSortQueue(message)
-
-	kvs.canExecute(message)             // Posso eseguire il mio messaggio
-	kvs.realFunction(message, response) // Eseguo la funzione reale
+	// canExecute è bloccante fin quando è possibile inviare a livello applicativo il messaggio
+	kvs.canExecute(message)
+	// Posso eseguire il mio messaggio
+	kvs.realFunction(message, response)
 
 	go kvs.canHandleOtherResponse() // Controllo se posso gestire altri messaggi
-
 	return nil
 }
 

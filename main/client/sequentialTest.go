@@ -65,6 +65,7 @@ func getEndOps() []Operation {
 // - Server 1: put x:1, get x, del x, get x
 // - Server 2: put x:2, get x, del x, get x
 // - Server 3: put x:3, get x, del x, get x
+// Questo test è utile per verificare che i server rispondano correttamente alle richieste di put, get e del
 func basicTestSeq(rpcName string) {
 	fmt.Println("In questo basicTestSeq vengono inviate in goroutine:\n" +
 		"- put x:1, get x, del x, get x al server1\n" +
