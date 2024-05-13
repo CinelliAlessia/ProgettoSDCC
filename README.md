@@ -151,7 +151,7 @@ docker ps
 
 *per entrare in un container*
 
-docker exec -it main-server-1 /bin/bash
+docker exec -it main-server1-1 /bin/bash
 
 *Per uscire da un container Docker senza interromperlo:*
 
@@ -159,7 +159,7 @@ Utilizzare la combinazione di tasti Ctrl + P seguita da Ctrl + Q
 
 *Per arrestare i container:*
 
-sudo docker-compose down
+docker stop <nome-container>
 
 
 L'implementazione con endKey che ho creato, funziona univocamente se su ciascun server vengono eseguite pari operazioni di lettura

@@ -205,7 +205,6 @@ func waitToAcceptResponse(index int, args common.Args, rpcName string, response 
 			debugPrintResponse(rpcName, index, args, *response)
 			clientState.MutexReceiveUnlock(index)
 			return
-
 		}
 	}
 }

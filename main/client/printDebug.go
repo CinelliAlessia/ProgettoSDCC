@@ -16,13 +16,24 @@ func debugPrintRun(rpcName string, args common.Args) {
 	debugName := strings.SplitAfter(rpcName, ".")
 	name := debugName[1]
 
-	switch name {
-	case common.Put:
-		fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue(), args.GetSendingFIFO())
-	case common.Get:
-		fmt.Println(color.BlueString("RUN Get"), args.GetKey(), args.GetSendingFIFO())
-	case common.Del:
-		fmt.Println(color.BlueString("RUN Delete"), args.GetKey(), args.GetSendingFIFO())
+	if common.GetDebug() {
+		switch name {
+		case common.Put:
+			fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue(), "ts client", args.GetSendingFIFO())
+		case common.Get:
+			fmt.Println(color.BlueString("RUN Get"), args.GetKey(), "ts client", args.GetSendingFIFO())
+		case common.Del:
+			fmt.Println(color.BlueString("RUN Delete"), args.GetKey(), "ts client", args.GetSendingFIFO())
+		}
+	} else {
+		switch name {
+		case common.Put:
+			fmt.Println(color.BlueString("RUN Put"), args.GetKey()+":"+args.GetValue())
+		case common.Get:
+			fmt.Println(color.BlueString("RUN Get"), args.GetKey())
+		case common.Del:
+			fmt.Println(color.BlueString("RUN Delete"), args.GetKey())
+		}
 	}
 
 }
