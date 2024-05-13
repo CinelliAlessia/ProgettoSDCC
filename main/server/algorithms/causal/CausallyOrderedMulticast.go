@@ -11,32 +11,6 @@ import (
 // non restituisce true, indicando che la richiesta può essere eseguita a livello applicativo. Quando ciò accade,
 // la funzione esegue effettivamente l'operazione a livello applicativo tramite la chiamata a realFunction e rimuove
 // il messaggio dalla coda.
-func (kvc *KeyValueStoreCausale) Update2(message commonMsg.MessageC, response *common.Response) error {
-	(&message).ConfigureSafeBool()
-
-	kvc.addToQueue(&message) // Aggiungi il messaggio alla coda
-
-	// Solo per DEBUG
-	if kvc.GetServerID() != (&message).GetSenderID() {
-		printDebugBlue("RICEVUTO da server", message, kvc)
-	}
-
-	executeMessage := make(chan bool, 1)
-	go func() {
-		// Attendo che il canale sia true impostato da canExecute
-		(&message).WaitCondition() // Aspetta che la condizione sia true, verrà impostato in canExecute se è possibile eseguire il messaggio a livello applicativo
-		kvc.realFunction(&message, response)
-		executeMessage <- true
-	}()
-
-	// Controllo se è possibile eseguire il messaggio a livello applicativo
-	go kvc.canExecute(&message)
-
-	<-executeMessage // Attendo che la condizione sia true
-	// è stata eseguita real function nella goroutine, la risposta è stata popolata.
-	return nil
-}
-
 func (kvc *KeyValueStoreCausale) Update(message commonMsg.MessageC, response *common.Response) error {
 
 	kvc.addToQueue(&message) // Aggiungi il messaggio alla coda
@@ -64,20 +38,6 @@ func (kvc *KeyValueStoreCausale) addToQueue(message *commonMsg.MessageC) {
 
 // canExecute controlla se è possibile eseguire il messaggio a livello applicativo, se è possibile lo esegue
 // e restituisce true, altrimenti restituisce false
-func (kvc *KeyValueStoreCausale) canExecute2(message *commonMsg.MessageC) {
-	// Valuto un messaggio alla volta
-	kvc.executeFunctionMutex.Lock()
-	defer kvc.executeFunctionMutex.Unlock()
-	canSend := kvc.controlSendToApplication(message) // Controllo se le due condizioni del M.C.O sono soddisfatte
-
-	if canSend {
-		message.SetCondition(true) // Imposto la condizione a true
-	} else {
-		// Bufferizzo il messaggio
-		kvc.AddBufferedMessage(*message)
-	}
-}
-
 func (kvc *KeyValueStoreCausale) canExecute(message *commonMsg.MessageC) {
 	message.ConfigureSafeBool()
 
@@ -98,7 +58,6 @@ func (kvc *KeyValueStoreCausale) canExecute(message *commonMsg.MessageC) {
 	}
 	<-executeMessage // Attendo che la condizione sia true
 	// è stata eseguita real function nella goroutine, la risposta è stata popolata.
-
 }
 
 // controlSendToApplication :

@@ -21,34 +21,6 @@ func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Respo
 	return kvc.executeRequest(args, response, common.Del)
 }
 
-func (kvc *KeyValueStoreCausale) executeRequest2(args common.Args, response *common.Response, operation string) error {
-	args.ConfigureSafeBool() // Inizializzo il safeBool
-
-	receiveMessage := make(chan bool, 1)
-
-	// Eseguo la funzione reale solo se la condizione è true
-	go func() {
-		// Attendo che il canale sia true impostato da canExecute
-		args.WaitCondition() // Aspetta che la condizione sia true
-		receiveMessage <- true
-	}()
-
-	// Controllo se è possibile processare la richiesta
-	go kvc.canReceive(args)
-
-	<-receiveMessage // Attendo che la condizione sia true
-
-	// è possibile processare la richiesta
-	message := kvc.createMessage(args, operation)
-
-	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
-	if err != nil {
-		response.SetResult(false)
-		return err
-	}
-	return nil
-}
-
 func (kvc *KeyValueStoreCausale) executeRequest(args common.Args, response *common.Response, operation string) error {
 
 	// Controllo se è possibile processare la richiesta
@@ -123,30 +95,6 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 }
 
 // In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered
-func (kvc *KeyValueStoreCausale) canReceive2(args common.Args) bool {
-	idClient := args.GetClientID()
-
-	// Se il client non è nella mappa, lo aggiungo e imposto il timestamp di ricezione e di invio a zero
-	if !kvc.ExistClient(idClient) {
-		// Non ho mai ricevuto un messaggio da questo client
-		kvc.NewClientMap(idClient) // Inserisco il client nella mappa
-	}
-
-	// Il client è sicuramente nella mappa
-	requestTs := kvc.GetReceiveTsFromClient(idClient) // Ottengo il numero di messaggi ricevuti da questo client
-
-	if args.GetSendingFIFO() == requestTs { // Se il messaggio che ricevo dal client è quello che mi aspetto
-		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia
-		// finito di creare il precedente
-		kvc.LockMutexMessage(idClient)
-		kvc.SetReceiveTsFromClient(idClient, args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
-		args.SetCondition(true)                                       // Imposto la condizione a true, il messaggio può essere eseguito
-		return true                                                   // è possibile accettare il messaggio
-	}
-	kvc.AddBufferedArgs(args) // Aggiungo il messaggio in attesa di essere eseguito
-	return false
-}
-
 func (kvc *KeyValueStoreCausale) canReceive(args common.Args) {
 	idClient := args.GetClientID()
 
