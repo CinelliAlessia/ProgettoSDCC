@@ -77,31 +77,31 @@ func basicTestCE(rpcName string) {
 }
 
 // In questo mediumTestCE vengono inviate in goroutine:
-//   - una richiesta di get y, put x:b e get y al server1,
-//   - una richiesta di put y:b, get y, put x:c, get x al server2,
-//   - una richiesta di get x, put y:c e get y al server3,
+//   - una richiesta di put x:a, get y, put x:c al server1,
+//   - una richiesta di get x, put x:b, get x al server2,
+//   - una richiesta di put x:a, del x, put y:a, get x al server3.
 func mediumTestCE(rpcName string) {
-	fmt.Println("In questo complexTestCE vengono inviate in goroutine:\n" +
-		"- una richiesta di get y, put x:b e get y al server1\n" +
-		"- una richiesta di put y:b, get y, put x:c, get x al server2\n" +
-		"- una richiesta di get x, put y:c e get y al server3")
+	fmt.Println("In questo mediumTestCE vengono inviate in goroutine:\n" +
+		"- una richiesta di put x:a, get y, put x:c al server1\n" +
+		"- una richiesta di get x, put x:b, get x al server2\n" +
+		"- una richiesta di put x:a, del x, put y:a, get x al server3")
 
 	operations := [][]Operation{
 		{
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "a"},
 			{ServerIndex: 0, OperationType: common.GetRPC, Key: "y"},
-			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "b"},
-			{ServerIndex: 0, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "c"},
 		},
 		{
-			{ServerIndex: 1, OperationType: common.PutRPC, Key: "y", Value: "b"},
-			{ServerIndex: 1, OperationType: common.GetRPC, Key: "y"},
-			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "c"},
+			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "b"},
 			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 		},
 		{
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "x", Value: "a"},
+			{ServerIndex: 2, OperationType: common.DelRPC, Key: "x"},
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "a"},
 			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
-			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "c"},
-			{ServerIndex: 2, OperationType: common.GetRPC, Key: "y"},
 		},
 	}
 
@@ -109,31 +109,33 @@ func mediumTestCE(rpcName string) {
 }
 
 // In questo complexTestCE vengono inviate in goroutine:
-//   - una richiesta di put x:a, put x:b, get x, put x:d al server1,
-//   - una richiesta di get x, pu x:c, get x al server2,
-//   - una richiesta di put x:a, get x, get x al server3,
+//   - una richiesta di	get x, put x:b, get x, del z al server1,
+//   - una richiesta di put x:a, put z:b, get x, put x:c al server2,
+//   - una richiesta di get x, put y:c, get y, put y:c al server3.
 func complexTestCE(rpcName string) {
 	fmt.Println("In questo complexTestCE vengono inviate in goroutine:\n" +
-		"- una richiesta di put x:a, put x:b, get x, put x:d al server1\n" +
-		"- una richiesta di get x, put x:c, get x al server2\n" +
-		"- una richiesta di put x:a, get x, get x al server3")
+		"- una richiesta di get x, put x:b, get x, del z al server1\n" +
+		"- una richiesta di put x:a, put z:b, get x, put x:c al server2\n" +
+		"- una richiesta di get x, put y:c, get y, put y:c al server3")
 
 	operations := [][]Operation{
 		{
-			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "a"},
-			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "b"},
 			{ServerIndex: 0, OperationType: common.GetRPC, Key: "x"},
-			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "d"},
+			{ServerIndex: 0, OperationType: common.PutRPC, Key: "x", Value: "b"},
+			{ServerIndex: 0, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 0, OperationType: common.DelRPC, Key: "z"},
 		},
 		{
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "a"},
+			{ServerIndex: 1, OperationType: common.PutRPC, Key: "z", Value: "b"},
 			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 			{ServerIndex: 1, OperationType: common.PutRPC, Key: "x", Value: "c"},
-			{ServerIndex: 1, OperationType: common.GetRPC, Key: "x"},
 		},
 		{
-			{ServerIndex: 2, OperationType: common.PutRPC, Key: "x", Value: "a"},
 			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
-			{ServerIndex: 2, OperationType: common.GetRPC, Key: "x"},
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "c"},
+			{ServerIndex: 2, OperationType: common.GetRPC, Key: "y"},
+			{ServerIndex: 2, OperationType: common.PutRPC, Key: "y", Value: "a"},
 		},
 	}
 

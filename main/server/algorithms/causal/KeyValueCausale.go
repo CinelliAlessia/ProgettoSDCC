@@ -100,8 +100,19 @@ func (kvc *KeyValueStoreCausale) SetIdServer(id int) {
 	kvc.Common.Id = id
 }
 
-func (kvc *KeyValueStoreCausale) GetIdServer() int {
+func (kvc *KeyValueStoreCausale) GetServerID() int {
 	return kvc.Common.Id
+}
+
+// ----- Print ----- //
+func (kvc *KeyValueStoreCausale) PrintDatastore() {
+	fmt.Println(kvc.Common.Datastore)
+}
+
+func (kvc *KeyValueStoreCausale) PrintQueue() {
+	for _, message := range kvc.GetQueue() {
+		fmt.Println(message)
+	}
 }
 
 // ----- Client Map ----- //
@@ -200,25 +211,16 @@ func (kvc *KeyValueStoreCausale) UnlockMutexQueue() {
 
 // Aggiunge un messaggio al buffer
 func (kvc *KeyValueStoreCausale) AddBufferedMessage(message commonMsg.MessageC) {
-	kvc.mutexBuffered.Lock()
-	defer kvc.mutexBuffered.Unlock()
-
 	kvc.BufferedMessage = append(kvc.BufferedMessage, message)
 }
 
 // Restituisce il buffer
 func (kvc *KeyValueStoreCausale) GetBufferedMessage() []commonMsg.MessageC {
-	kvc.mutexBuffered.Lock()
-	defer kvc.mutexBuffered.Unlock()
-
 	return kvc.BufferedMessage
 }
 
 // Rimuove un messaggio dal buffer
 func (kvc *KeyValueStoreCausale) RemoveBufferedMessage(message commonMsg.MessageC) {
-	kvc.mutexBuffered.Lock()
-	defer kvc.mutexBuffered.Unlock()
-
 	for i, m := range kvc.BufferedMessage {
 		if m.GetIdMessage() == message.GetIdMessage() {
 			kvc.BufferedMessage = append(kvc.BufferedMessage[:i], kvc.BufferedMessage[i+1:]...)
@@ -230,31 +232,22 @@ func (kvc *KeyValueStoreCausale) RemoveBufferedMessage(message commonMsg.Message
 func (kvc *KeyValueStoreCausale) canHandleOtherResponse() {
 	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
 	// condizioni di invio, allora imposti il canale a true
+	kvc.mutexBuffered.Lock()
+	defer kvc.mutexBuffered.Unlock()
+
 	for i, message := range kvc.GetBufferedMessage() {
-		if kvc.controlSendToApplication(&message) {
-			msg := &kvc.GetBufferedMessage()[i]
-			// Invio a livello applicativo
-			(msg).SetCondition(true)
-			fmt.Println("canSend true in canHandleOtherResponse", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
+		msg := &kvc.GetBufferedMessage()[i]
+
+		canSend := kvc.controlSendToApplication(msg) // Controllo se le due condizioni del M.C.O sono soddisfatte
+		if canSend {
+			msg.SetCondition(true) // Imposto la condizione a true
 			kvc.RemoveBufferedMessage(message)
 			break
 		}
 	}
 }
 
-// Rimuove un messaggio dal buffer
-func (kvc *KeyValueStoreCausale) RemoveBufferedArgs(args common.Args) {
-
-	for i, a := range kvc.BufferedArgsReceive {
-		if a.GetClientID() == args.GetClientID() &&
-			a.GetSendingFIFO() == args.GetSendingFIFO() {
-			kvc.BufferedArgsReceive = append(kvc.BufferedArgsReceive[:i], kvc.BufferedArgsReceive[i+1:]...)
-			return
-		}
-	}
-}
-
-func (kvc *KeyValueStoreCausale) canHandleOtherRequest() {
+/*func (kvc *KeyValueStoreCausale) canHandleOtherRequest2() {
 	kvc.mutexBufferedReceive.Lock()
 	defer kvc.mutexBufferedReceive.Unlock()
 	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
@@ -268,14 +261,44 @@ func (kvc *KeyValueStoreCausale) canHandleOtherRequest() {
 			break
 		}
 	}
+}*/
+
+func (kvc *KeyValueStoreCausale) canHandleOtherRequest() {
+	kvc.mutexBufferedReceive.Lock()
+	defer kvc.mutexBufferedReceive.Unlock()
+	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
+	// condizioni di invio, allora imposti il canale a true
+	for _, args := range kvc.GetBufferedArgs() {
+
+		idClient := args.GetClientID()
+
+		// Il client è sicuramente nella mappa
+		requestTs := kvc.GetReceiveTsFromClient(idClient) // Ottengo il numero di messaggi ricevuti da questo client
+		if args.GetSendingFIFO() == requestTs {           // Se il messaggio che ricevo dal client è quello che mi aspetto
+			// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia
+			// finito di creare il precedente
+			kvc.LockMutexMessage(idClient)
+			kvc.SetReceiveTsFromClient(idClient, args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
+			args.SetCondition(true)                                       // Imposto la condizione a true, il messaggio può essere eseguito
+			kvc.RemoveBufferedArgs(args)
+		}
+	}
 }
 
 // Aggiunge un messaggio al buffer
 func (kvc *KeyValueStoreCausale) AddBufferedArgs(args common.Args) {
-	kvc.mutexBufferedReceive.Lock()
-	defer kvc.mutexBufferedReceive.Unlock()
-
 	kvc.BufferedArgsReceive = append(kvc.BufferedArgsReceive, args)
+}
+
+// Rimuove un messaggio dal buffer
+func (kvc *KeyValueStoreCausale) RemoveBufferedArgs(args common.Args) {
+	for i, a := range kvc.BufferedArgsReceive {
+		if a.GetClientID() == args.GetClientID() &&
+			a.GetSendingFIFO() == args.GetSendingFIFO() {
+			kvc.BufferedArgsReceive = append(kvc.BufferedArgsReceive[:i], kvc.BufferedArgsReceive[i+1:]...)
+			return
+		}
+	}
 }
 
 func (kvc *KeyValueStoreCausale) GetBufferedArgs() []common.Args {
