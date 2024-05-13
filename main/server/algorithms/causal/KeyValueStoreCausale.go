@@ -8,41 +8,37 @@ import (
 
 // Get restituisce il valore associato alla chiave specificata -> Lettura -> Evento interno
 func (kvc *KeyValueStoreCausale) Get(args common.Args, response *common.Response) error {
-	for !kvc.canReceive(args) {
-		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
-	}
-	message := kvc.createMessage(args, common.Get)
-
-	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
-	if err != nil {
-		response.SetResult(false)
-		return err
-	}
-	return nil
+	return kvc.executeRequest(args, response, common.Get)
 }
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvc *KeyValueStoreCausale) Put(args common.Args, response *common.Response) error {
-	for !kvc.canReceive(args) {
-		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
-	}
-	message := kvc.createMessage(args, common.Put)
-
-	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
-	if err != nil {
-		response.SetResult(false)
-		return err
-	}
-	return nil
+	return kvc.executeRequest(args, response, common.Put)
 }
 
 // Delete elimina una coppia chiave-valore, è un operazione di scrittura
 func (kvc *KeyValueStoreCausale) Delete(args common.Args, response *common.Response) error {
-	for !kvc.canReceive(args) {
-		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
-	}
+	return kvc.executeRequest(args, response, common.Del)
+}
 
-	message := kvc.createMessage(args, common.Del)
+func (kvc *KeyValueStoreCausale) executeRequest(args common.Args, response *common.Response, operation string) error {
+	args.ConfigureSafeBool() // Inizializzo il safeBool
+
+	receiveMessage := make(chan bool, 1)
+
+	// Eseguo la funzione reale solo se la condizione è true
+	go func() {
+		// Attendo che il canale sia true impostato da canExecute
+		args.WaitCondition() // Aspetta che la condizione sia true
+		receiveMessage <- true
+	}()
+
+	// Controllo se è possibile eseguire il messaggio a livello applicativo
+	go kvc.canReceive(args)
+
+	<-receiveMessage
+
+	message := kvc.createMessage(args, operation)
 
 	err := algorithms.SendToAllServer(common.Causal+".Update", *message, response)
 	if err != nil {
@@ -88,6 +84,8 @@ func (kvc *KeyValueStoreCausale) realFunction(message *commonMsg.MessageC, respo
 		printGreen("ESEGUITO", *message, kvc)
 	}
 
+	// Controllo se è possibile gestire altre risposte
+	go kvc.canHandleOtherResponse()
 	return nil
 }
 
@@ -99,6 +97,7 @@ func (kvc *KeyValueStoreCausale) createMessage(args common.Args, typeFunc string
 	kvc.SetVectorClock(kvc.GetIdServer(), kvc.GetClock()[kvc.GetIdServer()]+1)
 
 	message := commonMsg.NewMessageC(kvc.GetIdServer(), typeFunc, args, kvc.GetClock())
+
 	printDebugBlue("RICEVUTO da client", *message, kvc)
 
 	// Questo mutex mi permette di evitare scheduling tra il lascia passare di canReceive e la creazione del messaggio
@@ -123,7 +122,10 @@ func (kvc *KeyValueStoreCausale) canReceive(args common.Args) bool {
 		// Blocco il mutex per evitare che il client possa inviare un nuovo messaggio prima che io abbia finito di creare il precedente
 		kvc.LockMutexMessage(args.GetClientID())
 		kvc.SetReceiveTsFromClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
-		return true                                                             // è possibile accettare il messaggio
+		args.SetCondition(true)                                                 // Imposto la condizione a true, il messaggio può essere eseguito
+		kvc.canHandleOtherRequest()
+		return true // è possibile accettare il messaggio
 	}
+	kvc.AddBufferedArgs(args) // Aggiungo il messaggio in attesa di essere eseguito
 	return false
 }

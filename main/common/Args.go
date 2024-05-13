@@ -1,11 +1,16 @@
 package common
 
+import (
+	"sync"
+)
+
 // Args rappresenta gli argomenti delle chiamate RPC
 type Args struct {
 	Key         string
 	Value       string
 	SendingFIFO int    // Assunzione FIFO Ordering
 	ClientID    string // Per identificare il client nella operazione RPC
+	SafeBool    *SafeBool
 }
 
 /* ARGS STRUCT */
@@ -66,4 +71,45 @@ func (args *Args) SetClientID(id string) {
 // GetClientID restituisce l'identificativo del client che ha effettuato la richiesta
 func (args *Args) GetClientID() string {
 	return args.ClientID
+}
+
+func (args *Args) ConfigureSafeBool() {
+	args.SafeBool = NewSafeBool()
+}
+
+type SafeBool struct {
+	mutexCondition sync.Mutex
+	cond           *sync.Cond
+	Value          bool
+}
+
+func NewSafeBool() *SafeBool {
+	sb := &SafeBool{}
+	sb.cond = sync.NewCond(&sb.mutexCondition)
+	return sb
+}
+
+func (sb *SafeBool) Set(value bool) {
+	sb.mutexCondition.Lock()
+	defer sb.mutexCondition.Unlock()
+	sb.Value = value
+	sb.cond.Broadcast()
+}
+
+func (sb *SafeBool) Wait() bool {
+	sb.mutexCondition.Lock()
+	defer sb.mutexCondition.Unlock()
+	for !sb.Value {
+		sb.cond.Wait()
+	}
+	return sb.Value
+}
+
+func (args *Args) WaitCondition() bool {
+	boolean := args.SafeBool.Wait()
+	return boolean
+}
+
+func (args *Args) SetCondition(b bool) {
+	args.SafeBool.Set(b)
 }

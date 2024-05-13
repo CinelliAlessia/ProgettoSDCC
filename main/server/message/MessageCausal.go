@@ -1,6 +1,7 @@
 package commonMsg
 
 import (
+	"fmt"
 	"main/common"
 )
 
@@ -26,7 +27,12 @@ func NewMessageC(idSender int, typeOfMessage string, args common.Args, vectorClo
 	msg.SetSendingFIFO(args.GetSendingFIFO())
 
 	msg.SetClock(vectorClock)
+
 	return msg
+}
+
+func (msg *MessageC) ConfigureSafeBool() {
+	msg.Common.SafeBool = NewSafeBool()
 }
 
 // setIdMessage Imposta l'identificativo univoco del messaggio
@@ -66,7 +72,7 @@ func (msg *MessageC) SetClock(vectorClock [common.Replicas]int) {
 
 // SetValueClock Imposta il valore dell'orologio vettoriale in posizione index
 //   - index: posizione dell'orologio vettoriale da modificare
-//   - value: valore da assegnare all'orologio vettoriale in posizione index
+//   - Value: valore da assegnare all'orologio vettoriale in posizione index
 func (msg *MessageC) SetValueClock(index int, value int) {
 	msg.VectorClock[index] = value
 }
@@ -114,4 +120,19 @@ func (msg *MessageC) SetSendingFIFO(timestamp int) {
 // GetSendingFIFO Restituisce il timestamp di invio del messaggio
 func (msg *MessageC) GetSendingFIFO() int {
 	return msg.Common.Args.GetSendingFIFO()
+}
+
+// ----- SafeBool ----- //
+
+func (msg *MessageC) SetCondition(b bool) {
+	fmt.Println("Imposto canale a", b, msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
+	msg.Common.SafeBool.Set(b)
+	fmt.Println("Dopo", msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
+}
+
+func (msg *MessageC) WaitCondition() bool {
+	fmt.Println("A Attesa canale", msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
+	boolean := msg.Common.SafeBool.Wait()
+	fmt.Println("Canale true per", msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
+	return boolean
 }
