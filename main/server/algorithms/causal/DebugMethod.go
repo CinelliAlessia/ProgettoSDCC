@@ -61,9 +61,9 @@ func printGreen(greenString string, message commonMsg.MessageC, kvc *KeyValueSto
 	} else {
 		switch message.GetTypeOfMessage() {
 		case common.Del:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey())
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey(), kvc.GetDatastore())
 		default:
-			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
+			fmt.Println(color.GreenString(greenString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(), kvc.GetDatastore())
 		}
 	}
 }
