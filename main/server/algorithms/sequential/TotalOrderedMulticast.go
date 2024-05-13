@@ -20,6 +20,8 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 	}
 	kvs.UnlockMutexClock()
 
+	message.ConfigureSafeBool()
+
 	//Aggiunta del messaggio alla coda ordinata per timestamp
 	kvs.addToSortQueue(&message)
 
@@ -29,17 +31,23 @@ func (kvs *KeyValueStoreSequential) Update(message commonMsg.MessageS, response 
 		return err
 	}
 
-	// Ciclo fin quando canExecute restituisce true, in quel caso
-	// la richiesta può essere eseguita a livello applicativo
-	for {
-		stop, err := kvs.canExecute(&message, response)
-		if stop {
-			break
-		}
+	executeMessage := make(chan bool, 1)
+
+	// Eseguo la funzione reale solo se la condizione è true
+	go func() {
+		// Attendo che il canale sia true impostato da canExecute
+		(&message).WaitCondition() // Aspetta che la condizione sia true
+		err := kvs.realFunction(&message, response)
 		if err != nil {
-			return err
-		}
-	}
+			return
+		} // Invio a livello applicativo
+		executeMessage <- true
+	}()
+
+	// Controllo se è possibile eseguire il messaggio a livello applicativo
+	go kvs.canExecute(&message)
+
+	<-executeMessage
 	return nil
 }
 
@@ -55,6 +63,8 @@ func (kvs *KeyValueStoreSequential) ReceiveAck(message commonMsg.MessageS, reply
 		kvs.addToSortQueue(&message)
 		*reply = kvs.updateAckMessage(&message)
 	}
+
+	go kvs.canHandleOtherResponse() // Controllo se posso inviare altri messaggi
 	return nil
 }
 
@@ -189,23 +199,21 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS
 
 // canExecute controlla se è possibile eseguire il messaggio a livello applicativo, se è possibile lo esegue
 // e restituisce true, altrimenti restituisce false
-func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS, response *common.Response) (bool, error) {
-	kvs.executeFunctionMutex.Lock()
-	defer kvs.executeFunctionMutex.Unlock()
+func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS) {
+	//kvs.executeFunctionMutex.Lock()
+	//defer kvs.executeFunctionMutex.Unlock()
 
 	canSend := kvs.controlSendToApplication(message) // Controllo se le due condizioni del M.T.O sono soddisfatte
 
 	if canSend {
+		message.SetCondition(true) // Imposto la condizione a true
+		fmt.Println("canSend true", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
 
-		err := kvs.realFunction(message, response) // Invio a livello applicativo
-		if err != nil {
-			response.SetResult(false)
-			return false, err
-		}
-		return true, nil
+	} else {
+		// Bufferizzo il messaggio
+		fmt.Println("Bufferizzo il messaggio", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
+		kvs.AddBufferedMessage(*message)
 	}
-
-	return false, nil
 }
 
 // controlSendToApplication verifica se è possibile inviare la richiesta a livello applicativo,
@@ -295,9 +303,9 @@ func (kvs *KeyValueStoreSequential) isAllEndKey() bool {
 	// Se in coda sono rimasti solamente messaggi di endKey con ack ricevuti pari a common.Replicas
 	if len(kvs.GetQueue()) > 0 {
 		for _, msg := range kvs.GetQueue() {
-			if msg.GetKey() != common.EndKey ||
-				msg.GetNumberAck() != common.Replicas {
-				allEndKey = false
+			if msg.GetKey() != common.EndKey || // Se il messaggio non è endKey
+				msg.GetNumberAck() != common.Replicas { // Se il messaggio non ha ricevuto tutti gli ack
+				allEndKey = false // Non sono tutti endKey o non sono validi perché non tutti i server ne sono a conoscenza
 				break
 			}
 		}

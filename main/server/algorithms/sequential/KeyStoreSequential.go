@@ -3,6 +3,7 @@ package sequential
 import (
 	"errors"
 	"fmt"
+	"main/common"
 	"main/server/algorithms"
 	"main/server/message"
 	"sync"
@@ -24,6 +25,12 @@ type KeyValueStoreSequential struct {
 
 	msgSent      int // Contatore per i messaggi inviati con msgSenderID == kvs.senderID
 	mutexMsgSent sync.Mutex
+
+	BufferedMessage []commonMsg.MessageS // Buffer per memorizzare i messaggi che non possono essere eseguiti a livello applicativo
+	mutexBuffered   sync.Mutex
+
+	BufferedArgsReceive  []common.Args // Buffer per memorizzare gli argomenti che non possono essere ricevuti
+	mutexBufferedReceive sync.Mutex
 }
 
 // NewKeyValueStoreSequential crea un nuovo KeyValueStoreSequential, inizializzando l'orologio logico scalare e la coda
@@ -229,3 +236,90 @@ func (kvs *KeyValueStoreSequential) LockMutexQueue() {
 func (kvs *KeyValueStoreSequential) UnlockMutexQueue() {
 	kvs.mutexQueue.Unlock()
 }
+
+// Messaggi bufferizzati
+
+// Aggiunge un messaggio al buffer
+func (kvs *KeyValueStoreSequential) AddBufferedMessage(message commonMsg.MessageS) {
+	kvs.mutexBuffered.Lock()
+	defer kvs.mutexBuffered.Unlock()
+
+	kvs.BufferedMessage = append(kvs.BufferedMessage, message)
+}
+
+// Restituisce il buffer
+func (kvs *KeyValueStoreSequential) GetBufferedMessage() []commonMsg.MessageS {
+	return kvs.BufferedMessage
+}
+
+// Rimuove un messaggio dal buffer
+func (kvs *KeyValueStoreSequential) RemoveBufferedMessage(message commonMsg.MessageS) {
+	for i, m := range kvs.BufferedMessage {
+		if m.GetIdMessage() == message.GetIdMessage() {
+			kvs.BufferedMessage = append(kvs.BufferedMessage[:i], kvs.BufferedMessage[i+1:]...)
+			return
+		}
+	}
+}
+
+func (kvs *KeyValueStoreSequential) canHandleOtherResponse() {
+	kvs.mutexBuffered.Lock()
+	defer kvs.mutexBuffered.Unlock()
+	fmt.Println("canHandleOtherResponse", kvs.GetBufferedMessage())
+	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
+	// condizioni di invio, allora imposti il canale a true
+	for i, message := range kvs.GetBufferedMessage() {
+		if kvs.controlSendToApplication(&message) {
+			msg := &kvs.GetBufferedMessage()[i]
+			// Invio a livello applicativo
+			(msg).SetCondition(true)
+			fmt.Println("canSend true in canHandleOtherResponse", message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())
+			kvs.RemoveBufferedMessage(message)
+			break
+		}
+	}
+}
+
+/*
+
+func (kvs *KeyValueStoreSequential) canHandleOtherRequest() {
+	kvs.mutexBufferedReceive.Lock()
+	defer kvs.mutexBufferedReceive.Unlock()
+	fmt.Println("canHandleOtherRequest", kvs.GetBufferedArgs())
+	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
+	// condizioni di invio, allora imposti il canale a true
+	for i, args := range kvs.GetBufferedArgs() {
+		if kvs.canReceive(args) {
+			a := &kvs.GetBufferedArgs()[i]
+			// Invio a livello applicativo
+			(a).SetCondition(true)
+			fmt.Println("canSend true in canHandleOtherRequest")
+			kvs.RemoveBufferedArgs(args)
+			break
+		}
+	}
+}
+
+// Aggiunge un messaggio al buffer
+func (kvs *KeyValueStoreSequential) AddBufferedArgs(args common.Args) {
+	kvs.mutexBufferedReceive.Lock()
+	defer kvs.mutexBufferedReceive.Unlock()
+
+	kvs.BufferedArgsReceive = append(kvs.BufferedArgsReceive, args)
+}
+
+// Rimuove un messaggio dal buffer
+func (kvs *KeyValueStoreSequential) RemoveBufferedArgs(args common.Args) {
+	for i, a := range kvs.BufferedArgsReceive {
+		if a.GetClientID() == args.GetClientID() &&
+			a.GetSendingFIFO() == args.GetSendingFIFO() {
+			kvs.BufferedArgsReceive = append(kvs.BufferedArgsReceive[:i], kvs.BufferedArgsReceive[i+1:]...)
+			return
+		}
+	}
+}
+
+func (kvs *KeyValueStoreSequential) GetBufferedArgs() []common.Args {
+	return kvs.BufferedArgsReceive
+}
+*/

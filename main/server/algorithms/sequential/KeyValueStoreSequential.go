@@ -10,38 +10,49 @@ import (
 // Restituisce il valore associato alla chiave specificata, non notifica ad altri server replica l'evento,
 // ma l'esecuzione avviene rispettando l'ordine di programma.
 func (kvs *KeyValueStoreSequential) Get(args common.Args, response *common.Response) error {
-
-	for !kvs.canReceive(args) {
-		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
-	}
+	kvs.receiveRequest(args)
 
 	// Si crea un messaggio con 3 ack "ricevuti" così che, per inviarlo a livello applicativo si controllerà
 	// solamente l'ordinamento del messaggio nella coda.
 	message := kvs.createMessage(args, common.Get)
+	message.ConfigureSafeBool()
 
 	//Aggiunge alla coda ordinandolo per timestamp, cosi verrà eseguito esclusivamente se è in testa alla coda
 	kvs.addToSortQueue(message)
 
-	// Controllo in while se il messaggio può essere inviato a livello applicativo
-	for {
-		stop, err := kvs.canExecute(message, response)
-		if stop {
-			break
-		}
+	executeMessage := make(chan bool, 1)
+
+	// Eseguo la funzione reale solo se la condizione è true
+	go func() {
+		// Attendo che il canale sia true impostato da canExecute
+		message.WaitCondition() // Aspetta che la condizione sia true
+		err := kvs.realFunction(message, response)
 		if err != nil {
-			return err
-		}
-	}
+			return
+		} // Invio a livello applicativo
+		executeMessage <- true
+	}()
+
+	// Controllo se è possibile eseguire il messaggio a livello applicativo
+	go kvs.canExecute(message)
+
+	<-executeMessage
 	return nil
 }
 
 // Put inserisce una nuova coppia chiave-valore, se la chiave è già presente, sovrascrive il valore associato
 func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Response) error {
-	for !kvs.canReceive(args) {
-		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
-	}
+	return kvs.executeRequest(args, response, common.Put)
+}
 
-	message := kvs.createMessage(args, common.Put)
+// Delete elimina una coppia chiave-valore, è un operazione di scrittura
+func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Response) error {
+	return kvs.executeRequest(args, response, common.Del)
+}
+
+func (kvs *KeyValueStoreSequential) executeRequest(args common.Args, response *common.Response, operation string) error {
+	kvs.receiveRequest(args)
+	message := kvs.createMessage(args, operation)
 
 	// Invio la richiesta a tutti i server per sincronizzare i datastore
 	err := algorithms.SendToAllServer(common.Sequential+".Update", *message, response)
@@ -52,21 +63,25 @@ func (kvs *KeyValueStoreSequential) Put(args common.Args, response *common.Respo
 	return nil
 }
 
-// Delete elimina una coppia chiave-valore, è un operazione di scrittura
-func (kvs *KeyValueStoreSequential) Delete(args common.Args, response *common.Response) error {
+func (kvs *KeyValueStoreSequential) receiveRequest(args common.Args) {
+	/*args.ConfigureSafeBool() // Inizializzo il safeBool
+	receiveMessage := make(chan bool, 1)
+
+	// Eseguo la funzione reale solo se la condizione è true
+	go func() {
+		// Attendo che il canale sia true impostato da canExecute
+		args.WaitCondition() // Aspetta che la condizione sia true
+		receiveMessage <- true
+	}()
+
+	// Controllo se è possibile eseguire il messaggio a livello applicativo
+	go kvs.canReceive(args)
+
+	<-receiveMessage*/
+
 	for !kvs.canReceive(args) {
-		// Aspetta di ricevere tutti i messaggi precedenti da parte del client
+		// Aspetto che il messaggio possa essere eseguito
 	}
-
-	message := kvs.createMessage(args, common.Del)
-
-	// Invio la richiesta a tutti i server per sincronizzare i datastore
-	err := algorithms.SendToAllServer(common.Sequential+".Update", *message, response)
-	if err != nil {
-		response.SetResult(false)
-		return err
-	}
-	return nil
 }
 
 // realFunction esegue l'operazione di get, put e di delete realmente,
@@ -110,6 +125,8 @@ func (kvs *KeyValueStoreSequential) realFunction(message *commonMsg.MessageS, re
 	if result {
 		printGreen("ESEGUITO", *message, kvs)
 	}
+	// Controllo se è possibile gestire altre risposte
+	go kvs.canHandleOtherResponse()
 	return nil
 }
 
@@ -157,7 +174,10 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) bool {
 		kvs.LockMutexMessage(args.GetClientID())
 		kvs.SetReceiveTsFromClient(args.GetClientID(), args.GetSendingFIFO()+1) // Incremento il timestamp di ricezione del client
 
+		//args.SetCondition(true) // Imposto la condizione a true, il messaggio può essere eseguito
+		//go kvs.canHandleOtherRequest()
 		return true // è possibile accettare il messaggio
 	}
+	//kvs.AddBufferedArgs(args) // Aggiungo il messaggio in attesa di essere eseguito
 	return false
 }
