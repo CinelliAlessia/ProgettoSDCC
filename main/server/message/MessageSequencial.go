@@ -1,7 +1,6 @@
 package commonMsg
 
 import (
-	"fmt"
 	"main/common"
 )
 
@@ -133,25 +132,19 @@ func (msg *MessageS) SetSendingFIFO(timestamp int) {
 	msg.Common.Args.SetSendingFIFO(timestamp)
 }
 
-// GetSendingFIFO Restituisce il timestamp logico del client associato al messaggio
-//
-//	L'ordine con cui la richiesta deve essere processata dal server
+// GetSendingFIFO Restituisce il timestamp logico del client associato al messaggio.
+// L'ordine con cui la richiesta deve essere processata dal server
 func (msg *MessageS) GetSendingFIFO() int {
-	args := msg.GetArgs()
-	return args.GetSendingFIFO()
+	return msg.Common.Args.GetSendingFIFO()
 }
 
 // ----- SafeBool ----- //
 
 func (msg *MessageS) SetCondition(b bool) {
-	fmt.Println("Imposto canale a", b, msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
 	msg.Common.SafeBool.Set(b)
-	fmt.Println("Dopo", msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
 }
 
 func (msg *MessageS) WaitCondition() bool {
-	fmt.Println("A Attesa canale", msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
 	boolean := msg.Common.SafeBool.Wait()
-	fmt.Println("Canale true per", msg.GetTypeOfMessage(), msg.GetKey()+":"+msg.GetValue())
 	return boolean
 }
