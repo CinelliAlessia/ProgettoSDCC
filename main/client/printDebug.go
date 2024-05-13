@@ -33,7 +33,7 @@ func debugPrintResponse(rpcName string, indexServer int, args common.Args, respo
 	name := debugName[1]
 
 	index := strconv.Itoa(indexServer)
-	stringName := "RISPOSTA " + name + index
+	stringName := "RISPOSTA " + name + " " + index
 
 	switch name {
 	case common.Put:
