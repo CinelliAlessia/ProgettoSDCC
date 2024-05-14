@@ -18,8 +18,6 @@ type KeyValueStoreCausale struct {
 	Queue      []commonMsg.MessageC
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
-	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
-
 	BufferedMessage []commonMsg.MessageC // Buffer per memorizzare i messaggi che non possono essere eseguiti a livello applicativo
 	mutexBuffered   sync.Mutex
 

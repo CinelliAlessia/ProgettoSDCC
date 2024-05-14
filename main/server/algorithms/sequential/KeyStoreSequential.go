@@ -22,11 +22,6 @@ type KeyValueStoreSequential struct {
 	Queue      []commonMsg.MessageS
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
-	executeFunctionMutex sync.Mutex // Mutex aggiunto per evitare scheduling che interrompano l'invio a livello applicativo del messaggio
-
-	msgSent      int // Contatore per i messaggi inviati con msgSenderID == kvs.senderID
-	mutexMsgSent sync.Mutex
-
 	BufferedMessage []commonMsg.MessageS // Buffer per memorizzare i messaggi che non possono essere eseguiti a livello applicativo
 	mutexBuffered   sync.Mutex
 
@@ -47,7 +42,6 @@ func NewKeyValueStoreSequential(idServer int) *KeyValueStoreSequential {
 	kvs.SetClock(0)                             // Inizializzazione dell'orologio logico scalare
 	kvs.SetQueue(make([]commonMsg.MessageS, 0)) // Inizializzazione della coda
 	kvs.SetIdServer(idServer)                   // Inizializzazione dell'id del server
-	kvs.SetMsgSent(0)                           // Inizializzazione del contatore dei messaggi inviati
 
 	return kvs
 }
@@ -192,22 +186,6 @@ func (kvs *KeyValueStoreSequential) GetResponseOrderingFIFO(ClientID string) int
 		return -1
 	}
 	return val.GetResponseOrderingFIFO()
-}
-
-// ----- Messaggi Inviati ----- //
-
-func (kvs *KeyValueStoreSequential) SetMsgSent(value int) {
-	kvs.mutexMsgSent.Lock()
-	defer kvs.mutexMsgSent.Unlock()
-
-	kvs.msgSent = value
-}
-
-func (kvs *KeyValueStoreSequential) GetMsgSent() int {
-	kvs.mutexMsgSent.Lock()
-	defer kvs.mutexMsgSent.Unlock()
-
-	return kvs.msgSent
 }
 
 // ----- Mutex ----- //

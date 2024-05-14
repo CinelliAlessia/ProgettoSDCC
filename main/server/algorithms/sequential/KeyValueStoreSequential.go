@@ -162,7 +162,6 @@ func (kvs *KeyValueStoreSequential) canReceive(args common.Args) {
 	<-receiveMessage // Attendo che la condizione sia true prima di terminare la funzione
 }
 
-// In canReceive, si vuole realizzare una mappa che aiuti nell'assunzione di una rete FIFO Ordered //
 func (kvs *KeyValueStoreSequential) canReceiveOld(args common.Args) {
 
 	idClient := args.GetClientID()
