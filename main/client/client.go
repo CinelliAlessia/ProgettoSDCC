@@ -31,7 +31,7 @@ func main() {
 	for {
 		// Stampa il menu interattivo
 		fmt.Println("Scegli un'operazione:")
-		fmt.Println("1. Consistenza causale")
+		fmt.Println("1. Consistenza Causale")
 		fmt.Println("2. Consistenza Sequenziale")
 
 		// Leggi l'input dell'utente per l'operazione
@@ -63,7 +63,7 @@ func main() {
 func sequential(rpcName string) {
 	for {
 		// Stampa il menu interattivo
-		fmt.Println("Consistenza sequenziale, scegli il test da eseguire: ")
+		fmt.Println("Consistenza Sequenziale, scegli il test da eseguire: ")
 
 		choice, done := chooseFuncTest()
 		if done {
@@ -91,7 +91,7 @@ func sequential(rpcName string) {
 // causal() Scegliere il tipo di test che si vuole eseguire per verificare le garanzie di consistenza causale
 func causal(rpcName string) {
 	for { // Stampa il menu interattivo
-		fmt.Println("Consistenza causale, scegli il test da eseguire: ")
+		fmt.Println("Consistenza Causale, scegli il test da eseguire: ")
 		choice, done := chooseFuncTest()
 		if done {
 			return
@@ -139,7 +139,5 @@ func chooseFuncTest() (int, bool) {
 			fmt.Println("Scelta non valida. Riprova.")
 		}
 	}
-
-	fmt.Println()
 	return choice, false
 }

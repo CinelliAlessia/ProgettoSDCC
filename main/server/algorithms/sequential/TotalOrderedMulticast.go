@@ -185,15 +185,17 @@ func (kvs *KeyValueStoreSequential) updateAckMessage(message *commonMsg.MessageS
 
 // ----- FUNZIONI PER GESTIRE L'ESECUZIONE DEL MESSAGGIO A LIVELLO APPLICATIVO ----- //
 
-// canExecute controlla se è possibile eseguire il messaggio a livello applicativo, se è possibile lo esegue
-// e restituisce true, altrimenti restituisce false
+// canExecute controlla se è possibile eseguire il messaggio a livello applicativo,
+// se è possibile imposta a true la variabile condizionale relativa al messaggio
+// altrimenti bufferizza il messaggio e si blocca in attesa di essere eseguito
 func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS) {
 	message.ConfigureSafeBool()
 
 	executeMessage := make(chan bool, 1)
 	go func() {
 		// Attendo che il canale sia true impostato da canExecute
-		message.WaitCondition() // Aspetta che la condizione sia true, verrà impostato in canExecute se è possibile eseguire il messaggio a livello applicativo
+		message.WaitCondition() // Aspetta che la condizione sia true, verrà impostato in canExecute
+		// se è possibile eseguire il messaggio a livello applicativo
 		executeMessage <- true
 	}()
 

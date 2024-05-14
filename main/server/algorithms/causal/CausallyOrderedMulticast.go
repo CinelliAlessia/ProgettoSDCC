@@ -6,11 +6,11 @@ import (
 	"main/server/message"
 )
 
-// Update esegue l'algoritmo multicast causalmente ordinato sul messaggio ricevuto.
-// Aggiunge il messaggio alla coda dei messaggi in attesa di essere eseguiti e controlla finché il controlSendToApplication
-// non restituisce true, indicando che la richiesta può essere eseguita a livello applicativo. Quando ciò accade,
-// la funzione esegue effettivamente l'operazione a livello applicativo tramite la chiamata a realFunction e rimuove
-// il messaggio dalla coda.
+// Update esegue l'algoritmo multicast causalmente ordinato sul messaggio ricevuto da un server replica.
+// Aggiunge il messaggio alla coda dei messaggi in attesa di essere eseguiti e
+// Esegue il metodo canExecute che terminerà solamente quando il messaggio potrà essere eseguito a livello applicativo.
+// Al termine di canExecute siamo sicuri che le condizioni sul messaggio siano soddisfatte e procediamo con la realFunction.
+// Infine, lanciamo una goroutine dove controlliamo se ci sono altri messaggi bufferizzati in coda che possono essere eseguiti.
 func (kvc *KeyValueStoreCausale) Update(message commonMsg.MessageC, response *common.Response) error {
 
 	kvc.addToQueue(&message) // Aggiungi il messaggio alla coda
@@ -36,15 +36,17 @@ func (kvc *KeyValueStoreCausale) addToQueue(message *commonMsg.MessageC) {
 	kvc.SetQueue(append(kvc.GetQueue(), *message))
 }
 
-// canExecute controlla se è possibile eseguire il messaggio a livello applicativo, se è possibile lo esegue
-// e restituisce true, altrimenti restituisce false
+// canExecute controlla se è possibile eseguire il messaggio a livello applicativo,
+// se è possibile imposta a true la variabile condizionale relativa al messaggio
+// altrimenti bufferizza il messaggio e si blocca in attesa di essere eseguito
 func (kvc *KeyValueStoreCausale) canExecute(message *commonMsg.MessageC) {
 	message.ConfigureSafeBool()
 
 	executeMessage := make(chan bool, 1)
 	go func() {
 		// Attendo che il canale sia true impostato da canExecute
-		message.WaitCondition() // Aspetta che la condizione sia true, verrà impostato in canExecute se è possibile eseguire il messaggio a livello applicativo
+		message.WaitCondition() // Aspetta che la condizione sia true, verrà impostato in canExecute se è
+		// possibile eseguire il messaggio a livello applicativo
 		executeMessage <- true
 	}()
 
