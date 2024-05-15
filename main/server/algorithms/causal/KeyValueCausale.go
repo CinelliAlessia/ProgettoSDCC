@@ -18,7 +18,7 @@ type KeyValueStoreCausale struct {
 	Queue      []commonMsg.MessageC
 	mutexQueue sync.Mutex // Mutex per proteggere l'accesso concorrente alla coda
 
-	BufferedMessage []commonMsg.MessageC // Buffer per memorizzare i messaggi che non possono essere eseguiti a livello applicativo
+	BufferedMessage []*commonMsg.MessageC // Buffer per memorizzare i messaggi che non possono essere eseguiti a livello applicativo
 	mutexBuffered   sync.Mutex
 
 	BufferedArgsReceive  []common.Args // Buffer per memorizzare gli argomenti che non possono essere ricevuti
@@ -252,17 +252,17 @@ func (kvc *KeyValueStoreCausale) canHandleOtherRequest() {
 // Messaggi bufferizzati
 
 // AddBufferedMessage Aggiunge un messaggio al buffer
-func (kvc *KeyValueStoreCausale) AddBufferedMessage(message commonMsg.MessageC) {
+func (kvc *KeyValueStoreCausale) AddBufferedMessage(message *commonMsg.MessageC) {
 	kvc.BufferedMessage = append(kvc.BufferedMessage, message)
 }
 
 // GetBufferedMessage Restituisce il buffer
-func (kvc *KeyValueStoreCausale) GetBufferedMessage() []commonMsg.MessageC {
+func (kvc *KeyValueStoreCausale) GetBufferedMessage() []*commonMsg.MessageC {
 	return kvc.BufferedMessage
 }
 
 // RemoveBufferedMessage Rimuove un messaggio dal buffer
-func (kvc *KeyValueStoreCausale) RemoveBufferedMessage(message commonMsg.MessageC) {
+func (kvc *KeyValueStoreCausale) RemoveBufferedMessage(message *commonMsg.MessageC) {
 	for i, m := range kvc.BufferedMessage {
 		if m.GetIdMessage() == message.GetIdMessage() {
 			kvc.BufferedMessage = append(kvc.BufferedMessage[:i], kvc.BufferedMessage[i+1:]...)
@@ -271,19 +271,32 @@ func (kvc *KeyValueStoreCausale) RemoveBufferedMessage(message commonMsg.Message
 	}
 }
 
+func (kvc *KeyValueStoreCausale) canHandleOtherResponse2() {
+	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
+	// condizioni di invio, allora imposti il canale a true
+	kvc.mutexBuffered.Lock()
+	defer kvc.mutexBuffered.Unlock()
+
+	for _, message := range kvc.GetBufferedMessage() {
+		canSend := kvc.controlSendToApplication(message) // Controllo se le due condizioni del M.C.O sono soddisfatte
+		if canSend {                                     // msg.GetCanSend() è ridondante
+			kvc.RemoveBufferedMessage(message)
+			message.SetCondition(true) // Imposto la condizione a true
+			break
+		}
+	}
+}
 func (kvc *KeyValueStoreCausale) canHandleOtherResponse() {
 	// Controlla tutta la coda dei messaggi bufferizzati, per i messaggi che rispettano le
 	// condizioni di invio, allora imposti il canale a true
 	kvc.mutexBuffered.Lock()
 	defer kvc.mutexBuffered.Unlock()
 
-	for i, message := range kvc.GetBufferedMessage() {
-		msg := &kvc.GetBufferedMessage()[i]
-
-		canSend := kvc.controlSendToApplication(msg) // Controllo se le due condizioni del M.C.O sono soddisfatte
-		if canSend {
-			msg.SetCondition(true) // Imposto la condizione a true
+	for _, message := range kvc.GetBufferedMessage() {
+		canSend := kvc.controlSendToApplication(message) // Controllo se le due condizioni del M.C.O sono soddisfatte
+		if canSend {                                     // msg.GetCanSend() è ridondante
 			kvc.RemoveBufferedMessage(message)
+			message.SetCondition(true) // Imposto la condizione a true
 			break
 		}
 	}

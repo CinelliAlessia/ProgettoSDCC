@@ -56,7 +56,7 @@ func (kvc *KeyValueStoreCausale) canExecute(message *commonMsg.MessageC) {
 		message.SetCondition(true) // Imposto la condizione a true
 	} else {
 		// Bufferizzo il messaggio
-		kvc.AddBufferedMessage(*message)
+		kvc.AddBufferedMessage(message)
 	}
 	<-executeMessage // Attendo che la condizione sia true
 	// è stata eseguita real function nella goroutine, la risposta è stata popolata.
@@ -97,8 +97,11 @@ func (kvc *KeyValueStoreCausale) controlSendToApplication(message *commonMsg.Mes
 	// Se non c'è aspetterò fin quando non verrà inserita
 	if message.GetTypeOfMessage() == common.Get && result {
 		_, result = kvc.GetDatastore()[message.GetKey()]
-		if common.GetDebug() {
-			fmt.Println("Get: variabile non presente nel datastore")
+
+		if !result {
+			if common.GetDebug() {
+				fmt.Println("Get: variabile non presente nel datastore")
+			}
 		}
 	}
 
