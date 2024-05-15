@@ -14,5 +14,6 @@ COPY go.work .
 COPY common common
 COPY server server
 
+WORKDIR /main/server
 # Avvia il tuo server Go
-CMD ["bash", "-c", "cd server && go run ."]
+#CMD ["bash", "-c", "cd server && go run ."]
