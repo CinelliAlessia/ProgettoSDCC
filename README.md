@@ -50,7 +50,7 @@ sudo docker ps
 
 *Per entrare in un container*
 
-sudo docker exec -it main-server1-1 /bin/bash
+sudo docker exec -it main-client-1 /bin/bash
 
 *Per uscire da un container Docker senza interromperlo:*
 
