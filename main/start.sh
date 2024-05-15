@@ -30,8 +30,7 @@ pkill gnome-terminal
 
 elif [ "$CONFIG" -eq 1 ]; then
   # Esecuzione con Docker Compose
-  #docker-compose up --build
-  docker-compose -f compose.yml up --build -d
+  docker-compose up --build
 else
   echo "Configurazione non supportata, inserire 1, 2 o 3."
 fi
