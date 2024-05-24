@@ -42,7 +42,7 @@ git clone https://github.com/CinelliAlessia/ProgettoSDCC.git
 
 cd ProgettoSDCC/main/
 
-sudo docker-compose up --build -d
+sudo docker-compose up --build
 
 *Per vedere i container attivi*
 
@@ -50,7 +50,7 @@ sudo docker ps
 
 *Per entrare in un container*
 
-sudo docker exec -it main-client-1 /bin/bash
+sudo docker exec -it main_client_1 /bin/bash
 
 *Per uscire da un container Docker senza interromperlo:*
 

@@ -25,6 +25,9 @@ func printDebugBlue(blueString string, message commonMsg.MessageC, kvc *KeyValue
 		case common.Del:
 			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
+		case common.Get:
+			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey(),
+				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
 		default:
 			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue(),
 				"clockClient", message.GetSendingFIFO(), "clockMsg:", message.GetClock(), "clockServer:", kvc.GetClock(), formattedTime)
@@ -32,6 +35,8 @@ func printDebugBlue(blueString string, message commonMsg.MessageC, kvc *KeyValue
 	} else {
 		switch message.GetTypeOfMessage() {
 		case common.Del:
+			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey())
+		case common.Get:
 			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey())
 		default:
 			fmt.Println(color.BlueString(blueString), message.GetTypeOfMessage(), message.GetKey()+":"+message.GetValue())

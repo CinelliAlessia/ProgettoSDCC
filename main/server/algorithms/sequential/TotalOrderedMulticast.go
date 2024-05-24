@@ -133,26 +133,23 @@ func (kvs *KeyValueStoreSequential) addToSortQueue(message *commonMsg.MessageS) 
 	// Verifica se il messaggio è già presente nella coda se è già presente non fare nulla
 	// Controllo effettuato perché è possibile che una richiesta venga aggiunta in coda sia alla ricezione della
 	// richiesta stessa sia di un ack che ne faccia riferimento, e quella richiesta non era ancora in coda
-	isPresent := false
 	for _, messageS := range kvs.GetQueue() {
 		if messageS.GetIdMessage() == message.GetIdMessage() {
-			isPresent = true
+			// Il messaggio è già presente in coda
 			return
 		}
 	}
 
 	// Se il messaggio non è presente, aggiungilo alla coda
-	if !isPresent {
-		kvs.SetQueue(append(kvs.GetQueue(), *message))
+	kvs.SetQueue(append(kvs.GetQueue(), *message))
 
-		// Ordina la coda in base al logicalClock, a parità di timestamp l'ordinamento è deterministico in base all'ID
-		sort.Slice(kvs.GetQueue(), func(i, j int) bool {
-			if kvs.GetMsgFromQueue(i).GetClock() == kvs.GetMsgFromQueue(j).GetClock() {
-				return kvs.GetMsgFromQueue(i).GetIdMessage() < kvs.GetMsgFromQueue(j).GetIdMessage()
-			}
-			return kvs.GetMsgFromQueue(i).GetClock() < kvs.GetMsgFromQueue(j).GetClock()
-		})
-	}
+	// Ordina la coda in base al logicalClock, a parità di timestamp l'ordinamento è deterministico in base all'ID
+	sort.Slice(kvs.GetQueue(), func(i, j int) bool {
+		if kvs.GetMsgFromQueue(i).GetClock() == kvs.GetMsgFromQueue(j).GetClock() {
+			return kvs.GetMsgFromQueue(i).GetIdMessage() < kvs.GetMsgFromQueue(j).GetIdMessage()
+		}
+		return kvs.GetMsgFromQueue(i).GetClock() < kvs.GetMsgFromQueue(j).GetClock()
+	})
 }
 
 // removeMessageToQueue Rimuove il messaggio passato come argomento dalla coda solamente se è l'elemento in testa,
@@ -199,7 +196,7 @@ func (kvs *KeyValueStoreSequential) canExecute(message *commonMsg.MessageS) {
 		executeMessage <- true
 	}()
 
-	canSend := kvs.controlSendToApplication(message) // Controllo se le due condizioni del M.C.O sono soddisfatte
+	canSend := kvs.controlSendToApplication(message) // Controllo se le due condizioni del M.T.O sono soddisfatte
 
 	if canSend {
 		message.SetCondition(true) // Imposto la condizione a true

@@ -3,7 +3,7 @@
 # Imposta la variabile di ambiente
 
 # 0 locale, 1 docker
-export CONFIG=0
+export CONFIG=1
 # 1=true 0=false
 export DEBUG=0
 # 1=true 0=false
